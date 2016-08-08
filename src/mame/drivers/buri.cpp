@@ -9,6 +9,7 @@
 #include "bus/rs232/rs232.h"
 #include "cpu/g65816/g65816.h"
 #include "machine/mos6551.h"
+#include "sound/3812intf.h"
 #include "video/tms9928a.h"
 
 class buri_state : public driver_device
@@ -43,6 +44,9 @@ static ADDRESS_MAP_START(buri_mem, AS_PROGRAM, 8, buri_state)
 
 	// ACIA
 	AM_RANGE(0xDFFC, 0xDFFF) AM_DEVREADWRITE("acia", mos6551_device, read, write)
+
+	// SOUND
+	AM_RANGE(0xDE02, 0xDE03) AM_DEVREADWRITE("ym3812", ym3812_device, read, write)
 ADDRESS_MAP_END
 
 static INPUT_PORTS_START(buri)
@@ -78,6 +82,10 @@ static MACHINE_CONFIG_START(buri, buri_state)
 	// MCFG_TMS9928A_OUT_INT_LINE_CB(INPUTLINE("maincpu", INPUT_LINE_IRQ0))
 	MCFG_TMS9928A_SCREEN_ADD_NTSC( "screen" )
 	MCFG_SCREEN_UPDATE_DEVICE( "tms9918", tms9918a_device, screen_update )
+
+	MCFG_SPEAKER_STANDARD_MONO("mono")
+	MCFG_SOUND_ADD("ym3812", YM3812, XTAL_3_579545MHz)
+	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "mono", 1.00)
 MACHINE_CONFIG_END
 
 ROM_START(buri)
@@ -104,4 +112,4 @@ WRITE_LINE_MEMBER(buri_state::acia_irq_w)
 }
 
 /*    YEAR  NAME    PARENT  COMPAT   MACHINE    INPUT    CLASS         INIT    COMPANY                FULLNAME               FLAGS */
-COMP(2016,  buri,   0,      0,       buri,      buri,    driver_device,0,      "Rich Wareham", "Búri homebrew computer", MACHINE_TYPE_COMPUTER | MACHINE_NO_SOUND)
+COMP(2016,  buri,   0,      0,       buri,      buri,    driver_device,0,      "Rich Wareham", "Búri homebrew computer", MACHINE_TYPE_COMPUTER)
