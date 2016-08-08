@@ -9,6 +9,7 @@
 #include "bus/rs232/rs232.h"
 #include "cpu/g65816/g65816.h"
 #include "machine/mos6551.h"
+#include "video/tms9928a.h"
 
 class buri_state : public driver_device
 {
@@ -35,6 +36,10 @@ public:
 static ADDRESS_MAP_START(buri_mem, AS_PROGRAM, 8, buri_state)
 	AM_RANGE(0x0000, 0x7FFF) AM_RAM
 	AM_RANGE(0xE000, 0xFFFF) AM_ROM AM_REGION("maincpu", 0)
+
+	// VDP
+	AM_RANGE(0xDE00, 0xDE00) AM_DEVREADWRITE("tms9918", tms9918a_device, vram_read, vram_write)
+	AM_RANGE(0xDE01, 0xDE01) AM_DEVREADWRITE("tms9918", tms9918a_device, register_read, register_write)
 
 	// ACIA
 	AM_RANGE(0xDFFC, 0xDFFF) AM_DEVREADWRITE("acia", mos6551_device, read, write)
@@ -67,6 +72,12 @@ static MACHINE_CONFIG_START(buri, buri_state)
 	MCFG_RS232_DSR_HANDLER(DEVWRITELINE("acia", mos6551_device, write_dsr))
 	MCFG_RS232_CTS_HANDLER(DEVWRITELINE("acia", mos6551_device, write_cts))
 	MCFG_DEVICE_CARD_DEVICE_INPUT_DEFAULTS("pty", terminal)
+
+	MCFG_DEVICE_ADD("tms9918", TMS9918A, XTAL_10_738635MHz)
+	MCFG_TMS9928A_VRAM_SIZE(0x4000)
+	// MCFG_TMS9928A_OUT_INT_LINE_CB(INPUTLINE("maincpu", INPUT_LINE_IRQ0))
+	MCFG_TMS9928A_SCREEN_ADD_NTSC( "screen" )
+	MCFG_SCREEN_UPDATE_DEVICE( "tms9918", tms9918a_device, screen_update )
 MACHINE_CONFIG_END
 
 ROM_START(buri)
