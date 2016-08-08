@@ -61,12 +61,12 @@ static MACHINE_CONFIG_START(buri, buri_state)
 	MCFG_MOS6551_TXD_HANDLER(DEVWRITELINE("uart", rs232_port_device, write_txd))
 	MCFG_MOS6551_IRQ_HANDLER(WRITELINE(buri_state, acia_irq_w))
 
-	MCFG_RS232_PORT_ADD("uart", default_rs232_devices, "terminal")
+	MCFG_RS232_PORT_ADD("uart", default_rs232_devices, "pty")
 	MCFG_RS232_RXD_HANDLER(DEVWRITELINE("acia", mos6551_device, write_rxd))
 	MCFG_RS232_DCD_HANDLER(DEVWRITELINE("acia", mos6551_device, write_dcd))
 	MCFG_RS232_DSR_HANDLER(DEVWRITELINE("acia", mos6551_device, write_dsr))
 	MCFG_RS232_CTS_HANDLER(DEVWRITELINE("acia", mos6551_device, write_cts))
-	MCFG_DEVICE_CARD_DEVICE_INPUT_DEFAULTS("terminal", terminal)
+	MCFG_DEVICE_CARD_DEVICE_INPUT_DEFAULTS("pty", terminal)
 MACHINE_CONFIG_END
 
 ROM_START(buri)
