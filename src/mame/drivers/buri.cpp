@@ -35,8 +35,10 @@ public:
 };
 
 static ADDRESS_MAP_START(buri_mem, AS_PROGRAM, 8, buri_state)
-	AM_RANGE(0x0000, 0x7FFF) AM_RAM
+	AM_RANGE(0x0000, 0xC000) AM_RAM
 	AM_RANGE(0xE000, 0xFFFF) AM_ROM AM_REGION("maincpu", 0)
+	AM_RANGE(0x010000, 0x07FFFF) AM_RAM
+	AM_RANGE(0xE0C000, 0xE0FFFF) AM_RAM
 
 	// VDP
 	AM_RANGE(0xDE00, 0xDE00) AM_DEVREADWRITE("tms9918", tms9918a_device, vram_read, vram_write)
