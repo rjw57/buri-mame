@@ -34,16 +34,34 @@ public:
 	           m_maincpu(*this, "maincpu"),
 	           m_mos6551(*this, MOS6551_TAG),
 		   m_ns16550(*this, NS16550_TAG)
-	{ }
+	{
+		m_irqs.val = 0;
+	}
 
-	DECLARE_WRITE_LINE_MEMBER(acia_irq_w);
+	DECLARE_WRITE_LINE_MEMBER(mos6551_irq_w);
+	DECLARE_WRITE_LINE_MEMBER(ns16550_irq_w);
+	DECLARE_WRITE_LINE_MEMBER(tms9918a_irq_w);
 
 	required_device<cpu_device> m_maincpu;
 	optional_device<mos6551_device> m_mos6551;
 	optional_device<ns16550_device> m_ns16550;
 
-	// interrupts
-	int m_mos6551_irq;
+	union {
+		uint32_t val;
+		struct {
+			int mos6551 : 1;
+			int ns16550 : 1;
+			int tms9918a : 1;
+		} flags;
+	} m_irqs;
+
+private:
+	void irqs_updated_() {
+		// NB IRQ line is active LOW
+		m_maincpu->set_input_line(
+			G65816_INT_IRQ,
+			m_irqs.val ? CLEAR_LINE : ASSERT_LINE);
+	}
 };
 
 static ADDRESS_MAP_START(buri_mem, AS_PROGRAM, 8, buri_state)
@@ -93,7 +111,7 @@ static MACHINE_CONFIG_START(buri, buri_state)
 	MCFG_DEVICE_ADD(MOS6551_TAG, MOS6551, 0)
 	MCFG_MOS6551_XTAL(XTAL_1_8432MHz)
 	MCFG_MOS6551_TXD_HANDLER(DEVWRITELINE(UART1_TAG, rs232_port_device, write_txd))
-	MCFG_MOS6551_IRQ_HANDLER(WRITELINE(buri_state, acia_irq_w))
+	MCFG_MOS6551_IRQ_HANDLER(WRITELINE(buri_state, mos6551_irq_w))
 
 	MCFG_RS232_PORT_ADD(UART1_TAG, default_rs232_devices, "pty")
 	MCFG_RS232_RXD_HANDLER(
@@ -111,6 +129,8 @@ static MACHINE_CONFIG_START(buri, buri_state)
 	MCFG_DEVICE_ADD(NS16550_TAG, NS16550, 0)
 	MCFG_INS8250_OUT_TX_CB(DEVWRITELINE(
 		UART2_TAG, rs232_port_device, write_txd))
+	MCFG_INS8250_OUT_INT_CB(WRITELINE(
+		buri_state, ns16550_irq_w))
 
 	MCFG_RS232_PORT_ADD(UART2_TAG, default_rs232_devices, "pty")
 	MCFG_RS232_RXD_HANDLER(
@@ -124,7 +144,7 @@ static MACHINE_CONFIG_START(buri, buri_state)
 
 	MCFG_DEVICE_ADD(TMS9918_TAG, TMS9918A, XTAL_10_738635MHz)
 	MCFG_TMS9928A_VRAM_SIZE(0x4000)
-	// MCFG_TMS9928A_OUT_INT_LINE_CB(INPUTLINE("maincpu", INPUT_LINE_IRQ0))
+	MCFG_TMS9928A_OUT_INT_LINE_CB(WRITELINE(buri_state, tms9918a_irq_w))
 	MCFG_TMS9928A_SCREEN_ADD_NTSC( "screen" )
 	MCFG_SCREEN_UPDATE_DEVICE( TMS9918_TAG, tms9918a_device, screen_update )
 
@@ -138,9 +158,25 @@ ROM_START(buri)
 	ROM_LOAD("burios.bin", 0x0000, 0x2000, CRC(e527d758))
 ROM_END
 
-WRITE_LINE_MEMBER(buri_state::acia_irq_w)
+WRITE_LINE_MEMBER(buri_state::mos6551_irq_w)
 {
-	m_maincpu->set_input_line(G65816_INT_IRQ, state ? ASSERT_LINE : CLEAR_LINE);
+	// MOS6551 IRQ line is active *low*
+	m_irqs.flags.mos6551 = (state == 0);
+	irqs_updated_();
+}
+
+WRITE_LINE_MEMBER(buri_state::ns16550_irq_w)
+{
+	// NS16550 IRQ line is active *high*
+	m_irqs.flags.ns16550 = (state != 0);
+	irqs_updated_();
+}
+
+WRITE_LINE_MEMBER(buri_state::tms9918a_irq_w)
+{
+	// TMS9918A IRQ line is active *low*
+	m_irqs.flags.tms9918a = (state == 0);
+	irqs_updated_();
 }
 
 /*    YEAR  NAME    PARENT  COMPAT   MACHINE    INPUT    CLASS         INIT    COMPANY                FULLNAME               FLAGS */
