@@ -740,20 +740,21 @@ int device_image_interface::reopen_for_write(const std::string &path)
 //  flags to use, and in what order
 //-------------------------------------------------
 
-void device_image_interface::determine_open_plan(int is_create, UINT32 *open_plan)
+std::vector<UINT32> device_image_interface::determine_open_plan(bool is_create)
 {
-	int i = 0;
+	std::vector<UINT32> open_plan;
 
-	// emit flags
+	// emit flags into a vector
 	if (!is_create && is_readable() && is_writeable())
-		open_plan[i++] = OPEN_FLAG_READ | OPEN_FLAG_WRITE;
+		open_plan.push_back(OPEN_FLAG_READ | OPEN_FLAG_WRITE);
 	if (!is_create && !is_readable() && is_writeable())
-		open_plan[i++] = OPEN_FLAG_WRITE;
+		open_plan.push_back(OPEN_FLAG_WRITE);
 	if (!is_create && is_readable())
-		open_plan[i++] = OPEN_FLAG_READ;
-	if (is_writeable() && is_creatable())
-		open_plan[i++] = OPEN_FLAG_READ | OPEN_FLAG_WRITE | OPEN_FLAG_CREATE;
-	open_plan[i] = 0;
+		open_plan.push_back(OPEN_FLAG_READ);
+	if (is_create && is_writeable() && is_creatable())
+		open_plan.push_back(OPEN_FLAG_READ | OPEN_FLAG_WRITE | OPEN_FLAG_CREATE);
+
+	return open_plan;
 }
 
 
@@ -922,9 +923,6 @@ bool device_image_interface::load_software(software_list_device &swlist, const c
 
 image_init_result device_image_interface::load_internal(const std::string &path, bool is_create, int create_format, util::option_resolution *create_args, bool just_load)
 {
-	UINT32 open_plan[4];
-	int i;
-
 	// first unload the image
 	unload();
 
@@ -940,13 +938,13 @@ image_init_result device_image_interface::load_internal(const std::string &path,
 	if (core_opens_image_file())
 	{
 		// determine open plan
-		determine_open_plan(is_create, open_plan);
+		std::vector<UINT32> open_plan = determine_open_plan(is_create);
 
 		// attempt to open the file in various ways
-		for (i = 0; !m_file && open_plan[i]; i++)
+		for (auto iter = open_plan.cbegin(); !m_file && iter != open_plan.cend(); iter++)
 		{
 			// open the file
-			m_err = load_image_by_path(open_plan[i], path);
+			m_err = load_image_by_path(*iter, path);
 			if (m_err && (m_err != IMAGE_ERROR_FILENOTFOUND))
 				goto done;
 		}
@@ -1255,53 +1253,6 @@ void device_image_interface::update_names(const device_type device_type, const c
 }
 
 //-------------------------------------------------
-//  software_name_split - helper that splits a
-//  software_list:software:part string into
-//  separate software_list, software, and part
-//  strings.
-//
-//  str1:str2:str3  => swlist_name - str1, swname - str2, swpart - str3
-//  str1:str2       => swlist_name - nullptr, swname - str1, swpart - str2
-//  str1            => swlist_name - nullptr, swname - str1, swpart - nullptr
-//
-//  Notice however that we could also have been
-//  passed a string swlist_name:swname, and thus
-//  some special check has to be performed in this
-//  case.
-//-------------------------------------------------
-
-void device_image_interface::software_name_split(const std::string &swlist_swname, std::string &swlist_name, std::string &swname, std::string &swpart)
-{
-	// reset all output parameters
-	swlist_name.clear();
-	swname.clear();
-	swpart.clear();
-
-	// if no colon, this is the swname by itself
-	auto split1 = swlist_swname.find_first_of(':');
-	if (split1 == std::string::npos)
-	{
-		swname = swlist_swname;
-		return;
-	}
-
-	// if one colon, it is the swname and swpart alone
-	auto split2 = swlist_swname.find_first_of(':', split1 + 1);
-	if (split2 == std::string::npos)
-	{
-		swname = swlist_swname.substr(0, split1);
-		swpart = swlist_swname.substr(split1 + 1);
-		return;
-	}
-
-	// if two colons present, split into 3 parts
-	swlist_name = swlist_swname.substr(0, split1);
-	swname = swlist_swname.substr(split1 + 1, split2 - (split1 + 1));
-	swpart = swlist_swname.substr(split2 + 1);
-}
-
-
-//-------------------------------------------------
 //	find_software_item
 //-------------------------------------------------
 
@@ -1309,7 +1260,8 @@ const software_part *device_image_interface::find_software_item(const std::strin
 {
 	// split full software name into software list name and short software name
 	std::string swlist_name, swinfo_name, swpart_name;
-	software_name_split(path, swlist_name, swinfo_name, swpart_name);
+	if (!software_name_parse(path, &swlist_name, &swinfo_name, &swpart_name))
+		return nullptr;
 
 	// determine interface
 	const char *interface = nullptr;

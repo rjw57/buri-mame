@@ -238,7 +238,6 @@ public:
 	bool load_software(software_list_device &swlist, const char *swname, const rom_entry *entry);
 	int reopen_for_write(const std::string &path);
 
-	static void software_name_split(const std::string &swlist_swname, std::string &swlist_name, std::string &swname, std::string &swpart);
 	static void static_set_user_loadable(device_t &device, bool user_loadable) {
 		device_image_interface *img;
 		if (!device.interface(img))
@@ -253,7 +252,6 @@ protected:
 	virtual const software_list_loader &get_software_list_loader() const;
 
 	image_init_result load_internal(const std::string &path, bool is_create, int create_format, util::option_resolution *create_args, bool just_load);
-	void determine_open_plan(int is_create, UINT32 *open_plan);
 	image_error_t load_image_by_path(UINT32 open_flags, const std::string &path);
 	void clear();
 	bool is_loaded();
@@ -266,6 +264,8 @@ protected:
 
 	void setup_working_directory();
 	bool try_change_working_directory(const std::string &subdir);
+
+	void make_readonly() { m_readonly = true; }
 
 	void run_hash(void (*partialhash)(util::hash_collection &, const unsigned char *, unsigned long, const char *), util::hash_collection &hashes, const char *types);
 	void image_checkhash();
@@ -305,6 +305,7 @@ protected:
 private:
 	static image_error_t image_error_from_file_error(osd_file::error filerr);
 	bool schedule_postload_hard_reset_if_needed();
+	std::vector<UINT32> determine_open_plan(bool is_create);
 
 	// creation info
 	formatlist_type m_formatlist;
