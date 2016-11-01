@@ -99,7 +99,7 @@ WRITE16_MEMBER(artmagic_state::control_w)
 	/* OKI banking here */
 	if (offset == 0)
 	{
-		m_oki->set_bank_base((((data >> 4) & 1) * 0x40000) % m_oki_region->bytes());
+		m_oki->set_rom_bank((data >> 4) & 1);
 	}
 
 	logerror("%06X:control_w(%d) = %04X\n", space.device().safe_pc(), offset, data);
@@ -122,7 +122,7 @@ void artmagic_state::device_timer(emu_timer &timer, device_timer_id id, int para
 		update_irq_state();
 		break;
 	default:
-		assert_always(FALSE, "Unknown id in artmagic_state::device_timer");
+		assert_always(false, "Unknown id in artmagic_state::device_timer");
 	}
 }
 
@@ -130,7 +130,7 @@ void artmagic_state::device_timer(emu_timer &timer, device_timer_id id, int para
 READ16_MEMBER(artmagic_state::ultennis_hack_r)
 {
 	/* IRQ5 points to: jsr (a5); rte */
-	UINT32 pc = space.device().safe_pc();
+	uint32_t pc = space.device().safe_pc();
 	if (pc == 0x18c2 || pc == 0x18e4)
 	{
 		m_hack_irq = 1;
@@ -161,15 +161,15 @@ void artmagic_state::ultennis_protection()
 		case 0x01:  /* 01 aaaa bbbb cccc dddd (xxxx) */
 			if (m_prot_input_index == 9)
 			{
-				UINT16 a = m_prot_input[1] | (m_prot_input[2] << 8);
-				UINT16 b = m_prot_input[3] | (m_prot_input[4] << 8);
-				UINT16 c = m_prot_input[5] | (m_prot_input[6] << 8);
-				UINT16 d = m_prot_input[7] | (m_prot_input[8] << 8);
-				UINT16 x = a - b;
-				if ((INT16)x >= 0)
+				uint16_t a = m_prot_input[1] | (m_prot_input[2] << 8);
+				uint16_t b = m_prot_input[3] | (m_prot_input[4] << 8);
+				uint16_t c = m_prot_input[5] | (m_prot_input[6] << 8);
+				uint16_t d = m_prot_input[7] | (m_prot_input[8] << 8);
+				uint16_t x = a - b;
+				if ((int16_t)x >= 0)
 					x = (x * c) >> 16;
 				else
-					x = -(((UINT16)-x * c) >> 16);
+					x = -(((uint16_t)-x * c) >> 16);
 				x += d;
 				m_prot_output[0] = x;
 				m_prot_output[1] = x >> 8;
@@ -195,10 +195,10 @@ void artmagic_state::ultennis_protection()
 			*/
 			if (m_prot_input_index == 7)
 			{
-				UINT16 a = (INT16)(m_prot_input[1] | (m_prot_input[2] << 8));
-				UINT16 b = (INT16)(m_prot_input[3] | (m_prot_input[4] << 8));
-				/*UINT16 c = (INT16)(m_prot_input[5] | (m_prot_input[6] << 8));*/
-				UINT32 x = a * a * (b/2);
+				uint16_t a = (int16_t)(m_prot_input[1] | (m_prot_input[2] << 8));
+				uint16_t b = (int16_t)(m_prot_input[3] | (m_prot_input[4] << 8));
+				/*uint16_t c = (int16_t)(m_prot_input[5] | (m_prot_input[6] << 8));*/
+				uint32_t x = a * a * (b/2);
 				m_prot_output[0] = x;
 				m_prot_output[1] = x >> 8;
 				m_prot_output[2] = x >> 16;
@@ -212,7 +212,7 @@ void artmagic_state::ultennis_protection()
 		case 0x03:  /* 03 (xxxx) */
 			if (m_prot_input_index == 1)
 			{
-				UINT16 x = m_prot_save;
+				uint16_t x = m_prot_save;
 				m_prot_output[0] = x;
 				m_prot_output[1] = x >> 8;
 				m_prot_output_index = 0;
@@ -224,7 +224,7 @@ void artmagic_state::ultennis_protection()
 		case 0x04:  /* 04 aaaa */
 			if (m_prot_input_index == 3)
 			{
-				UINT16 a = m_prot_input[1] | (m_prot_input[2] << 8);
+				uint16_t a = m_prot_input[1] | (m_prot_input[2] << 8);
 				m_prot_save = a;
 				m_prot_input_index = m_prot_output_index = 0;
 			}
@@ -251,15 +251,15 @@ void artmagic_state::cheesech_protection()
 		case 0x01:  /* 01 aaaa bbbb (xxxx) */
 			if (m_prot_input_index == 5)
 			{
-				UINT16 a = m_prot_input[1] | (m_prot_input[2] << 8);
-				UINT16 b = m_prot_input[3] | (m_prot_input[4] << 8);
-				UINT16 c = 0x4000;      /* seems to be hard-coded */
-				UINT16 d = 0x00a0;      /* seems to be hard-coded */
-				UINT16 x = a - b;
-				if ((INT16)x >= 0)
+				uint16_t a = m_prot_input[1] | (m_prot_input[2] << 8);
+				uint16_t b = m_prot_input[3] | (m_prot_input[4] << 8);
+				uint16_t c = 0x4000;      /* seems to be hard-coded */
+				uint16_t d = 0x00a0;      /* seems to be hard-coded */
+				uint16_t x = a - b;
+				if ((int16_t)x >= 0)
 					x = (x * c) >> 16;
 				else
-					x = -(((UINT16)-x * c) >> 16);
+					x = -(((uint16_t)-x * c) >> 16);
 				x += d;
 				m_prot_output[0] = x;
 				m_prot_output[1] = x >> 8;
@@ -272,7 +272,7 @@ void artmagic_state::cheesech_protection()
 		case 0x03:  /* 03 (xxxx) */
 			if (m_prot_input_index == 1)
 			{
-				UINT16 x = m_prot_save;
+				uint16_t x = m_prot_save;
 				m_prot_output[0] = x;
 				m_prot_output[1] = x >> 8;
 				m_prot_output_index = 0;
@@ -284,7 +284,7 @@ void artmagic_state::cheesech_protection()
 		case 0x04:  /* 04 aaaa */
 			if (m_prot_input_index == 3)
 			{
-				UINT16 a = m_prot_input[1] | (m_prot_input[2] << 8);
+				uint16_t a = m_prot_input[1] | (m_prot_input[2] << 8);
 				m_prot_save = a;
 				m_prot_input_index = m_prot_output_index = 0;
 			}
@@ -306,15 +306,15 @@ void artmagic_state::stonebal_protection()
 		case 0x01:  /* 01 aaaa bbbb cccc dddd (xxxx) */
 			if (m_prot_input_index == 9)
 			{
-				UINT16 a = m_prot_input[1] | (m_prot_input[2] << 8);
-				UINT16 b = m_prot_input[3] | (m_prot_input[4] << 8);
-				UINT16 c = m_prot_input[5] | (m_prot_input[6] << 8);
-				UINT16 d = m_prot_input[7] | (m_prot_input[8] << 8);
-				UINT16 x = a - b;
-				if ((INT16)x >= 0)
+				uint16_t a = m_prot_input[1] | (m_prot_input[2] << 8);
+				uint16_t b = m_prot_input[3] | (m_prot_input[4] << 8);
+				uint16_t c = m_prot_input[5] | (m_prot_input[6] << 8);
+				uint16_t d = m_prot_input[7] | (m_prot_input[8] << 8);
+				uint16_t x = a - b;
+				if ((int16_t)x >= 0)
 					x = (x * d) >> 16;
 				else
-					x = -(((UINT16)-x * d) >> 16);
+					x = -(((uint16_t)-x * d) >> 16);
 				x += c;
 				m_prot_output[0] = x;
 				m_prot_output[1] = x >> 8;
@@ -327,8 +327,8 @@ void artmagic_state::stonebal_protection()
 		case 0x02:  /* 02 aaaa (xx) */
 			if (m_prot_input_index == 3)
 			{
-				/*UINT16 a = m_prot_input[1] | (m_prot_input[2] << 8);*/
-				UINT8 x = 0xa5;
+				/*uint16_t a = m_prot_input[1] | (m_prot_input[2] << 8);*/
+				uint8_t x = 0xa5;
 				m_prot_output[0] = x;
 				m_prot_output_index = 0;
 			}
@@ -339,7 +339,7 @@ void artmagic_state::stonebal_protection()
 		case 0x03:  /* 03 (xxxx) */
 			if (m_prot_input_index == 1)
 			{
-				UINT16 x = m_prot_save;
+				uint16_t x = m_prot_save;
 				m_prot_output[0] = x;
 				m_prot_output[1] = x >> 8;
 				m_prot_output_index = 0;
@@ -351,7 +351,7 @@ void artmagic_state::stonebal_protection()
 		case 0x04:  /* 04 aaaa */
 			if (m_prot_input_index == 3)
 			{
-				UINT16 a = m_prot_input[1] | (m_prot_input[2] << 8);
+				uint16_t a = m_prot_input[1] | (m_prot_input[2] << 8);
 				m_prot_save = a;
 				m_prot_input_index = m_prot_output_index = 0;
 			}
@@ -437,9 +437,17 @@ static ADDRESS_MAP_START( stonebal_map, AS_PROGRAM, 16, artmagic_state )
 	AM_RANGE(0x380000, 0x380007) AM_DEVREADWRITE("tms", tms34010_device, host_r, host_w)
 ADDRESS_MAP_END
 
-READ16_MEMBER(artmagic_state::unk_r)
+// TODO: jumps to undefined area at PC=33a0 -> 230000, presumably protection device provides a code snippet
+READ16_MEMBER(artmagic_state::shtstar_unk_r)
 {
-	return machine().rand();
+	// bits 7-4 should be 0
+	// bit 2 and 0 are status ready related.
+	return 4 | 1; //machine().rand();
+}
+
+READ16_MEMBER(artmagic_state::shtstar_unk_2_r)
+{
+	return 1;
 }
 
 static ADDRESS_MAP_START( shtstar_map, AS_PROGRAM, 16, artmagic_state )
@@ -454,8 +462,8 @@ static ADDRESS_MAP_START( shtstar_map, AS_PROGRAM, 16, artmagic_state )
 	AM_RANGE(0x3c0008, 0x3c0009) AM_READ_PORT("3c0008")
 	AM_RANGE(0x3c000a, 0x3c000b) AM_READ_PORT("3c000a")
 
-	AM_RANGE(0x3c0012, 0x3c0013) AM_READ(unk_r)
-	AM_RANGE(0x3c0014, 0x3c0015) AM_NOP
+	AM_RANGE(0x3c0012, 0x3c0013) AM_READ(shtstar_unk_r)
+	AM_RANGE(0x3c0016, 0x3c0017) AM_READ(shtstar_unk_2_r)
 
 	AM_RANGE(0x300000, 0x300003) AM_WRITE(control_w) AM_SHARE("control")
 	AM_RANGE(0x3c0004, 0x3c0007) AM_WRITE(protection_bit_w)
@@ -809,7 +817,7 @@ static MACHINE_CONFIG_START( artmagic, artmagic_state )
 
 	MCFG_CPU_ADD("tms", TMS34010, MASTER_CLOCK_40MHz)
 	MCFG_CPU_PROGRAM_MAP(tms_map)
-	MCFG_TMS340X0_HALT_ON_RESET(TRUE) /* halt on reset */
+	MCFG_TMS340X0_HALT_ON_RESET(true) /* halt on reset */
 	MCFG_TMS340X0_PIXEL_CLOCK(MASTER_CLOCK_40MHz/6) /* pixel clock */
 	MCFG_TMS340X0_PIXELS_PER_CLOCK(1) /* pixels per clock */
 	MCFG_TMS340X0_SCANLINE_RGB32_CB(artmagic_state, scanline)              /* scanline update (rgb32) */

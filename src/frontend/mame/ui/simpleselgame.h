@@ -43,9 +43,9 @@ private:
 	void inkey_special(const event *menu_event);
 
 	// internal state
-	UINT8                   m_error;
+	uint8_t                   m_error;
 	bool                    m_rerandomize;
-	char                    m_search[40];
+	std::string             m_search;
 	int                     m_matchlist[VISIBLE_GAMES_IN_LIST];
 	std::vector<const game_driver *> m_driverlist;
 	std::unique_ptr<driver_enumerator> m_drivlist;

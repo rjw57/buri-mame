@@ -3,7 +3,7 @@
 
 /* There are 2 versions of the Air Raid / Cross Shooter hardware, one has everything integrated on a single PCB
    the other is a Air Raid specific video PCB used with the Street Fight motherboard, there could be differences.
-  
+
    This is very similar to Dark Mist */
 
 #include "emu.h"
@@ -11,7 +11,7 @@
 
 extern const device_type AIRRAID_VIDEO = &device_creator<airraid_video_device>;
 
-airraid_video_device::airraid_video_device(const machine_config &mconfig, const char *tag, device_t *owner, UINT32 clock)
+airraid_video_device::airraid_video_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 	: device_t(mconfig, AIRRAID_VIDEO, "Seibu Air Raid Video", tag, owner, clock, "airraid_vid", __FILE__),
 		m_gfxdecode(*this, "gfxdecode"),
 		m_palette(*this, "^palette"),
@@ -80,19 +80,22 @@ machine_config_constructor airraid_video_device::device_mconfig_additions() cons
 
 void airraid_video_device::device_start()
 {
+	if (!m_gfxdecode->started())
+		throw device_missing_dependencies();
+
 	save_item(NAME(m_hw));
 
 	// there might actually be 4 banks of 2048 x 16 tilemaps in here as the upper scroll bits are with the rom banking.
-	m_bg_tilemap = &machine().tilemap().create(m_gfxdecode, tilemap_get_info_delegate(FUNC(airraid_video_device::get_bg_tile_info),this),tilemap_mapper_delegate(FUNC(airraid_video_device::bg_scan),this),16,16,2048, 64);
+	m_bg_tilemap = &machine().tilemap().create(*m_gfxdecode, tilemap_get_info_delegate(FUNC(airraid_video_device::get_bg_tile_info),this),tilemap_mapper_delegate(FUNC(airraid_video_device::bg_scan),this),16,16,2048, 64);
 
 	// which could in turn mean this is actually 256 x 128, not 256 x 512
-//  m_fg_tilemap = &machine().tilemap().create(m_gfxdecode, tilemap_get_info_delegate(FUNC(airraid_video_device::get_fg_tile_info),this),tilemap_mapper_delegate(FUNC(airraid_video_device::fg_scan),this),16,16,256, 512);
-	m_fg_tilemap = &machine().tilemap().create(m_gfxdecode, tilemap_get_info_delegate(FUNC(airraid_video_device::get_fg_tile_info),this),tilemap_mapper_delegate(FUNC(airraid_video_device::fg_scan),this),16,16,256, 128);
+//  m_fg_tilemap = &machine().tilemap().create(*m_gfxdecode, tilemap_get_info_delegate(FUNC(airraid_video_device::get_fg_tile_info),this),tilemap_mapper_delegate(FUNC(airraid_video_device::fg_scan),this),16,16,256, 512);
+	m_fg_tilemap = &machine().tilemap().create(*m_gfxdecode, tilemap_get_info_delegate(FUNC(airraid_video_device::get_fg_tile_info),this),tilemap_mapper_delegate(FUNC(airraid_video_device::fg_scan),this),16,16,256, 128);
 
-	m_tx_tilemap = &machine().tilemap().create(m_gfxdecode, tilemap_get_info_delegate(FUNC(airraid_video_device::get_cstx_tile_info),this),TILEMAP_SCAN_ROWS, 8,8,32,32);
+	m_tx_tilemap = &machine().tilemap().create(*m_gfxdecode, tilemap_get_info_delegate(FUNC(airraid_video_device::get_cstx_tile_info),this),TILEMAP_SCAN_ROWS, 8,8,32,32);
 
-//	m_fg_tilemap->set_transparent_pen(0);
-//	m_tx_tilemap->set_transparent_pen(0);
+//  m_fg_tilemap->set_transparent_pen(0);
+//  m_tx_tilemap->set_transparent_pen(0);
 
 	// we do manual mixing using a temp bitmap
 	m_screen->register_screen_bitmap(m_temp_bitmap);
@@ -157,10 +160,10 @@ void airraid_video_device::draw_sprites(bitmap_ind16 &bitmap, const rectangle &c
 		if (m_sprite_ram[i+1]&0x80)
 			continue;
 
-		UINT16 tile = (m_sprite_ram[i]);
+		uint16_t tile = (m_sprite_ram[i]);
 		tile |= (m_sprite_ram[i + 1] & 0x70) << 4;
 
-		UINT16 col = (m_sprite_ram[i+1] & 0x0f);
+		uint16_t col = (m_sprite_ram[i+1] & 0x0f);
 		//col |= (m_sprite_ram[i+1] & 0x80)<<3;
 
 		m_gfxdecode->gfx(1)->transpen(bitmap,cliprect, tile,col, 0, 0, m_sprite_ram[i+3],m_sprite_ram[i+2],0);
@@ -174,16 +177,16 @@ void airraid_video_device::draw_sprites(bitmap_ind16 &bitmap, const rectangle &c
 #define DISPLAY_TXT     8
 #define DM_GETSCROLL(n) (((m_vregs[(n)]<<1)&0xff) + ((m_vregs[(n)]&0x80)?1:0) +( ((m_vregs[(n)-1]<<4) | (m_vregs[(n)-1]<<12) )&0xff00))
 
-void airraid_video_device::mix_layer(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect, UINT8* clut, int base)
+void airraid_video_device::mix_layer(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect, uint8_t* clut, int base)
 {
 	for (int y = cliprect.min_y; y <= cliprect.max_y; y++)
 	{
-		UINT16 *dest = &bitmap.pix16(y);
-		UINT16 *src = &m_temp_bitmap.pix16(y);
+		uint16_t *dest = &bitmap.pix16(y);
+		uint16_t *src = &m_temp_bitmap.pix16(y);
 		for (int x = cliprect.min_x; x <= cliprect.max_x; x++)
 		{
-			UINT8 pix = src[x] & 0xff;
-			UINT8 real = clut[pix];
+			uint8_t pix = src[x] & 0xff;
+			uint8_t real = clut[pix];
 
 			if (!(real & 0x40))
 			{
@@ -194,9 +197,9 @@ void airraid_video_device::mix_layer(screen_device &screen, bitmap_ind16 &bitmap
 }
 
 
-UINT32 airraid_video_device::screen_update_airraid(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect)
+uint32_t airraid_video_device::screen_update_airraid(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect)
 {
-	UINT16 bgscrolly = DM_GETSCROLL(0x6);
+	uint16_t bgscrolly = DM_GETSCROLL(0x6);
 	// this is more likely to be 'bank' than scroll, like NMK16
 	bgscrolly += ((m_hw & 0xc0) >> 6) * 256;
 
@@ -208,7 +211,7 @@ UINT32 airraid_video_device::screen_update_airraid(screen_device &screen, bitmap
 	// draw screen
 	bitmap.fill(0x80, cliprect); // temp
 
-//	m_temp_bitmap.fill(0x00, cliprect);
+//  m_temp_bitmap.fill(0x00, cliprect);
 
 	if ((m_hw & DISPLAY_BG) == 0x00)
 	{
@@ -255,7 +258,7 @@ WRITE8_MEMBER(airraid_video_device::vregs_w)
 		printf("vregs_w %02x: %02x\n", offset, data);
 }
 
-void airraid_video_device::layer_enable_w(UINT8 enable)
+void airraid_video_device::layer_enable_w(uint8_t enable)
 {
 	m_hw = enable;
 }

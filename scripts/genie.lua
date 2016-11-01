@@ -368,15 +368,6 @@ newoption {
 }
 
 newoption {
-	trigger = "USE_LIBUV",
-	description = "Use libuv.",
-	allowed = {
-		{ "0",   "Disabled"     },
-		{ "1",   "Enabled"      },
-	}
-}
-
-newoption {
 	trigger = "DEBUG_DIR",
 	description = "Default directory for debugger.",
 }
@@ -384,6 +375,11 @@ newoption {
 newoption {
 	trigger = "DEBUG_ARGS",
 	description = "Arguments for running debug build.",
+}
+
+newoption {
+	trigger = "WEBASSEMBLY",
+	description = "Produce WebAssembly output when building with Emscripten.",
 }
 
 dofile ("extlib.lua")
@@ -410,10 +406,6 @@ if not _OPTIONS["NOASM"] then
 	else
 		_OPTIONS["NOASM"] = "0"
 	end
-end
-
-if not _OPTIONS["USE_LIBUV"] then
-	_OPTIONS["USE_LIBUV"] = "1"
 end
 
 if _OPTIONS["NOASM"]=="1" and not _OPTIONS["FORCE_DRC_C_BACKEND"] then
@@ -486,7 +478,7 @@ configuration { "Release", "vs*" }
 		"Optimize",
 	}
 
--- Force VS2013/15 targets to use bundled SDL2
+-- Force VS2015 targets to use bundled SDL2
 if string.sub(_ACTION,1,4) == "vs20" and _OPTIONS["osd"]=="sdl" then
 	if _OPTIONS["with-bundled-sdl2"]==nil then
 		_OPTIONS["with-bundled-sdl2"] = "1"
@@ -527,12 +519,6 @@ configuration { "gmake or ninja" }
 
 dofile ("toolchain.lua")
 
-if _OPTIONS["USE_LIBUV"]=="0" then
-	defines {
-		"NO_LIBUV",
-	}
-end
-
 if _OPTIONS["targetos"]=="windows" then
 	configuration { "x64" }
 		defines {
@@ -553,7 +539,7 @@ configuration { "Debug" }
 	defines {
 		"MAME_DEBUG",
 		"MAME_PROFILER",
---		"BGFX_CONFIG_DEBUG=1",
+--      "BGFX_CONFIG_DEBUG=1",
 	}
 
 if _OPTIONS["FASTDEBUG"]=="1" then
@@ -958,28 +944,22 @@ end
 			buildoptions {
 				"-Wno-cast-align",
 				"-Wno-tautological-compare",
-				"-Wno-dynamic-class-memaccess",
 				"-Wno-unused-value",
-				"-Wno-inline-new-delete",
 				"-Wno-constant-logical-operand",
-				"-Wno-deprecated-register",
+				"-Wno-missing-braces", -- clang is not as permissive as GCC about std::array initialization
 				"-fdiagnostics-show-note-include-stack",
 			}
 			if (version >= 30500) then
 				buildoptions {
-					"-Wno-absolute-value",
 					"-Wno-unknown-warning-option",
 					"-Wno-extern-c-compat",
-				}
-			end
-			if (version >= 70000) then
-				buildoptions {
-					"-Wno-tautological-undefined-compare",
+					"-Wno-unknown-attributes",
+					"-Wno-ignored-qualifiers"
 				}
 			end
 		else
-			if (version < 40900) then
-				print("GCC version 4.9 or later needed")
+			if (version < 50000) then
+				print("GCC version 5.0 or later needed")
 				os.exit(-1)
 			end
 				buildoptions {
@@ -1157,6 +1137,7 @@ configuration { "vs*" }
 			"_WIN32",
 			"_CRT_NONSTDC_NO_DEPRECATE",
 			"_CRT_SECURE_NO_DEPRECATE",
+			"_CRT_STDIO_LEGACY_WIDE_SPECIFIERS",
 		}
 		links {
 			"user32",
@@ -1305,6 +1286,12 @@ configuration { "winphone8* or winstore8*" }
 		"/ignore:4264" -- LNK4264: archiving object file compiled with /ZW into a static library; note that when authoring Windows Runtime types it is not recommended to link with a static library that contains Windows Runtime metadata
 	}
 
+
+-- adding this till we sort out asserts in debug mode
+configuration { "Debug", "gmake" }
+	buildoptions_cpp {
+		"-Wno-terminate",
+	}
 
 configuration { }
 

@@ -61,7 +61,6 @@
 # USE_SYSTEM_LIB_LUA = 1
 # USE_SYSTEM_LIB_PORTMIDI = 1
 # USE_SYSTEM_LIB_PORTAUDIO = 1
-# USE_SYSTEM_LIB_UV = 1
 # USE_BUNDLED_LIB_SDL2 = 1
 
 # MESA_INSTALL_ROOT = /opt/mesa
@@ -96,7 +95,6 @@
 # FORCE_VERSION_COMPILE = 1
 
 # MSBUILD = 1
-# USE_LIBUV = 1
 # IGNORE_BAD_LOCALISATION=1
 # PRECOMPILE = 0
 
@@ -136,10 +134,10 @@ GENIEOS := linux
 PLATFORM := unknown
 ifneq ($(filter x86_64,$(UNAME_P)),)
 PLATFORM := x86
-endif 
+endif
 ifneq ($(filter %86,$(UNAME_P)),)
 PLATFORM := x86
-endif 
+endif
 ifneq ($(filter alpha,$(UNAME_M)),)
 PLATFORM := alpha
 endif
@@ -148,19 +146,19 @@ PLATFORM := alpha
 endif
 ifneq ($(filter arm%,$(UNAME_M)),)
 PLATFORM := arm
-endif 
+endif
 ifneq ($(filter arm%,$(UNAME_P)),)
 PLATFORM := arm
-endif 
+endif
 ifneq ($(filter aarch64%,$(UNAME_M)),)
 PLATFORM := arm64
-endif 
+endif
 ifneq ($(filter aarch64%,$(UNAME_P)),)
 PLATFORM := arm64
-endif 
+endif
 ifneq ($(filter powerpc,$(UNAME_P)),)
 PLATFORM := powerpc
-endif 
+endif
 ifneq ($(filter mips64%,$(UNAME_M)),)
 ifeq ($(shell getconf LONG_BIT),64)
 PLATFORM := mips64
@@ -435,10 +433,6 @@ endif
 
 ifdef USE_BUNDLED_LIB_SDL2
 PARAMS += --with-bundled-sdl2
-endif
-
-ifdef USE_SYSTEM_LIB_UV
-PARAMS += --with-system-uv='$(USE_SYSTEM_LIB_UV)'
 endif
 
 #-------------------------------------------------
@@ -737,10 +731,6 @@ ifdef PLATFORM
 TARGET_PARAMS += --PLATFORM='$(PLATFORM)'
 endif
 
-ifdef USE_LIBUV
-PARAMS += --USE_LIBUV='$(USE_LIBUV)'
-endif
-
 ifdef PRECOMPILE
 PARAMS += --precompile='$(PRECOMPILE)'
 endif
@@ -751,6 +741,10 @@ endif
 
 ifdef DEBUG_ARGS
 PARAMS += --DEBUG_ARGS='$(DEBUG_ARGS)'
+endif
+
+ifdef WEBASSEMBLY
+PARAMS += --WEBASSEMBLY='$(WEBASSEMBLY)'
 endif
 #-------------------------------------------------
 # All scripts
@@ -958,7 +952,7 @@ ifndef MINGW64
 	$(error MINGW64 is not set)
 endif
 	$(SILENT) $(MAKE) $(MAKEPARAMS) -C $(PROJECTDIR)/$(MAKETYPE)-mingw64-gcc config=$(CONFIG)64 WINDRES=$(WINDRES) precompile
-	$(SILENT) $(MAKE) $(MAKEPARAMS) -C $(PROJECTDIR)/$(MAKETYPE)-mingw64-gcc config=$(CONFIG)64 WINDRES=$(WINDRES) 
+	$(SILENT) $(MAKE) $(MAKEPARAMS) -C $(PROJECTDIR)/$(MAKETYPE)-mingw64-gcc config=$(CONFIG)64 WINDRES=$(WINDRES)
 
 #-------------------------------------------------
 # gmake-mingw32-gcc
@@ -999,31 +993,6 @@ windows_x86_clang: generate $(PROJECTDIR)/$(MAKETYPE)-mingw-clang/Makefile
 	$(SILENT) $(MAKE) $(MAKEPARAMS) -C $(PROJECTDIR)/$(MAKETYPE)-mingw-clang config=$(CONFIG)32 WINDRES=$(WINDRES)
 
 #-------------------------------------------------
-# Visual Studio 2013
-#-------------------------------------------------
-
-.PHONY: vs2013
-vs2013: generate
-	$(SILENT) $(GENIE) $(PARAMS) $(TARGET_PARAMS) vs2013
-ifdef MSBUILD
-	$(SILENT) msbuild.exe $(PROJECTDIR_WIN)/vs2013/$(PROJECT_NAME).sln $(MSBUILD_PARAMS)
-endif
-
-.PHONY: vs2013_intel
-vs2013_intel: generate
-	$(SILENT) $(GENIE) $(PARAMS) $(TARGET_PARAMS) --vs=intel-15 vs2013
-ifdef MSBUILD
-	$(SILENT) msbuild.exe $(PROJECTDIR_WIN)/vs2013-intel/$(PROJECT_NAME).sln $(MSBUILD_PARAMS)
-endif
-
-.PHONY: vs2013_xp
-vs2013_xp: generate
-	$(SILENT) $(GENIE) $(PARAMS) $(TARGET_PARAMS) --vs=vs2013-xp vs2013
-ifdef MSBUILD
-	$(SILENT) msbuild.exe $(PROJECTDIR_WIN)/vs2013-xp/$(PROJECT_NAME).sln $(MSBUILD_PARAMS)
-endif
-
-#-------------------------------------------------
 # Visual Studio 2015
 #-------------------------------------------------
 
@@ -1050,7 +1019,7 @@ endif
 
 .PHONY: vs2015_uwp
 vs2015_uwp: generate
-	$(SILENT) $(GENIE) $(PARAMS) $(TARGET_PARAMS) --vs=winstore82 --osd=windows --NO_USE_MIDI=1 --USE_LIBUV=0 --NO_OPENGL=1 --USE_QTDEBUG=0 --MODERN_WIN_API=1 vs2015
+	$(SILENT) $(GENIE) $(PARAMS) $(TARGET_PARAMS) --vs=winstore82 --osd=windows --NO_USE_MIDI=1 --NO_OPENGL=1 --USE_QTDEBUG=0 --MODERN_WIN_API=1 vs2015
 ifdef MSBUILD
 	$(SILENT) msbuild.exe $(PROJECTDIR_WIN)/vs2015-winstore82/$(PROJECT_NAME).sln $(MSBUILD_PARAMS)
 endif
@@ -1360,7 +1329,7 @@ endif
 ifndef MARVELL_ROOTFS
 	$(error MARVELL_ROOTFS is not set)
 endif
-	$(SILENT) $(GENIE) $(PARAMS) $(TARGET_PARAMS) --gcc=steamlink --gcc_version=$(GCC_VERSION) --NO_OPENGL=1 --NO_USE_MIDI=1 --NO_X11=1 --NOASM=1 --SDL_INSTALL_ROOT=$(MARVELL_ROOTFS)/usr  $(MAKETYPE)  
+	$(SILENT) $(GENIE) $(PARAMS) $(TARGET_PARAMS) --gcc=steamlink --gcc_version=$(GCC_VERSION) --NO_OPENGL=1 --NO_USE_MIDI=1 --NO_X11=1 --NOASM=1 --SDL_INSTALL_ROOT=$(MARVELL_ROOTFS)/usr  $(MAKETYPE)
 
 .PHONY: steamlink
 steamlink: generate $(PROJECTDIR)/$(MAKETYPE)-steamlink/Makefile
@@ -1384,7 +1353,7 @@ endif
 ifndef RASPBERRY_SYSROOT
 	$(error RASPBERRY_SYSROOT is not set)
 endif
-	$(SILENT) $(GENIE) $(PARAMS) --gcc=rpi --gcc_version=4.9.2 --osd=sdl --targetos=rpi --targetos=rpi --NO_USE_MIDI=1 --PLATFORM=arm --NOASM=1 --USE_QTDEBUG=0 --SDL_INSTALL_ROOT=$(RASPBERRY_SYSROOT)/usr  $(MAKETYPE)  
+	$(SILENT) $(GENIE) $(PARAMS) --gcc=rpi --gcc_version=4.9.2 --osd=sdl --targetos=rpi --targetos=rpi --NO_USE_MIDI=1 --PLATFORM=arm --NOASM=1 --USE_QTDEBUG=0 --SDL_INSTALL_ROOT=$(RASPBERRY_SYSROOT)/usr  $(MAKETYPE)
 
 .PHONY: rpi
 rpi: generate $(PROJECTDIR_SDL)/$(MAKETYPE)-rpi/Makefile
@@ -1408,7 +1377,7 @@ endif
 ifndef CI20_SYSROOT
 	$(error CI20_SYSROOT is not set)
 endif
-	$(SILENT) $(GENIE) $(PARAMS) --gcc=ci20 --gcc_version=4.9.2 --osd=sdl --targetos=ci20 --targetos=ci20 --NO_USE_MIDI=1  --PLATFORM=arm --NOASM=1 --USE_QTDEBUG=0 --SDL_INSTALL_ROOT=$(RASPBERRY_SYSROOT)/usr  $(MAKETYPE)  
+	$(SILENT) $(GENIE) $(PARAMS) --gcc=ci20 --gcc_version=4.9.2 --osd=sdl --targetos=ci20 --targetos=ci20 --NO_USE_MIDI=1  --PLATFORM=arm --NOASM=1 --USE_QTDEBUG=0 --SDL_INSTALL_ROOT=$(RASPBERRY_SYSROOT)/usr  $(MAKETYPE)
 
 .PHONY: ci20
 ci20: generate $(PROJECTDIR_SDL)/$(MAKETYPE)-ci20/Makefile
@@ -1499,14 +1468,14 @@ endif
 
 ifeq (posix,$(SHELLTYPE))
 $(GENDIR)/version.cpp: $(GENDIR)/git_desc | $(GEN_FOLDERS)
-	@echo '#define BARE_BUILD_VERSION "0.176"' > $@
+	@echo '#define BARE_BUILD_VERSION "0.179"' > $@
 	@echo 'extern const char bare_build_version[];' >> $@
 	@echo 'extern const char build_version[];' >> $@
 	@echo 'const char bare_build_version[] = BARE_BUILD_VERSION;' >> $@
 	@echo 'const char build_version[] = BARE_BUILD_VERSION " ($(NEW_GIT_VERSION))";' >> $@
 else
 $(GENDIR)/version.cpp: $(GENDIR)/git_desc
-	@echo #define BARE_BUILD_VERSION "0.176" > $@
+	@echo #define BARE_BUILD_VERSION "0.179" > $@
 	@echo extern const char bare_build_version[]; >> $@
 	@echo extern const char build_version[]; >> $@
 	@echo const char bare_build_version[] = BARE_BUILD_VERSION; >> $@
@@ -1520,7 +1489,7 @@ $(GENDIR)/%.lh: $(SRC)/%.lay scripts/build/complay.py | $(GEN_FOLDERS)
 
 $(GENDIR)/mame/drivers/ymmu100.hxx: $(SRC)/mame/drivers/ymmu100.ppm scripts/build/file2str.py
 	@echo Converting $<...
-	$(SILENT)$(PYTHON) scripts/build/file2str.py $< $@ ymmu100_bkg UINT8
+	$(SILENT)$(PYTHON) scripts/build/file2str.py $< $@ ymmu100_bkg uint8_t
 
 $(SRC)/devices/cpu/m68000/m68kops.cpp: $(SRC)/devices/cpu/m68000/m68k_in.cpp $(SRC)/devices/cpu/m68000/m68kmake.cpp
 ifeq ($(TARGETOS),asmjs)
@@ -1633,7 +1602,7 @@ cppcheck:
 #-------------------------------------------------
 # BGFX shaders
 #
-# to build all just use : make shaders 
+# to build all just use : make shaders
 #
 # to build specific chain use for example : make shaders CHAIN=eagle
 # data for chain is taken from src/osd/modules/render/bgfx/shaders/chains/
@@ -1650,11 +1619,13 @@ bgfx-tools:
 shaders: bgfx-tools
 	-$(call MKDIR,build/shaders/dx11)
 	-$(call MKDIR,build/shaders/dx9)
-	-$(call MKDIR,build/shaders/gles)
+	-$(call MKDIR,build/shaders/pssl)
+	-$(call MKDIR,build/shaders/metal)
+	-$(call MKDIR,build/shaders/essl)
 	-$(call MKDIR,build/shaders/glsl)
-	-$(call MKDIR,build/shaders/metal)	
+	-$(call MKDIR,build/shaders/spirv)
 	$(SILENT) $(MAKE) -C $(SRC)/osd/modules/render/bgfx/shaders rebuild CHAIN="$(CHAIN)"
-	
+
 #-------------------------------------------------
 # Translation
 #-------------------------------------------------
@@ -1664,6 +1635,6 @@ shaders: bgfx-tools
 translation:
 	$(SILENT) echo Generating mame.pot
 	$(SILENT) find src -iname "*.cpp" | xargs xgettext --from-code=UTF-8 -k_ -k__ -o mame.pot
-	$(SILENT) find language -iname "*.po" | xargs -n 1 -I %% msgmerge -U -N %% mame.pot 
+	$(SILENT) find language -iname "*.po" | xargs -n 1 -I %% msgmerge -U -N %% mame.pot
 	$(SILENT) find language -iname "*.po" | xargs -n 1 -I %% msgattrib --clear-fuzzy --empty %% -o %%
 

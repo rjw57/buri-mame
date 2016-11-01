@@ -32,6 +32,8 @@
 
 #include "winutil.h"
 
+#include "modules/monitor/monitor_common.h"
+
 #if !WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
 #include <agile.h>
 using namespace Windows::UI::Core;
@@ -211,7 +213,7 @@ void windows_osd_interface::update_slider_list()
 	for (auto window : osd_common_t::s_window_list)
 	{
 		// check if any window has dirty sliders
-		if (window->renderer().sliders_dirty())
+		if (window->has_renderer() && window->renderer().sliders_dirty())
 		{
 			build_slider_list();
 			return;
@@ -230,13 +232,16 @@ void windows_osd_interface::build_slider_list()
 
 	for (auto window : osd_common_t::s_window_list)
 	{
-		// take the sliders of the first window
-		std::vector<ui::menu_item> window_sliders = window->renderer().get_slider_list();
-		m_sliders.insert(m_sliders.end(), window_sliders.begin(), window_sliders.end());
+		if (window->has_renderer())
+		{
+			// take the sliders of the first window
+			std::vector<ui::menu_item> window_sliders = window->renderer().get_slider_list();
+			m_sliders.insert(m_sliders.end(), window_sliders.begin(), window_sliders.end());
+		}
 	}
 }
 
-void windows_osd_interface::add_audio_to_recording(const INT16 *buffer, int samples_this_frame)
+void windows_osd_interface::add_audio_to_recording(const int16_t *buffer, int samples_this_frame)
 {
 	auto window = osd_common_t::s_window_list.front(); // We only record on the first window
 	if (window != nullptr)
@@ -782,7 +787,28 @@ void win_window_info::create(running_machine &machine, int index, std::shared_pt
 		fatalerror("Unable to complete window creation\n");
 }
 
+std::shared_ptr<osd_monitor_info> win_window_info::monitor_from_rect(const osd_rect* proposed) const
+{
+	std::shared_ptr<osd_monitor_info> monitor;
 
+	// in window mode, find the nearest
+	if (!fullscreen())
+	{
+		if (proposed != nullptr)
+		{
+			monitor = m_monitor->module().monitor_from_rect(*proposed);
+		}
+		else
+			monitor = m_monitor->module().monitor_from_window(*this);
+	}
+	else
+	{
+		// in full screen, just use the configured monitor
+		monitor = m_monitor;
+	}
+
+	return monitor;
+}
 
 //============================================================
 //  winwindow_video_window_destroy
@@ -839,7 +865,7 @@ void win_window_info::update()
 	}
 
 	// if we're visible and running and not in the middle of a resize, draw
-	if (platform_window<HWND>() != nullptr && m_target != nullptr)
+	if (platform_window<HWND>() != nullptr && m_target != nullptr && has_renderer())
 	{
 		bool got_lock = true;
 
@@ -867,44 +893,6 @@ void win_window_info::update()
 		}
 	}
 }
-
-
-
-//============================================================
-//  winwindow_video_window_monitor
-//  (window thread)
-//============================================================
-
-std::shared_ptr<osd_monitor_info> win_window_info::winwindow_video_window_monitor(const osd_rect *proposed)
-{
-	std::shared_ptr<osd_monitor_info> monitor;
-
-	// in window mode, find the nearest
-	if (!fullscreen())
-	{
-		if (proposed != nullptr)
-		{
-			RECT p;
-			p.top = proposed->top();
-			p.left = proposed->left();
-			p.bottom = proposed->bottom();
-			p.right = proposed->right();
-			monitor = win_monitor_info::monitor_from_handle(MonitorFromRect(&p, MONITOR_DEFAULTTONEAREST));
-		}
-		else
-			monitor = win_monitor_info::monitor_from_handle(MonitorFromWindow(platform_window<HWND>(), MONITOR_DEFAULTTONEAREST));
-	}
-
-	// in full screen, just use the configured monitor
-	else
-		monitor = m_monitor;
-
-	// make sure we're up-to-date
-	//monitor->refresh();
-	return monitor;
-}
-
-
 
 //============================================================
 //  create_window_class
@@ -1230,7 +1218,7 @@ LRESULT CALLBACK win_window_info::video_window_proc(HWND wnd, UINT message, WPAR
 			break;
 
 		case WM_CHAR:
-			window->machine().ui_input().push_char_event(window->m_target, (unicode_char) wparam);
+			window->machine().ui_input().push_char_event(window->m_target, (char32_t) wparam);
 			break;
 
 		case WM_MOUSEWHEEL:
@@ -1284,7 +1272,7 @@ LRESULT CALLBACK win_window_info::video_window_proc(HWND wnd, UINT message, WPAR
 		// syscommands: catch win_start_maximized
 		case WM_SYSCOMMAND:
 		{
-			UINT16 cmd = wparam & 0xfff0;
+			uint16_t cmd = wparam & 0xfff0;
 
 			// prevent screensaver or monitor power events
 			if (cmd == SC_MONITORPOWER || cmd == SC_SCREENSAVE)
@@ -1418,17 +1406,23 @@ void win_window_info::draw_video_contents(HDC dc, int update)
 
 osd_rect win_window_info::constrain_to_aspect_ratio(const osd_rect &rect, int adjustment)
 {
-	INT32 extrawidth = wnd_extra_width();
-	INT32 extraheight = wnd_extra_height();
-	INT32 propwidth, propheight;
-	INT32 minwidth, minheight;
-	INT32 maxwidth, maxheight;
-	INT32 viswidth, visheight;
-	INT32 adjwidth, adjheight;
-	float pixel_aspect;
-	std::shared_ptr<osd_monitor_info> monitor = winwindow_video_window_monitor(&rect);
-
 	assert(GetCurrentThreadId() == window_threadid);
+
+	int32_t extrawidth = wnd_extra_width();
+	int32_t extraheight = wnd_extra_height();
+	int32_t propwidth, propheight;
+	int32_t minwidth, minheight;
+	int32_t maxwidth, maxheight;
+	int32_t viswidth, visheight;
+	int32_t adjwidth, adjheight;
+	float pixel_aspect;
+
+	auto monitor = monitor_from_rect(&rect);
+
+	// Sometimes this gets called when monitors have already been torn down
+	// In that the case, just return the unmodified rect
+	if (monitor == nullptr)
+		return rect;
 
 	// do not constrain aspect ratio for integer scaled views
 	if (m_target->scale_mode() != SCALE_FRACTIONAL)
@@ -1537,7 +1531,7 @@ osd_rect win_window_info::constrain_to_aspect_ratio(const osd_rect &rect, int ad
 
 osd_dim win_window_info::get_min_bounds(int constrain)
 {
-	INT32 minwidth, minheight;
+	int32_t minwidth, minheight;
 
 	//assert(GetCurrentThreadId() == window_threadid);
 
@@ -1727,7 +1721,7 @@ void win_window_info::adjust_window_position_after_major_change()
 	// in full screen, make sure it covers the primary display
 	else
 	{
-		std::shared_ptr<osd_monitor_info> monitor = winwindow_video_window_monitor(nullptr);
+		std::shared_ptr<osd_monitor_info> monitor = monitor_from_rect(nullptr);
 		newrect = monitor->position_size();
 	}
 

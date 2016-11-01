@@ -4,7 +4,7 @@
 
     softlist.h
 
-	Software list file format.
+    Software list file format.
 
 *********************************************************************/
 
@@ -120,16 +120,16 @@ public:
 	const std::string &publisher() const { return m_publisher; }
 	const std::list<feature_list_item> &other_info() const { return m_other_info; }
 	const std::list<feature_list_item> &shared_info() const { return m_shared_info; }
-	UINT32 supported() const { return m_supported; }
+	uint32_t supported() const { return m_supported; }
 	const std::list<software_part> &parts() const { return m_partdata; }
 
 	// additional operations
-	const software_part *find_part(const std::string &partname, const char *interface = nullptr) const;
+	const software_part *find_part(const std::string &part_name, const char *interface = nullptr) const;
 	bool has_multiple_parts(const char *interface) const;
 
 private:
 	// internal state
-	UINT32                  m_supported;
+	uint32_t                  m_supported;
 	std::string             m_shortname;
 	std::string             m_longname;
 	std::string             m_parentname;
@@ -174,7 +174,7 @@ private:
 	// internal helpers
 	template <typename T> std::vector<std::string> parse_attributes(const char **attributes, const T &attrlist);
 	bool parse_name_and_value(const char **attributes, std::string &name, std::string &value);
-	void add_rom_entry(std::string &&name, std::string &&hashdata, UINT32 offset, UINT32 length, UINT32 flags);
+	void add_rom_entry(std::string &&name, std::string &&hashdata, uint32_t offset, uint32_t length, uint32_t flags);
 
 	// expat callbacks
 	static void start_handler(void *data, const char *tagname, const char **attributes);
@@ -190,13 +190,13 @@ private:
 	void parse_soft_end(const char *name);
 
 	// internal parsing state
-	util::core_file &					m_file;
-	std::string 						m_filename;
-	std::list<software_info> &	m_infolist;
-	std::ostringstream &		m_errors;
-	struct XML_ParserStruct *	m_parser;
-	bool						m_done;
-	std::string &				m_description;
+	util::core_file &                   m_file;
+	std::string                         m_filename;
+	std::list<software_info> &  m_infolist;
+	std::ostringstream &        m_errors;
+	struct XML_ParserStruct *   m_parser;
+	bool                        m_done;
+	std::string &               m_description;
 	bool                    m_data_accum_expected;
 	std::string             m_data_accum;
 	software_info *         m_current_info;
@@ -207,8 +207,7 @@ private:
 
 // ----- Helpers -----
 
-// parses a software name (e.g. - 'apple2e:agentusa:flop1') into its consituent parts (returns false if cannot parse)
-bool software_name_parse(const std::string &text, std::string *swlist_name = nullptr, std::string *swname = nullptr, std::string *swpart = nullptr);
+// parses a software identifier (e.g. - 'apple2e:agentusa:flop1') into its consituent parts (returns false if cannot parse)
+bool software_name_parse(const std::string &identifier, std::string *list_name = nullptr, std::string *software_name = nullptr, std::string *part_name = nullptr);
 
 #endif // __SOFTLIST_H_
-

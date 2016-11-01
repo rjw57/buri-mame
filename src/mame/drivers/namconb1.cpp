@@ -305,7 +305,7 @@ TIMER_DEVICE_CALLBACK_MEMBER(namconb1_state::scantimer)
 	}
 
 	// Handle POSIRQ
-	UINT32 posirq_scanline = m_c116->get_reg(5) - 32;
+	uint32_t posirq_scanline = m_c116->get_reg(5) - 32;
 
 	if (scanline == posirq_scanline)
 	{
@@ -315,13 +315,13 @@ TIMER_DEVICE_CALLBACK_MEMBER(namconb1_state::scantimer)
 			m_maincpu->set_input_line(m_pos_irq_level, ASSERT_LINE);
 	}
 /*
-	// TODO: Real sources of these
-	if (scanline == 224)
-		m_mcu->set_input_line(M37710_LINE_IRQ0, HOLD_LINE);
-	else if (scanline == 0)
-		m_mcu->set_input_line(M37710_LINE_IRQ2, HOLD_LINE);
-	else if (scanline == 128)
-		m_mcu->set_input_line(M37710_LINE_ADC, HOLD_LINE);
+    // TODO: Real sources of these
+    if (scanline == 224)
+        m_mcu->set_input_line(M37710_LINE_IRQ0, HOLD_LINE);
+    else if (scanline == 0)
+        m_mcu->set_input_line(M37710_LINE_IRQ2, HOLD_LINE);
+    else if (scanline == 128)
+        m_mcu->set_input_line(M37710_LINE_ADC, HOLD_LINE);
 */
 }
 
@@ -547,7 +547,7 @@ READ8_MEMBER(namconb1_state::namconb2_cpureg_r)
 
 READ32_MEMBER(namconb1_state::custom_key_r)
 {
-	UINT16 old_count = m_count;
+	uint16_t old_count = m_count;
 
 	do
 	{ /* pick a random number, but don't pick the same twice in a row */
@@ -652,10 +652,10 @@ READ32_MEMBER(namconb1_state::gunbulet_gun_r)
 
 	switch (offset)
 	{
-		case 0: case 1: result = (UINT8)(0x0f + m_light1_y->read() * 224/255); break; /* Y (p2) */
-		case 2: case 3: result = (UINT8)(0x26 + m_light1_x->read() * 288/314); break; /* X (p2) */
-		case 4: case 5: result = (UINT8)(0x0f + m_light0_y->read() * 224/255); break; /* Y (p1) */
-		case 6: case 7: result = (UINT8)(0x26 + m_light0_x->read() * 288/314); break; /* X (p1) */
+		case 0: case 1: result = (uint8_t)(0x0f + m_light1_y->read() * 224/255); break; /* Y (p2) */
+		case 2: case 3: result = (uint8_t)(0x26 + m_light1_x->read() * 288/314); break; /* X (p2) */
+		case 4: case 5: result = (uint8_t)(0x0f + m_light0_y->read() * 224/255); break; /* Y (p1) */
+		case 6: case 7: result = (uint8_t)(0x26 + m_light0_x->read() * 288/314); break; /* X (p1) */
 	}
 	return result<<24;
 } /* gunbulet_gun_r */
@@ -1140,7 +1140,7 @@ static MACHINE_CONFIG_START( namconb1, namconb1_state )
 	MCFG_MACHINE_RESET_OVERRIDE(namconb1_state, namconb)
 
 	MCFG_TIMER_DRIVER_ADD_SCANLINE("scantimer", namconb1_state, scantimer, "screen", 0, 1)
-	
+
 	// has to be 60 hz or music will go crazy in nebulray, vshoot, gslugrs*
 	MCFG_TIMER_DRIVER_ADD_PERIODIC("mcu_irq0", namconb1_state, mcu_irq0_cb, attotime::from_hz(60))
 	MCFG_TIMER_DRIVER_ADD_PERIODIC("mcu_irq2", namconb1_state, mcu_irq2_cb, attotime::from_hz(60))
@@ -1185,7 +1185,7 @@ static MACHINE_CONFIG_START( namconb2, namconb1_state )
 	MCFG_TIMER_DRIVER_ADD_PERIODIC("mcu_irq0", namconb1_state, mcu_irq0_cb, attotime::from_hz(60))
 	MCFG_TIMER_DRIVER_ADD_PERIODIC("mcu_irq2", namconb1_state, mcu_irq2_cb, attotime::from_hz(60))
 	MCFG_TIMER_DRIVER_ADD_PERIODIC("mcu_adc", namconb1_state, mcu_adc_cb, attotime::from_hz(60))
-	
+
 	MCFG_SCREEN_ADD("screen", RASTER)
 	MCFG_SCREEN_REFRESH_RATE(59.7)
 	MCFG_SCREEN_SIZE(NAMCONB1_HTOTAL, NAMCONB1_VTOTAL)

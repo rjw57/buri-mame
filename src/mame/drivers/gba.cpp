@@ -11,21 +11,21 @@
 ***************************************************************************/
 
 #include "emu.h"
-#include "cpu/arm7/arm7.h"
-#include "cpu/arm7/arm7core.h"
-#include "sound/dac.h"
-#include "sound/gb.h"
 #include "includes/gba.h"
 #include "bus/gba/rom.h"
+#include "cpu/arm7/arm7.h"
+#include "cpu/arm7/arm7core.h"
+#include "sound/gb.h"
+#include "sound/volt_reg.h"
 #include "softlist.h"
 
 /* Sound Registers */
 #define SOUNDCNT_L  HWLO(0x080)  /* 0x4000080  2  R/W   Control Stereo/Volume/Enable */
 #define SOUNDCNT_H  HWHI(0x080)  /* 0x4000082  2  R/W   Control Mixing/DMA Control */
 #define SOUNDCNT_X  HWLO(0x084)  /* 0x4000084  2  R/W   Control Sound on/off */
-                                 /* 0x4000086  2  -     Unused */
+								 /* 0x4000086  2  -     Unused */
 #define SOUNDBIAS   HWLO(0x088)  /* 0x4000088  2  BIOS  Sound PWM Control */
-                                 /* 0x400008A  2  -     Unused */
+								 /* 0x400008A  2  -     Unused */
 
 /* DMA Registers (4 Transfer Channels) */
 #define DMASAD(c)   WORD(0x0B0 + c * 0xC) /* 0x40000B0  4  W     DMA 0 Source Address */
@@ -42,7 +42,7 @@
 #define SIOCNT      HWLO(0x128)  /* 0x4000128  2  R/W   SIO Control Register */
 #define SIOMLT_SEND HWHI(0x128)  /* 0x400012A  2  R/W   SIO Data (Local of MultiPlayer; shared below) */
 #define SIODATA8    HWHI(0x128)  /* 0x400012A  2  R/W   SIO Data (Normal-8bit and UART Mode) */
-                                 /* 0x400012C  2  -     Unused */
+								 /* 0x400012C  2  -     Unused */
 
 /* Keypad Input Registers */
 #define KEYINPUT    HWLO(0x130)  /* 0x4000130  2  R     Key Status */
@@ -51,29 +51,29 @@
 /* Serial Communication (2) Registers */
 #define RCNT        HWLO(0x134)  /* 0x4000134  2  R/W   SIO Mode Select/General Purpose Data */
 #define IR          HWHI(0x134)  /* 0x4000136  2  R/W   Ancient - Infrared Register (Prototypes only) */
-                                 /* 0x4000138  8  -     Unused */
+								 /* 0x4000138  8  -     Unused */
 #define JOYCNT      HWLO(0x140)  /* 0x4000140  2  R/W   SIO JOY Bus Control */
-                                 /* 0x4000142  2  -     Unused */
+								 /* 0x4000142  2  -     Unused */
 #define JOY_RECV    WORD(0x150)  /* 0x4000150  4  R/W   SIO JOY Bus Receive Data */
 #define JOY_TRANS   WORD(0x154)  /* 0x4000154  4  R/W   SIO JOY Bus Transmit Data */
 #define JOYSTAT     HWLO(0x158)  /* 0x4000158  2  R/?   SIO JOY Bus Receive Status */
-                                 /* 0x400015A  2  -     Unused */
+								 /* 0x400015A  2  -     Unused */
 
 /* Interrupt, Waitstate, and Power-Down Control Registers */
 #define IE          HWLO(0x200)  /* 0x4000200  2  R/W   Interrupt Enable Register */
 #define IF          HWHI(0x200)  /* 0x4000202  2  R/W   Interrupt Request Flags / IRQ Acknowledge */
 #define WAITCNT     HWLO(0x204)  /* 0x4000204  2  R/W   Game Pak Waitstate Control */
-                                 /* 0x4000206     -     Unused */
+								 /* 0x4000206     -     Unused */
 #define IME         HWLO(0x208)  /* 0x4000208  2  R/W   Interrupt Master Enable Register */
-                                 /* 0x400020A     -     Unused */
-                                 /* 0x4000300  1  R/W   Undocumented - Post Boot Flag */
-                                 /* 0x4000301  1  W     Undocumented - Power Down Control */
-                                 /* 0x4000302     -     Unused */
-                                 /* 0x4000410  ?  ?     Undocumented - Purpose Unknown / Bug ??? 0FFh */
-                                 /* 0x4000411     -     Unused */
-                                 /* 0x4000800  4  R/W   Undocumented - Internal Memory Control (R/W) */
-                                 /* 0x4000804     -     Unused */
-                                 /* 0x4xx0800  4  R/W   Mirrors of 4000800h (repeated each 64K) */
+								 /* 0x400020A     -     Unused */
+								 /* 0x4000300  1  R/W   Undocumented - Post Boot Flag */
+								 /* 0x4000301  1  W     Undocumented - Power Down Control */
+								 /* 0x4000302     -     Unused */
+								 /* 0x4000410  ?  ?     Undocumented - Purpose Unknown / Bug ??? 0FFh */
+								 /* 0x4000411     -     Unused */
+								 /* 0x4000800  4  R/W   Undocumented - Internal Memory Control (R/W) */
+								 /* 0x4000804     -     Unused */
+								 /* 0x4xx0800  4  R/W   Mirrors of 4000800h (repeated each 64K) */
 
 #define SOUNDBIAS_SET(val)      HWLO_SET(0x088, val)
 
@@ -129,10 +129,10 @@ static inline void ATTR_PRINTF(3,4) verboselog(device_t &device, int n_level, co
 	}
 }
 
-static const UINT32 timer_clks[4] = { XTAL_16_777216MHz, XTAL_16_777216MHz / 64, XTAL_16_777216MHz / 256, XTAL_16_777216MHz / 1024 };
+static const uint32_t timer_clks[4] = { XTAL_16_777216MHz, XTAL_16_777216MHz / 64, XTAL_16_777216MHz / 256, XTAL_16_777216MHz / 1024 };
 
 
-void gba_state::request_irq(UINT32 int_type)
+void gba_state::request_irq(uint32_t int_type)
 {
 	// set flag for later recovery
 	IF_SET(int_type);
@@ -152,9 +152,9 @@ void gba_state::request_irq(UINT32 int_type)
 
 TIMER_CALLBACK_MEMBER(gba_state::dma_complete)
 {
-	static const UINT32 ch_int[4] = { INT_DMA0, INT_DMA1, INT_DMA2, INT_DMA3 };
+	static const uint32_t ch_int[4] = { INT_DMA0, INT_DMA1, INT_DMA2, INT_DMA3 };
 
-	FPTR ch = param;
+	uintptr_t ch = param;
 
 //  printf("dma complete: ch %d\n", ch);
 
@@ -172,7 +172,7 @@ TIMER_CALLBACK_MEMBER(gba_state::dma_complete)
 	// always clear active for immediate DMAs though
 	if (!((ctrl>>9) & 1) || ((ctrl & 0x3000) == 0))
 	{
-		DMACNT_H_RESET(ch, 0x8000);	// clear "active" bit
+		DMACNT_H_RESET(ch, 0x8000); // clear "active" bit
 	}
 	else
 	{
@@ -193,9 +193,9 @@ TIMER_CALLBACK_MEMBER(gba_state::dma_complete)
 void gba_state::dma_exec(int ch)
 {
 	address_space &space = m_maincpu->space(AS_PROGRAM);
-	UINT32 src = m_dma_src[ch];
-	UINT32 dst = m_dma_dst[ch];
-	UINT16 ctrl = DMACNT_H(ch);
+	uint32_t src = m_dma_src[ch];
+	uint32_t dst = m_dma_dst[ch];
+	uint16_t ctrl = DMACNT_H(ch);
 	int srcadd = (ctrl >> 7) & 3;
 	int dstadd = (ctrl >> 5) & 3;
 
@@ -308,7 +308,7 @@ void gba_state::dma_exec(int ch)
 	m_dma_src[ch] = src;
 	m_dma_dst[ch] = dst;
 
-//  printf("settng DMA timer %d for %d cycs (tmr %x)\n", ch, cnt, (UINT32)m_dma_timer[ch]);
+//  printf("settng DMA timer %d for %d cycs (tmr %x)\n", ch, cnt, (uint32_t)m_dma_timer[ch]);
 //  m_dma_timer[ch]->adjust(ATTOTIME_IN_CYCLES(0, cnt), ch);
 	dma_complete(nullptr, ch);
 }
@@ -329,11 +329,11 @@ void gba_state::audio_tick(int ref)
 
 			if (SOUNDCNT_H & 0x200)
 			{
-				m_ladac->write_signed8(m_fifo_a[m_fifo_a_ptr]^0x80);
+				m_ldaca->write(m_fifo_a[m_fifo_a_ptr]);
 			}
 			if (SOUNDCNT_H & 0x100)
 			{
-				m_radac->write_signed8(m_fifo_a[m_fifo_a_ptr]^0x80);
+				m_rdaca->write(m_fifo_a[m_fifo_a_ptr]);
 			}
 			m_fifo_a_ptr++;
 		}
@@ -365,11 +365,11 @@ void gba_state::audio_tick(int ref)
 
 			if (SOUNDCNT_H & 0x2000)
 			{
-				m_lbdac->write_signed8(m_fifo_b[m_fifo_b_ptr]^0x80);
+				m_ldacb->write(m_fifo_b[m_fifo_b_ptr]);
 			}
 			if (SOUNDCNT_H & 0x1000)
 			{
-				m_rbdac->write_signed8(m_fifo_b[m_fifo_b_ptr]^0x80);
+				m_rdacb->write(m_fifo_b[m_fifo_b_ptr]);
 			}
 			m_fifo_b_ptr++;
 		}
@@ -393,8 +393,8 @@ void gba_state::audio_tick(int ref)
 
 TIMER_CALLBACK_MEMBER(gba_state::timer_expire)
 {
-	static const UINT32 tmr_ints[4] = { INT_TM0_OVERFLOW, INT_TM1_OVERFLOW, INT_TM2_OVERFLOW, INT_TM3_OVERFLOW };
-	FPTR tmr = (FPTR) param;
+	static const uint32_t tmr_ints[4] = { INT_TM0_OVERFLOW, INT_TM1_OVERFLOW, INT_TM2_OVERFLOW, INT_TM3_OVERFLOW };
+	uintptr_t tmr = (uintptr_t) param;
 
 	// "The reload value is copied into the counter only upon following two situations: Automatically upon timer overflows,"
 	// "or when the timer start bit becomes changed from 0 to 1."
@@ -545,7 +545,7 @@ static const char *reg_names[] = {
 
 READ32_MEMBER(gba_state::gba_io_r)
 {
-	UINT32 retval = 0;
+	uint32_t retval = 0;
 
 	switch( offset + 0x60/4 )
 	{
@@ -606,7 +606,7 @@ READ32_MEMBER(gba_state::gba_io_r)
 		case 0x00b8/4:
 			if (ACCESSING_BITS_0_15)
 			{
-				// read only				
+				// read only
 			}
 			if (ACCESSING_BITS_16_31)
 			{
@@ -620,7 +620,7 @@ READ32_MEMBER(gba_state::gba_io_r)
 		case 0x00c4/4:
 			if (ACCESSING_BITS_0_15)
 			{
-				// read only				
+				// read only
 			}
 			if (ACCESSING_BITS_16_31)
 			{
@@ -634,7 +634,7 @@ READ32_MEMBER(gba_state::gba_io_r)
 		case 0x00d0/4:
 			if (ACCESSING_BITS_0_15)
 			{
-				// read only				
+				// read only
 			}
 			if (ACCESSING_BITS_16_31)
 			{
@@ -650,7 +650,7 @@ READ32_MEMBER(gba_state::gba_io_r)
 				// note: this suspicious piece of code crashes "Buffy The Vampire Slayer" (08008DB4) and "The Ant Bully", so disable it for now
 			if (ACCESSING_BITS_0_15)
 			{
-				// read only				
+				// read only
 			}
 			if (ACCESSING_BITS_16_31)
 			{
@@ -662,7 +662,7 @@ READ32_MEMBER(gba_state::gba_io_r)
 		case 0x0108/4:
 		case 0x010c/4:
 			{
-				UINT32 elapsed;
+				uint32_t elapsed;
 				double time, ticks;
 				int timer = offset + 0x60/4 - 0x100/4;
 
@@ -686,7 +686,7 @@ READ32_MEMBER(gba_state::gba_io_r)
 						time *= ticks;
 						time /= (1.0 / m_timer_hz[timer]);
 
-						elapsed = (UINT32)time;
+						elapsed = (uint32_t)time;
 					}
 
 //                  printf("elapsed = %x\n", elapsed);
@@ -725,7 +725,7 @@ READ32_MEMBER(gba_state::gba_io_r)
 			break;
 	}
 
-//	assert_always(offset < ARRAY_LENGTH(reg_names) / 2, "Not enough register names in gba_state");
+//  assert_always(offset < ARRAY_LENGTH(reg_names) / 2, "Not enough register names in gba_state");
 
 	if (ACCESSING_BITS_0_15)
 	{
@@ -741,13 +741,13 @@ READ32_MEMBER(gba_state::gba_io_r)
 
 WRITE32_MEMBER(gba_state::gba_io_w)
 {
-	UINT8 soundcnt_x = SOUNDCNT_X;
-	UINT16 siocnt = SIOCNT;
-	UINT16 dmachcnt[4] = { DMACNT_H(0), DMACNT_H(1), DMACNT_H(2), DMACNT_H(3) };
+	uint8_t soundcnt_x = SOUNDCNT_X;
+	uint16_t siocnt = SIOCNT;
+	uint16_t dmachcnt[4] = { DMACNT_H(0), DMACNT_H(1), DMACNT_H(2), DMACNT_H(3) };
 
 	COMBINE_DATA(&m_regs[offset]);
 
-//	assert_always(offset < ARRAY_LENGTH(reg_names) / 2, "Not enough register names in gba_state");
+//  assert_always(offset < ARRAY_LENGTH(reg_names) / 2, "Not enough register names in gba_state");
 
 	if (ACCESSING_BITS_0_15)
 	{
@@ -865,8 +865,8 @@ WRITE32_MEMBER(gba_state::gba_io_w)
 				{
 					m_fifo_a_ptr = 17;
 					m_fifo_a_in = 17;
-					m_ladac->write_signed8(0x80);
-					m_radac->write_signed8(0x80);
+					m_ldaca->write(0);
+					m_rdaca->write(0);
 				}
 
 				// DAC B reset?
@@ -874,8 +874,8 @@ WRITE32_MEMBER(gba_state::gba_io_w)
 				{
 					m_fifo_b_ptr = 17;
 					m_fifo_b_in = 17;
-					m_lbdac->write_signed8(0x80);
-					m_rbdac->write_signed8(0x80);
+					m_ldacb->write(0);
+					m_rdacb->write(0);
 				}
 			}
 			break;
@@ -887,10 +887,10 @@ WRITE32_MEMBER(gba_state::gba_io_w)
 				{
 					m_fifo_a_ptr = m_fifo_a_in = 17;
 					m_fifo_b_ptr = m_fifo_b_in = 17;
-					m_ladac->write_signed8(0x80);
-					m_radac->write_signed8(0x80);
-					m_lbdac->write_signed8(0x80);
-					m_rbdac->write_signed8(0x80);
+					m_ldaca->write(0);
+					m_rdaca->write(0);
+					m_ldacb->write(0);
+					m_rdacb->write(0);
 				}
 			}
 			break;
@@ -1024,7 +1024,7 @@ WRITE32_MEMBER(gba_state::gba_io_w)
 		case 0x010c/4:
 			{
 				double rate, clocksel;
-				UINT32 old_timer_regs;
+				uint32_t old_timer_regs;
 
 				int timer = offset + 0x60/4 - 0x100/4;
 
@@ -1132,7 +1132,7 @@ WRITE32_MEMBER(gba_state::gba_io_w)
 
 READ32_MEMBER(gba_state::gba_bios_r)
 {
-	UINT32 *rom = m_region_maincpu;
+	uint32_t *rom = m_region_maincpu;
 	if (m_bios_hack->read())
 	{
 		// partially patch out logo and checksum checks
@@ -1149,16 +1149,16 @@ READ32_MEMBER(gba_state::gba_bios_r)
 
 READ32_MEMBER(gba_state::gba_10000000_r)
 {
-	UINT32 data;
-	UINT32 pc = m_maincpu->state_int(ARM7_PC);
-	UINT32 cpsr = m_maincpu->state_int(ARM7_CPSR);
+	uint32_t data;
+	uint32_t pc = m_maincpu->state_int(ARM7_PC);
+	uint32_t cpsr = m_maincpu->state_int(ARM7_CPSR);
 	if (T_IS_SET( cpsr))
 	{
 		data = space.read_dword(pc + 8);
 	}
 	else
 	{
-		UINT16 insn = space.read_word(pc + 4);
+		uint16_t insn = space.read_word(pc + 4);
 		data = (insn << 16) | (insn << 0);
 	}
 	logerror("%s: unmapped program memory read from %08X = %08X & %08X\n", machine().describe_context( ), 0x10000000 + (offset << 2), data, mem_mask);
@@ -1263,10 +1263,10 @@ void gba_state::machine_reset()
 	m_fifo_a_in = m_fifo_b_in = 17;
 
 	// and clear the DACs
-	m_ladac->write_signed8(0x80);
-	m_radac->write_signed8(0x80);
-	m_lbdac->write_signed8(0x80);
-	m_rbdac->write_signed8(0x80);
+	m_ldaca->write(0);
+	m_rdaca->write(0);
+	m_ldacb->write(0);
+	m_rdacb->write(0);
 }
 
 void gba_state::machine_start()
@@ -1357,7 +1357,7 @@ void gba_state::machine_start()
 
 	}
 
-	save_pointer(NAME(m_regs), sizeof(m_regs));
+	save_item(NAME(m_regs));
 	save_item(NAME(m_dma_src));
 	save_item(NAME(m_dma_dst));
 	save_item(NAME(m_dma_cnt));
@@ -1407,18 +1407,20 @@ static MACHINE_CONFIG_START( gbadv, gba_state )
 	MCFG_GBA_LCD_DMA_HBLANK(WRITELINE(gba_state, dma_hblank_callback))
 	MCFG_GBA_LCD_DMA_VBLANK(WRITELINE(gba_state, dma_vblank_callback))
 
-	MCFG_SPEAKER_STANDARD_STEREO("spkleft", "spkright")
-	MCFG_SOUND_ADD("custom", GAMEBOY, 0)
-	MCFG_SOUND_ROUTE(0, "spkleft", 0.50)
-	MCFG_SOUND_ROUTE(1, "spkright", 0.50)
-	MCFG_SOUND_ADD("direct_a_left", DAC, 0)         // GBA direct sound A left
-	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "spkleft", 0.50)
-	MCFG_SOUND_ADD("direct_a_right", DAC, 0)        // GBA direct sound A right
-	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "spkright", 0.50)
-	MCFG_SOUND_ADD("direct_b_left", DAC, 0)         // GBA direct sound B left
-	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "spkleft", 0.50)
-	MCFG_SOUND_ADD("direct_b_right", DAC, 0)        // GBA direct sound B right
-	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "spkright", 0.50)
+	MCFG_SPEAKER_STANDARD_STEREO("lspeaker", "rspeaker")
+	MCFG_SOUND_ADD("custom", CGB04_APU, XTAL_16_777216MHz/4)
+	MCFG_SOUND_ROUTE(0, "lspeaker", 0.5)
+	MCFG_SOUND_ROUTE(1, "rspeaker", 0.5)
+
+	MCFG_SOUND_ADD("ldaca", DAC_8BIT_R2R_TWOS_COMPLEMENT, 0) MCFG_SOUND_ROUTE(ALL_OUTPUTS, "lspeaker", 0.5) // unknown DAC
+	MCFG_SOUND_ADD("rdaca", DAC_8BIT_R2R_TWOS_COMPLEMENT, 0) MCFG_SOUND_ROUTE(ALL_OUTPUTS, "rspeaker", 0.5) // unknown DAC
+	MCFG_SOUND_ADD("ldacb", DAC_8BIT_R2R_TWOS_COMPLEMENT, 0) MCFG_SOUND_ROUTE(ALL_OUTPUTS, "lspeaker", 0.5) // unknown DAC
+	MCFG_SOUND_ADD("rdacb", DAC_8BIT_R2R_TWOS_COMPLEMENT, 0) MCFG_SOUND_ROUTE(ALL_OUTPUTS, "rspeaker", 0.5) // unknown DAC
+	MCFG_DEVICE_ADD("vref", VOLTAGE_REGULATOR, 0) MCFG_VOLTAGE_REGULATOR_OUTPUT(5.0)
+	MCFG_SOUND_ROUTE_EX(0, "ldaca", 1.0, DAC_VREF_POS_INPUT) MCFG_SOUND_ROUTE_EX(0, "ldaca", -1.0, DAC_VREF_NEG_INPUT)
+	MCFG_SOUND_ROUTE_EX(0, "rdaca", 1.0, DAC_VREF_POS_INPUT) MCFG_SOUND_ROUTE_EX(0, "rdaca", -1.0, DAC_VREF_NEG_INPUT)
+	MCFG_SOUND_ROUTE_EX(0, "ldacb", 1.0, DAC_VREF_POS_INPUT) MCFG_SOUND_ROUTE_EX(0, "ldacb", -1.0, DAC_VREF_NEG_INPUT)
+	MCFG_SOUND_ROUTE_EX(0, "rdacb", 1.0, DAC_VREF_POS_INPUT) MCFG_SOUND_ROUTE_EX(0, "rdacb", -1.0, DAC_VREF_NEG_INPUT)
 
 	MCFG_GBA_CARTRIDGE_ADD("cartslot", gba_cart, nullptr)
 	MCFG_SOFTWARE_LIST_ADD("cart_list","gba")

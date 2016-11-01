@@ -65,7 +65,7 @@ public:
 		, m_4013b(*this, "4013b")
 		, m_aysnd1(*this, "aysnd1")
 		, m_aysnd2(*this, "aysnd2")
-		, m_keyboard(*this, "X")
+		, m_keyboard(*this, "X.%u", 0)
 	{ }
 
 	DECLARE_WRITE8_MEMBER(port01_w);
@@ -87,14 +87,14 @@ public:
 	DECLARE_READ_LINE_MEMBER(clear_a_r);
 
 private:
-	UINT16 m_clockcnt;
-	UINT16 m_resetcnt;
-	UINT16 m_resetcnt_a;
-	UINT8 m_soundlatch;
-	UINT8 m_a_irqset;
-	UINT16 m_a_irqcnt;
-	UINT8 m_kbdrow;
-	UINT8 m_segment[5];
+	uint16_t m_clockcnt;
+	uint16_t m_resetcnt;
+	uint16_t m_resetcnt_a;
+	uint8_t m_soundlatch;
+	uint8_t m_a_irqset;
+	uint16_t m_a_irqcnt;
+	uint8_t m_kbdrow;
+	uint8_t m_segment[5];
 	bool m_disp_sw;
 	virtual void machine_reset() override;
 	required_device<cosmac_device> m_maincpu;
@@ -115,7 +115,7 @@ ADDRESS_MAP_END
 static ADDRESS_MAP_START( play_3_io, AS_IO, 8, play_3_state )
 	AM_RANGE(0x01, 0x01) AM_WRITE(port01_w) // digits, scan-lines
 	AM_RANGE(0x02, 0x02) AM_WRITE(port02_w) // sound code
-	AM_RANGE(0x03, 0x03) AM_WRITE(port03_w) // 
+	AM_RANGE(0x03, 0x03) AM_WRITE(port03_w) //
 	AM_RANGE(0x04, 0x04) AM_READ(port04_r) // switches
 	AM_RANGE(0x05, 0x05) AM_READ(port05_r) // more switches
 	AM_RANGE(0x06, 0x06) AM_WRITE(port06_w) // segments
@@ -125,7 +125,7 @@ ADDRESS_MAP_END
 static ADDRESS_MAP_START( megaaton_io, AS_IO, 8, play_3_state )
 	AM_RANGE(0x01, 0x01) AM_WRITE(megaaton_port01_w) // digits, scan-lines
 	AM_RANGE(0x02, 0x02) AM_WRITE(port02_w) // sound code
-	AM_RANGE(0x03, 0x03) AM_WRITE(port03_w) // 
+	AM_RANGE(0x03, 0x03) AM_WRITE(port03_w) //
 	AM_RANGE(0x04, 0x04) AM_READ(port04_r) // switches
 	AM_RANGE(0x05, 0x05) AM_READ(port05_r) // more switches
 	AM_RANGE(0x06, 0x06) AM_WRITE(port06_w) // segments
@@ -256,7 +256,7 @@ void play_3_state::machine_reset()
 	m_soundlatch = 0;
 	m_kbdrow = 0;
 	m_disp_sw = 0;
-	for (UINT8 i = 0; i < 5; i++)
+	for (uint8_t i = 0; i < 5; i++)
 		m_segment[i] = 0;
 }
 
@@ -266,9 +266,9 @@ WRITE8_MEMBER( play_3_state::port01_w )
 	if (m_kbdrow && m_disp_sw)
 	{
 		m_disp_sw = 0;
-		for (UINT8 j = 0; j < 6; j++)
+		for (uint8_t j = 0; j < 6; j++)
 			if (BIT(m_kbdrow, j))
-				for (UINT8 i = 0; i < 5; i++)
+				for (uint8_t i = 0; i < 5; i++)
 				{
 					output().set_digit_value(j*10 + i, m_segment[i] & 0x7f);
 					// decimal dot on tens controls if last 0 shows or not
@@ -281,7 +281,7 @@ WRITE8_MEMBER( play_3_state::port01_w )
 // megaaton status digits are rearranged slightly
 WRITE8_MEMBER( play_3_state::megaaton_port01_w )
 {
-	UINT8 i,j,digit;
+	uint8_t i,j,digit;
 	m_kbdrow = data;
 	if (m_kbdrow && m_disp_sw)
 	{
@@ -323,7 +323,7 @@ WRITE8_MEMBER( play_3_state::port03_w )
 READ8_MEMBER( play_3_state::port04_r )
 {
 	if (m_kbdrow & 0x3f)
-		for (UINT8 i = 0; i < 6; i++)
+		for (uint8_t i = 0; i < 6; i++)
 			if (BIT(m_kbdrow, i))
 				return m_keyboard[i]->read();
 
@@ -332,7 +332,7 @@ READ8_MEMBER( play_3_state::port04_r )
 
 READ8_MEMBER( play_3_state::port05_r )
 {
-	UINT8 data = 0, key8 = m_keyboard[8]->read() & 0x0f;
+	uint8_t data = 0, key8 = m_keyboard[8]->read() & 0x0f;
 	if (BIT(m_kbdrow, 0))
 		data |= m_keyboard[6]->read();
 	if (BIT(m_kbdrow, 1))
@@ -683,21 +683,21 @@ ROM_START(msdisco)
 ROM_END
 
 GAME(1982,  spain82,   0,        play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "Spain '82",                 MACHINE_MECHANICAL | MACHINE_NOT_WORKING | MACHINE_NO_SOUND)
-GAME(1983,  megaaton,  0,        megaaton, megaaton, driver_device, 0, ROT0, "Playmatic", "Meg-Aaton",                 MACHINE_MECHANICAL | MACHINE_IMPERFECT_SOUND)
-GAME(1983,  megaatona, megaaton, megaaton, megaaton, driver_device, 0, ROT0, "Playmatic", "Meg-Aaton (alternate set)", MACHINE_MECHANICAL | MACHINE_IMPERFECT_SOUND)
-GAME(1984,  nautilus,  0,        play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "Nautilus",                  MACHINE_MECHANICAL | MACHINE_NO_SOUND)
-GAME(1984,  theraid,   0,        play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "The Raid",                  MACHINE_MECHANICAL | MACHINE_IMPERFECT_SOUND)
-GAME(1984,  ufo_x,     0,        play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "UFO-X",                     MACHINE_MECHANICAL | MACHINE_IMPERFECT_SOUND)
-GAME(1984,  kz26,      0,        play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "KZ-26",                     MACHINE_MECHANICAL | MACHINE_IMPERFECT_SOUND)
-GAME(1985,  rock2500,  0,        play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "Rock 2500",                 MACHINE_MECHANICAL | MACHINE_IMPERFECT_SOUND)
-GAME(1985,  starfirp,  0,        play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "Star Fire",                 MACHINE_MECHANICAL | MACHINE_IMPERFECT_SOUND)
-GAME(1985,  starfirpa, starfirp, play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "Star Fire (alternate set)", MACHINE_MECHANICAL | MACHINE_IMPERFECT_SOUND)
-GAME(1985,  trailer,   0,        play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "Trailer",                   MACHINE_MECHANICAL | MACHINE_IMPERFECT_SOUND)
-GAME(1986,  fldragon,  0,        play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "Flash Dragon",              MACHINE_MECHANICAL | MACHINE_IMPERFECT_SOUND)
-GAME(1986,  fldragona, fldragon, play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "Flash Dragon (alternate set)", MACHINE_MECHANICAL | MACHINE_IMPERFECT_SOUND)
-GAME(1987,  phntmshp,  0,        play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "Phantom Ship",              MACHINE_MECHANICAL | MACHINE_NO_SOUND)
+GAME(1983,  megaaton,  0,        megaaton, megaaton, driver_device, 0, ROT0, "Playmatic", "Meg-Aaton",                 MACHINE_MECHANICAL | MACHINE_NOT_WORKING | MACHINE_IMPERFECT_SOUND)
+GAME(1983,  megaatona, megaaton, megaaton, megaaton, driver_device, 0, ROT0, "Playmatic", "Meg-Aaton (alternate set)", MACHINE_MECHANICAL | MACHINE_NOT_WORKING | MACHINE_IMPERFECT_SOUND)
+GAME(1984,  nautilus,  0,        play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "Nautilus",                  MACHINE_MECHANICAL | MACHINE_NOT_WORKING | MACHINE_NO_SOUND)
+GAME(1984,  theraid,   0,        play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "The Raid",                  MACHINE_MECHANICAL | MACHINE_NOT_WORKING | MACHINE_IMPERFECT_SOUND)
+GAME(1984,  ufo_x,     0,        play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "UFO-X",                     MACHINE_MECHANICAL | MACHINE_NOT_WORKING | MACHINE_IMPERFECT_SOUND)
+GAME(1984,  kz26,      0,        play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "KZ-26",                     MACHINE_MECHANICAL | MACHINE_NOT_WORKING | MACHINE_IMPERFECT_SOUND)
+GAME(1985,  rock2500,  0,        play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "Rock 2500",                 MACHINE_MECHANICAL | MACHINE_NOT_WORKING | MACHINE_IMPERFECT_SOUND)
+GAME(1985,  starfirp,  0,        play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "Star Fire",                 MACHINE_MECHANICAL | MACHINE_NOT_WORKING | MACHINE_IMPERFECT_SOUND)
+GAME(1985,  starfirpa, starfirp, play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "Star Fire (alternate set)", MACHINE_MECHANICAL | MACHINE_NOT_WORKING | MACHINE_IMPERFECT_SOUND)
+GAME(1985,  trailer,   0,        play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "Trailer",                   MACHINE_MECHANICAL | MACHINE_NOT_WORKING | MACHINE_IMPERFECT_SOUND)
+GAME(1986,  fldragon,  0,        play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "Flash Dragon",              MACHINE_MECHANICAL | MACHINE_NOT_WORKING | MACHINE_IMPERFECT_SOUND)
+GAME(1986,  fldragona, fldragon, play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "Flash Dragon (alternate set)", MACHINE_MECHANICAL | MACHINE_NOT_WORKING | MACHINE_IMPERFECT_SOUND)
+GAME(1987,  phntmshp,  0,        play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "Phantom Ship",              MACHINE_MECHANICAL | MACHINE_NOT_WORKING | MACHINE_NO_SOUND)
 GAME(1987,  sklflite,  0,        play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "Skill Flight (Playmatic)",  MACHINE_MECHANICAL | MACHINE_NOT_WORKING | MACHINE_NO_SOUND)
 // not by Playmatic, but same hardware
-GAME(1987,  ironball,  0,        play_3,   play_3,   driver_device, 0, ROT0, "Stargame",  "Iron Balls",                MACHINE_MECHANICAL | MACHINE_IMPERFECT_SOUND)
+GAME(1987,  ironball,  0,        play_3,   play_3,   driver_device, 0, ROT0, "Stargame",  "Iron Balls",                MACHINE_MECHANICAL | MACHINE_NOT_WORKING | MACHINE_IMPERFECT_SOUND)
 // bingo hardware, to be split (?)
 GAME(1983,  msdisco,   0,        play_3,   play_3,   driver_device, 0, ROT0, "Playmatic", "Miss Disco (Bingo)",        MACHINE_IS_SKELETON_MECHANICAL)

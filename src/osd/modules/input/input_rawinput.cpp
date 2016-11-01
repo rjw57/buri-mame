@@ -21,10 +21,10 @@
 
 #include <mutex>
 #include <functional>
+#include <algorithm>
 
 // MAME headers
 #include "emu.h"
-#include "osdepend.h"
 #include "strconv.h"
 
 // MAMEOS headers
@@ -289,8 +289,8 @@ private:
 	HANDLE  m_handle;
 
 public:
-	rawinput_device(running_machine& machine, const char* name, input_device_class deviceclass, input_module& module)
-		: event_based_device(machine, name, deviceclass, module),
+	rawinput_device(running_machine& machine, const char *name, const char *id, input_device_class deviceclass, input_module& module)
+		: event_based_device(machine, name, id, deviceclass, module),
 			m_handle(nullptr)
 	{
 	}
@@ -308,8 +308,8 @@ class rawinput_keyboard_device : public rawinput_device
 public:
 	keyboard_state keyboard;
 
-	rawinput_keyboard_device(running_machine& machine, const char* name, input_module& module)
-		: rawinput_device(machine, name, DEVICE_CLASS_KEYBOARD, module),
+	rawinput_keyboard_device(running_machine& machine, const char *name, const char *id, input_module& module)
+		: rawinput_device(machine, name, id, DEVICE_CLASS_KEYBOARD, module),
 			keyboard({{0}})
 	{
 	}
@@ -322,7 +322,7 @@ public:
 	void process_event(RAWINPUT &rawinput) override
 	{
 		// determine the full DIK-compatible scancode
-		UINT8 scancode = (rawinput.data.keyboard.MakeCode & 0x7f) | ((rawinput.data.keyboard.Flags & RI_KEY_E0) ? 0x80 : 0x00);
+		uint8_t scancode = (rawinput.data.keyboard.MakeCode & 0x7f) | ((rawinput.data.keyboard.Flags & RI_KEY_E0) ? 0x80 : 0x00);
 
 		// scancode 0xaa is a special shift code we need to ignore
 		if (scancode == 0xaa)
@@ -344,8 +344,8 @@ private:
 public:
 	mouse_state          mouse;
 
-	rawinput_mouse_device(running_machine& machine, const char* name, input_module& module)
-		: rawinput_device(machine, name, DEVICE_CLASS_MOUSE, module),
+	rawinput_mouse_device(running_machine& machine, const char *name, const char *id, input_module& module)
+		: rawinput_device(machine, name, id, DEVICE_CLASS_MOUSE, module),
 			mouse({0})
 	{
 	}
@@ -376,7 +376,7 @@ public:
 
 			// update zaxis
 			if (rawinput.data.mouse.usButtonFlags & RI_MOUSE_WHEEL)
-				mouse.lZ += static_cast<INT16>(rawinput.data.mouse.usButtonData) * INPUT_RELATIVE_PER_PIXEL;
+				mouse.lZ += static_cast<int16_t>(rawinput.data.mouse.usButtonData) * INPUT_RELATIVE_PER_PIXEL;
 
 			// update the button states; always update the corresponding mouse buttons
 			if (rawinput.data.mouse.usButtonFlags & RI_MOUSE_BUTTON_1_DOWN) mouse.rgbButtons[0] = 0x80;
@@ -404,8 +404,8 @@ private:
 public:
 	mouse_state          lightgun;
 
-	rawinput_lightgun_device(running_machine& machine, const char* name, input_module& module)
-		: rawinput_device(machine, name, DEVICE_CLASS_LIGHTGUN, module),
+	rawinput_lightgun_device(running_machine& machine, const char *name, const char *id, input_module& module)
+		: rawinput_device(machine, name, id, DEVICE_CLASS_LIGHTGUN, module),
 		lightgun({0})
 	{
 	}
@@ -434,7 +434,7 @@ public:
 
 			// update zaxis
 			if (rawinput.data.mouse.usButtonFlags & RI_MOUSE_WHEEL)
-				lightgun.lZ += static_cast<INT16>(rawinput.data.mouse.usButtonData) * INPUT_RELATIVE_PER_PIXEL;
+				lightgun.lZ += static_cast<int16_t>(rawinput.data.mouse.usButtonData) * INPUT_RELATIVE_PER_PIXEL;
 
 			// update the button states; always update the corresponding mouse buttons
 			if (rawinput.data.mouse.usButtonFlags & RI_MOUSE_BUTTON_1_DOWN) lightgun.rgbButtons[0] = 0x80;
@@ -467,7 +467,11 @@ private:
 
 public:
 	rawinput_module(const char *type, const char* name)
-		: wininput_module(type, name)
+		: wininput_module(type, name),
+		get_rawinput_device_list(nullptr),
+		get_rawinput_data(nullptr),
+		get_rawinput_device_info(nullptr),
+		register_rawinput_devices(nullptr)
 	{
 	}
 
@@ -569,9 +573,12 @@ protected:
 		std::wstring name = rawinput_device_improve_name(tname.get());
 
 		// convert name to utf8
-		std::string utf8_name = utf8_from_wstring(name.c_str());
+		std::string utf8_name = osd::text::from_wstring(name.c_str());
 
-		devinfo = devicelist()->create_device<TDevice>(machine, utf8_name.c_str(), *this);
+		// set device id to raw input name
+		std::string utf8_id = osd::text::from_wstring(tname.get());
+
+		devinfo = devicelist()->create_device<TDevice>(machine, utf8_name.c_str(), utf8_id.c_str(), *this);
 
 		// Add the handle
 		devinfo->set_handle(rawinputdevice->hDevice);
@@ -615,24 +622,23 @@ protected:
 		{
 			std::lock_guard<std::mutex> scope_lock(m_module_lock);
 
-			rawinput_device *devinfo;
+			RAWINPUT *input = reinterpret_cast<RAWINPUT*>(data);
+
 			// find the device in the list and update
-			for (int i = 0; i < devicelist()->size(); i++)
+			auto target_device = std::find_if(devicelist()->begin(), devicelist()->end(), [input](auto &device)
 			{
-				devinfo = dynamic_cast<rawinput_device*>(devicelist()->at(i));
-				if (devinfo)
-				{
-					RAWINPUT *input = reinterpret_cast<RAWINPUT*>(data);
-					if (input->header.hDevice == devinfo->device_handle())
-					{
-						devinfo->queue_events(input, 1);
-						result = true;
-					}
-				}
+				auto devinfo = dynamic_cast<rawinput_device*>(device.get());
+				return devinfo != nullptr && input->header.hDevice == devinfo->device_handle();
+			});
+
+			if (target_device != devicelist()->end())
+			{
+				static_cast<rawinput_device*>((*target_device).get())->queue_events(input, 1);
+				return true;
 			}
 		}
 
-		return result;
+		return false;
 	}
 };
 
@@ -673,7 +679,7 @@ protected:
 			// generate the name
 			if (GetKeyNameText(((keynum & 0x7f) << 16) | ((keynum & 0x80) << 17), keyname, ARRAY_LENGTH(keyname)) == 0)
 				_sntprintf(keyname, ARRAY_LENGTH(keyname), TEXT("Scan%03d"), keynum);
-			std::string name = utf8_from_tstring(keyname);
+			std::string name = osd::text::from_tstring(keyname);
 
 			// add the item to the device
 			devinfo->device()->add_item(name.c_str(), itemid, generic_button_get_state<std::uint8_t>, &devinfo->keyboard.state[keynum]);

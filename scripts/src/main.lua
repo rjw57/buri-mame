@@ -128,13 +128,18 @@ end
 				.. " --post-js " .. _MAKE.esc(MAME_DIR) .. "scripts/resources/emscripten/emscripten_post.js"
 				.. " --embed-file " .. _MAKE.esc(MAME_DIR) .. "bgfx/chains@bgfx/chains"
 				.. " --embed-file " .. _MAKE.esc(MAME_DIR) .. "bgfx/effects@bgfx/effects"
-				.. " --embed-file " .. _MAKE.esc(MAME_DIR) .. "bgfx/shaders/gles@bgfx/shaders/gles"
+				.. " --embed-file " .. _MAKE.esc(MAME_DIR) .. "bgfx/shaders/essl@bgfx/shaders/essl"
 				.. " --embed-file " .. _MAKE.esc(MAME_DIR) .. "artwork/slot-mask.png@artwork/slot-mask.png"
 
 			if _OPTIONS["SYMBOLS"]~=nil and _OPTIONS["SYMBOLS"]~="0" then
 				emccopts = emccopts
 					.. " -g" .. _OPTIONS["SYMLEVEL"]
 					.. " -s DEMANGLE_SUPPORT=1"
+			end
+
+			if _OPTIONS["WEBASSEMBLY"] then
+				emccopts = emccopts
+					.. " -s BINARYEN=1"
 			end
 
 			if _OPTIONS["ARCHOPTS"] then
@@ -195,6 +200,7 @@ end
 if (STANDALONE~=true) then
 	links {
 		"frontend",
+		"linenoise-ng",
 	}
 end
 if (MACHINES["NETLIST"]~=null) then
@@ -223,17 +229,12 @@ end
 		ext_lib("jpeg"),
 		"7z",
 	}
-if (STANDALONE~=true) then		
+if (STANDALONE~=true) then
 	links {
 		ext_lib("lua"),
 		"lualibs",
 	}
 end
-	if _OPTIONS["USE_LIBUV"]=="1" then
-		links {
-			ext_lib("uv"),
-		}
-	end
 	links {
 		ext_lib("zlib"),
 		ext_lib("flac"),
@@ -267,11 +268,11 @@ end
 		ext_includedir("flac"),
 	}
 
-	
+
 if (STANDALONE==true) then
 	standalone();
 end
-		
+
 if (STANDALONE~=true) then
 	if _OPTIONS["targetos"]=="macosx" and (not override_resources) then
 		linkoptions {
@@ -378,6 +379,6 @@ end
 		debugargs (_OPTIONS["DEBUG_ARGS"])
 	else
 		debugargs ("-window")
-	end	
-	
+	end
+
 end

@@ -69,9 +69,9 @@ public:
 	optional_device<okim6295_device> m_oki2;
 	required_device<okim6295_device> m_oki1;
 	/* memory pointers */
-	required_shared_ptr<UINT16> m_spriteram_1;
-	required_shared_ptr<UINT16> m_spriteram_2;
-	required_shared_ptr<UINT16> m_bgram;
+	required_shared_ptr<uint16_t> m_spriteram_1;
+	required_shared_ptr<uint16_t> m_spriteram_2;
+	required_shared_ptr<uint16_t> m_bgram;
 
 	/* video-related */
 	tilemap_t  *m_bg_tilemap;
@@ -85,7 +85,7 @@ public:
 	virtual void machine_start() override;
 	virtual void video_start() override;
 	void draw_sprites(bitmap_ind16 &bitmap, const rectangle &cliprect);
-	UINT32 screen_update_k3(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
+	uint32_t screen_update_k3(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
 	required_device<cpu_device> m_maincpu;
 	required_device<gfxdecode_device> m_gfxdecode;
 	required_device<palette_device> m_palette;
@@ -106,15 +106,15 @@ TILE_GET_INFO_MEMBER(k3_state::get_k3_bg_tile_info)
 
 void k3_state::video_start()
 {
-	m_bg_tilemap = &machine().tilemap().create(m_gfxdecode, tilemap_get_info_delegate(FUNC(k3_state::get_k3_bg_tile_info),this), TILEMAP_SCAN_ROWS, 16, 16, 32, 32);
+	m_bg_tilemap = &machine().tilemap().create(*m_gfxdecode, tilemap_get_info_delegate(FUNC(k3_state::get_k3_bg_tile_info),this), TILEMAP_SCAN_ROWS, 16, 16, 32, 32);
 }
 
 void k3_state::draw_sprites(bitmap_ind16 &bitmap, const rectangle &cliprect)
 {
 	gfx_element *gfx = m_gfxdecode->gfx(0);
-	UINT16 *source = m_spriteram_1;
-	UINT16 *source2 = m_spriteram_2;
-	UINT16 *finish = source + 0x1000 / 2;
+	uint16_t *source = m_spriteram_1;
+	uint16_t *source2 = m_spriteram_2;
+	uint16_t *finish = source + 0x1000 / 2;
 
 	while (source < finish)
 	{
@@ -134,7 +134,7 @@ void k3_state::draw_sprites(bitmap_ind16 &bitmap, const rectangle &cliprect)
 	}
 }
 
-UINT32 k3_state::screen_update_k3(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect)
+uint32_t k3_state::screen_update_k3(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect)
 {
 	m_bg_tilemap->draw(screen, bitmap, cliprect, 0, 0);
 	draw_sprites(bitmap, cliprect);
@@ -154,8 +154,8 @@ WRITE16_MEMBER(k3_state::k3_scrolly_w)
 
 WRITE16_MEMBER(k3_state::k3_soundbanks_w)
 {
-	m_oki2->set_bank_base((data & 4) ? 0x40000 : 0);
-	m_oki1->set_bank_base((data & 2) ? 0x40000 : 0);
+	m_oki2->set_rom_bank((data & 4) >> 2);
+	m_oki1->set_rom_bank((data & 2) >> 1);
 }
 
 WRITE16_MEMBER(k3_state::flagrall_soundbanks_w)
@@ -176,7 +176,7 @@ WRITE16_MEMBER(k3_state::flagrall_soundbanks_w)
 	if (data & 0xfcc9)
 		popmessage("unk control %04x", data & 0xfcc9);
 
-	m_oki1->set_bank_base(0x40000 * ((data & 0x6)>>1) );
+	m_oki1->set_rom_bank((data & 0x6) >> 1);
 
 }
 
@@ -295,7 +295,7 @@ static INPUT_PORTS_START( flagrall )
 	PORT_START("SYSTEM")
 	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_COIN1 )
 	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_COIN2 )
-	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_UNKNOWN )
+	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_START1 ) // needed to use the continue feature even if it's not used to start the game
 	PORT_BIT( 0x0008, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x0010, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x0020, IP_ACTIVE_LOW, IPT_UNKNOWN )

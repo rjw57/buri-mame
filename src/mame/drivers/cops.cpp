@@ -10,23 +10,23 @@
     Bad Boys by Inner Circle, so there is musical accompaniment to areas
     where the laserdisc audio is muted.
 
-	The different games here have subtly different control PCBs COPS has an Atari
-	part number (58-12B), while Revelations simply refers to a Lasermax control PCB 
-	(Lasermax being the consumer name for the LDP series)
-	
-    NOTES: To boot up Revelations, turn the refill key (R) and press button A 
-	to init NVRAM.
-    
-	TODO: There are probably more ROMs for Revelations and related, the disc
+    The different games here have subtly different control PCBs COPS has an Atari
+    part number (58-12B), while Revelations simply refers to a Lasermax control PCB
+    (Lasermax being the consumer name for the LDP series)
+
+    NOTES: To boot up Revelations, turn the refill key (R) and press button A
+    to init NVRAM.
+
+    TODO: There are probably more ROMs for Revelations and related, the disc
     contains full data for a picture based memory game called 'Vision Quest'.
-	However, the Vision Quest Laserdisc is slightly different, with Revelations
-	specific data seemingly replaced with black level.
+    However, the Vision Quest Laserdisc is slightly different, with Revelations
+    specific data seemingly replaced with black level.
 
     The UK version COPS appears to want to communicate with the LDP in a
     different way, passing illegal commands, need to verify this is the same
-	player.
-	
-	This should be similar hardware for Street Viper if we get a dump.
+    player.
+
+    This should be similar hardware for Street Viper if we get a dump.
 ***************************************************************************/
 
 
@@ -66,7 +66,7 @@ public:
 	required_device<sony_ldp1450_device> m_ld;
 
 	// screen updates
-	UINT32 screen_update(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
+	uint32_t screen_update(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
 
 protected:
 	// driver_device overrides
@@ -78,7 +78,7 @@ protected:
 public:
 	DECLARE_WRITE8_MEMBER(io1_w);
 	DECLARE_READ8_MEMBER(io1_r);
-	DECLARE_READ8_MEMBER(io1_lm_r);	
+	DECLARE_READ8_MEMBER(io1_lm_r);
 	DECLARE_WRITE8_MEMBER(io2_w);
 	DECLARE_READ8_MEMBER(io2_r);
 	DECLARE_READ8_MEMBER(ldstatus_r);
@@ -86,10 +86,10 @@ public:
 	DECLARE_WRITE_LINE_MEMBER(ld_w);
 	DECLARE_WRITE_LINE_MEMBER(via1_irq);
 	DECLARE_WRITE_LINE_MEMBER(via2_irq);
-    void dacia_receive(UINT8 data);
-    void update_dacia_irq();
-    DECLARE_WRITE8_MEMBER(dacia_w);
-    DECLARE_READ8_MEMBER(dacia_r);
+	void dacia_receive(uint8_t data);
+	void update_dacia_irq();
+	DECLARE_WRITE8_MEMBER(dacia_w);
+	DECLARE_READ8_MEMBER(dacia_r);
 	DECLARE_WRITE8_MEMBER(via1_b_w);
 	DECLARE_WRITE8_MEMBER(via1_cb1_w);
 	DECLARE_WRITE8_MEMBER(cdrom_data_w);
@@ -98,68 +98,68 @@ public:
 	DECLARE_DRIVER_INIT(cops);
 	int m_irq;
 
-	UINT8 m_lcd_addr_l, m_lcd_addr_h;
-	UINT8 m_lcd_data_l, m_lcd_data_h;
+	uint8_t m_lcd_addr_l, m_lcd_addr_h;
+	uint8_t m_lcd_data_l, m_lcd_data_h;
 
-    UINT8 m_dacia_irq1_reg;
-    UINT8 m_dacia_rts1;
-    UINT8 m_dacia_dtr1;
+	uint8_t m_dacia_irq1_reg;
+	uint8_t m_dacia_rts1;
+	uint8_t m_dacia_dtr1;
 
-	UINT8 m_parity_1;
-	UINT8 m_parity_mode_1;
-	UINT8 m_bpc_1;
-    int m_dacia_ic_div_1;
-    UINT8 m_dacia_echo1;
-    UINT8 m_dacia_stp_1;
-    UINT8 m_dacia_reg1;
-    UINT8 m_dacia_fe1;
-    UINT8 m_dacia_cmp1;
-    UINT8 m_dacia_cmpval1;
+	uint8_t m_parity_1;
+	uint8_t m_parity_mode_1;
+	uint8_t m_bpc_1;
+	int m_dacia_ic_div_1;
+	uint8_t m_dacia_echo1;
+	uint8_t m_dacia_stp_1;
+	uint8_t m_dacia_reg1;
+	uint8_t m_dacia_fe1;
+	uint8_t m_dacia_cmp1;
+	uint8_t m_dacia_cmpval1;
 
-    UINT8 m_dacia_irq2_reg;
-    UINT8 m_dacia_rts2;
-    UINT8 m_dacia_dtr2;
+	uint8_t m_dacia_irq2_reg;
+	uint8_t m_dacia_rts2;
+	uint8_t m_dacia_dtr2;
 
-	UINT8 m_parity_2;
-	UINT8 m_parity_mode_2;
-	UINT8 m_bpc_2;
-    int m_dacia_ic_div_2;
-    UINT8 m_dacia_echo2;
-    UINT8 m_dacia_stp_2;
-    UINT8 m_dacia_reg2;
-    UINT8 m_dacia_fe2;
-    UINT8 m_dacia_cmp2;
-    UINT8 m_dacia_cmpval2;
+	uint8_t m_parity_2;
+	uint8_t m_parity_mode_2;
+	uint8_t m_bpc_2;
+	int m_dacia_ic_div_2;
+	uint8_t m_dacia_echo2;
+	uint8_t m_dacia_stp_2;
+	uint8_t m_dacia_reg2;
+	uint8_t m_dacia_fe2;
+	uint8_t m_dacia_cmp2;
+	uint8_t m_dacia_cmpval2;
 
-    UINT8 m_dacia_cts;
-    UINT8 m_dacia_dcd;
-    UINT8 m_dacia_trans;
-    UINT8 m_dacia_trans2;
+	uint8_t m_dacia_cts;
+	uint8_t m_dacia_dcd;
+	uint8_t m_dacia_trans;
+	uint8_t m_dacia_trans2;
 
-    UINT8 m_dacia_receiver_data;
-    UINT8 m_dacia_receiver_full;
+	uint8_t m_dacia_receiver_data;
+	uint8_t m_dacia_receiver_full;
 
-    UINT8 m_dacia_receiver_data2;
-    UINT8 m_dacia_receiver_full2;
+	uint8_t m_dacia_receiver_data2;
+	uint8_t m_dacia_receiver_full2;
 
-	UINT8 m_cdrom_ctrl;
-	UINT8 m_cdrom_data;
+	uint8_t m_cdrom_ctrl;
+	uint8_t m_cdrom_data;
 
-	UINT8 m_sn_data;
-	UINT8 m_sn_cb1;
+	uint8_t m_sn_data;
+	uint8_t m_sn_cb1;
 
 	// LDP-1450
 	emu_timer *m_ld_timer;
 	TIMER_CALLBACK_MEMBER(ld_timer_callback);
 
-	UINT8 m_ld_command_to_send[8];
-	UINT8 m_ld_command_current_byte;
-	UINT8 ldcount=0;
-	UINT8 lddata;
-	UINT8 generate_isr();
-	UINT8 generate_isr2();
-//	void laserdisc_w(UINT8 data);
-	void laserdisc_response_w(UINT8 data);
+	uint8_t m_ld_command_to_send[8];
+	uint8_t m_ld_command_current_byte;
+	uint8_t ldcount=0;
+	uint8_t lddata;
+	uint8_t generate_isr();
+	uint8_t generate_isr2();
+//  void laserdisc_w(uint8_t data);
+	void laserdisc_response_w(uint8_t data);
 };
 
 const int timer_divide_select[16] =
@@ -186,7 +186,7 @@ void cops_state::video_start()
 {
 }
 
-UINT32 cops_state::screen_update( screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect )
+uint32_t cops_state::screen_update( screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect )
 {
 	return 0;
 }
@@ -201,7 +201,7 @@ WRITE8_MEMBER(cops_state::cdrom_data_w)
 {
 	const char *regs[4] = { "CMD", "PARAM", "WRITE", "CTRL" };
 	m_cdrom_data = BITSWAP8(data,0,1,2,3,4,5,6,7);
-	UINT8 reg = ((m_cdrom_ctrl & 4) >> 1) | ((m_cdrom_ctrl & 8) >> 3);
+	uint8_t reg = ((m_cdrom_ctrl & 4) >> 1) | ((m_cdrom_ctrl & 8) >> 3);
 	if (LOG_CDROM) logerror("%s:cdrom_data_w(reg = %s, data = %02x)\n", machine().describe_context(), regs[reg & 0x03], m_cdrom_data);
 }
 
@@ -214,7 +214,7 @@ WRITE8_MEMBER(cops_state::cdrom_ctrl_w)
 READ8_MEMBER(cops_state::cdrom_data_r)
 {
 	const char *regs[4] = { "STATUS", "RESULT", "READ", "FIFOST" };
-	UINT8 reg = ((m_cdrom_ctrl & 4) >> 1) | ((m_cdrom_ctrl & 8) >> 3);
+	uint8_t reg = ((m_cdrom_ctrl & 4) >> 1) | ((m_cdrom_ctrl & 8) >> 3);
 	if (LOG_CDROM) logerror("%s:cdrom_data_r(reg = %s)\n", machine().describe_context(), regs[reg & 0x03]);
 	return machine().rand()&0xff;
 }
@@ -260,31 +260,31 @@ WRITE_LINE_MEMBER(cops_state::ld_w)
 
 	printf("LDBIT %d",state);
 }
-/*void cops_state::laserdisc_w(UINT8 data)
+/*void cops_state::laserdisc_w(uint8_t data)
 {
-	switch( m_ld_input_state )
-	{
-		case LD_INPUT_TEXT_GET_X:
-			m_ld_input_state = LD_INPUT_TEXT_GET_Y;
-			break;
-		case LD_INPUT_TEXT_GET_Y:
-			m_ld_input_state = LD_INPUT_TEXT_GET_MODE;
-			break;
-		case LD_INPUT_TEXT_GET_MODE:
-			m_ld_input_state = LD_INPUT_GET_COMMAND;
-			break;
-		case LD_INPUT_TEXT_GET_SET_WINDOW:
-			m_ld_input_state = LD_INPUT_GET_COMMAND;
-			break;
-		case LD_INPUT_TEXT_GET_STRING:
-			if ( data == 0x1a )
-			{
-				m_ld_input_state = LD_INPUT_GET_COMMAND;
-			}
-			break;
-			}
-			break;
-	}
+    switch( m_ld_input_state )
+    {
+        case LD_INPUT_TEXT_GET_X:
+            m_ld_input_state = LD_INPUT_TEXT_GET_Y;
+            break;
+        case LD_INPUT_TEXT_GET_Y:
+            m_ld_input_state = LD_INPUT_TEXT_GET_MODE;
+            break;
+        case LD_INPUT_TEXT_GET_MODE:
+            m_ld_input_state = LD_INPUT_GET_COMMAND;
+            break;
+        case LD_INPUT_TEXT_GET_SET_WINDOW:
+            m_ld_input_state = LD_INPUT_GET_COMMAND;
+            break;
+        case LD_INPUT_TEXT_GET_STRING:
+            if ( data == 0x1a )
+            {
+                m_ld_input_state = LD_INPUT_GET_COMMAND;
+            }
+            break;
+            }
+            break;
+    }
 }*/
 
 /*************************************
@@ -295,70 +295,70 @@ WRITE_LINE_MEMBER(cops_state::ld_w)
 
 void cops_state::update_dacia_irq()
 {
-	UINT8 isr = generate_isr();
+	uint8_t isr = generate_isr();
 	//remove bits
 	isr &= ~m_dacia_irq1_reg;
-    m_maincpu->set_input_line(INPUT_LINE_NMI, isr? ASSERT_LINE:CLEAR_LINE);
+	m_maincpu->set_input_line(INPUT_LINE_NMI, isr? ASSERT_LINE:CLEAR_LINE);
 
-	UINT8 isr2 = generate_isr2();
+	uint8_t isr2 = generate_isr2();
 	//remove bits
 	isr2 &= ~m_dacia_irq2_reg;
-    m_maincpu->set_input_line(INPUT_LINE_NMI, isr2? ASSERT_LINE:CLEAR_LINE);
+	m_maincpu->set_input_line(INPUT_LINE_NMI, isr2? ASSERT_LINE:CLEAR_LINE);
 
 }
 
-void cops_state::dacia_receive(UINT8 data)
+void cops_state::dacia_receive(uint8_t data)
 {
-    if (m_dacia_cmp1)
-    {
-        if (m_dacia_cmpval1 == data)
-        {
-            m_dacia_receiver_data = data;
-            m_dacia_receiver_full = 1;
-            update_dacia_irq();
-            m_dacia_cmp1 =0;
-            m_dacia_cts =1;
-            m_dacia_trans =1;
-        }
-    }
-    else
-    {
-        m_dacia_receiver_data = data;
-        m_dacia_receiver_full = 1;
-        update_dacia_irq();
-        m_dacia_cts =1;
-        m_dacia_trans =1;
-    }
+	if (m_dacia_cmp1)
+	{
+		if (m_dacia_cmpval1 == data)
+		{
+			m_dacia_receiver_data = data;
+			m_dacia_receiver_full = 1;
+			update_dacia_irq();
+			m_dacia_cmp1 =0;
+			m_dacia_cts =1;
+			m_dacia_trans =1;
+		}
+	}
+	else
+	{
+		m_dacia_receiver_data = data;
+		m_dacia_receiver_full = 1;
+		update_dacia_irq();
+		m_dacia_cts =1;
+		m_dacia_trans =1;
+	}
 }
 
-UINT8 cops_state::generate_isr()
+uint8_t cops_state::generate_isr()
 {
-    UINT8 isr =0;
+	uint8_t isr =0;
 
-    isr |= m_dacia_receiver_full;
-    isr |= (m_dacia_cmp1 << 1);
-    isr |= (m_dacia_trans <<4);
+	isr |= m_dacia_receiver_full;
+	isr |= (m_dacia_cmp1 << 1);
+	isr |= (m_dacia_trans <<4);
 
-    if (isr)
-    {
-        isr |= 0x40;
-    }
-    return isr;
+	if (isr)
+	{
+		isr |= 0x40;
+	}
+	return isr;
 }
 
-UINT8 cops_state::generate_isr2()
+uint8_t cops_state::generate_isr2()
 {
-    UINT8 isr2 =0;
+	uint8_t isr2 =0;
 
-    isr2 |= m_dacia_receiver_full2;
-    isr2 |= (m_dacia_cmp2 << 1);
-    isr2 |= (m_dacia_trans2 <<4);
+	isr2 |= m_dacia_receiver_full2;
+	isr2 |= (m_dacia_cmp2 << 1);
+	isr2 |= (m_dacia_trans2 <<4);
 
-    if (isr2)
-    {
-        isr2 |= 0x40;
-    }
-    return isr2;
+	if (isr2)
+	{
+		isr2 |= 0x40;
+	}
+	return isr2;
 }
 
 READ8_MEMBER(cops_state::dacia_r)
@@ -367,7 +367,7 @@ READ8_MEMBER(cops_state::dacia_r)
 	{
 		case 0: /* ISR1: Interrupt Status Register */
 		{
-			UINT8 isr = generate_isr();
+			uint8_t isr = generate_isr();
 			m_dacia_trans =0;
 			m_maincpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
 			return isr;
@@ -375,7 +375,7 @@ READ8_MEMBER(cops_state::dacia_r)
 
 		case 1: /* CSR1: Control Status Register */
 		{
-			UINT8 csr =0;
+			uint8_t csr =0;
 			csr |= m_dacia_rts1;
 			csr |= (m_dacia_dtr1 << 1);
 			csr |= (m_dacia_cts <<4);
@@ -388,14 +388,14 @@ READ8_MEMBER(cops_state::dacia_r)
 		{
 			m_dacia_receiver_full = 0;
 			m_dacia_fe1=0;
-			
-//			if (LOG_DACIA) logerror("RDR1 %02x\n",m_dacia_receiver_data);
+
+//          if (LOG_DACIA) logerror("RDR1 %02x\n",m_dacia_receiver_data);
 			if (LOG_DACIA) logerror("RDR1 %02x\n",m_ld->status_r());
 			return m_ld->status_r();
 		}
 		case 4: /* ISR2: Interrupt Status Register */
 		{
-			UINT8 isr2 = generate_isr2();
+			uint8_t isr2 = generate_isr2();
 			m_dacia_trans2 =0;
 			m_maincpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
 			return isr2;
@@ -403,7 +403,7 @@ READ8_MEMBER(cops_state::dacia_r)
 
 		case 5: /* CSR2: Control Status Register */
 		{
-			UINT8 csr2 =0;
+			uint8_t csr2 =0;
 			csr2 |= m_dacia_rts2;
 			csr2 |= (m_dacia_dtr2 << 1);
 			csr2 |= (m_dacia_cts <<4);
@@ -415,7 +415,7 @@ READ8_MEMBER(cops_state::dacia_r)
 		case 7: /* RDR2: Receive data register */
 			m_dacia_receiver_full2 = 0;
 			m_dacia_fe2=0;
-			
+
 			if (LOG_DACIA) logerror("RDR2 %02x\n",m_ld->status_r());
 			return m_ld->status_r();
 
@@ -473,7 +473,7 @@ WRITE8_MEMBER(cops_state::dacia_w)
 				}
 				if (LOG_DACIA) logerror("DACIA TIME %02d\n", XTAL_3_6864MHz / m_dacia_ic_div_1);
 
-//				m_ld_timer->adjust(attotime::from_hz(XTAL_3_6864MHz / m_dacia_ic_div_1), 0, attotime::from_hz(XTAL_3_6864MHz / m_dacia_ic_div_1));
+//              m_ld_timer->adjust(attotime::from_hz(XTAL_3_6864MHz / m_dacia_ic_div_1), 0, attotime::from_hz(XTAL_3_6864MHz / m_dacia_ic_div_1));
 
 				if (LOG_DACIA) logerror("DACIA Ctrl Register: %02x\n", data);
 
@@ -499,7 +499,7 @@ WRITE8_MEMBER(cops_state::dacia_w)
 			if (LOG_DACIA) logerror("DACIA Transmit: %02x %c\n", data, (char)data);
 			m_ld->command_w(data);
 			break;
-		}			
+		}
 		case 4: /* IRQ enable Register 2 */
 		{
 			m_dacia_irq2_reg &= ~0x80;
@@ -567,14 +567,14 @@ WRITE8_MEMBER(cops_state::dacia_w)
 		case 7: /* Transmit Data Register 2 */
 		{
 			if (LOG_DACIA) logerror("DACIA Transmit 2: %02x %c\n", data, (char)data);
-			
-		//	for (int i=0; i <8; i++)
+
+		//  for (int i=0; i <8; i++)
 			{
-	//			m_ld_command_to_send[i] = data & (1<<i);
+	//          m_ld_command_to_send[i] = data & (1<<i);
 			}
-//			m_ld->command_w(data);
+//          m_ld->command_w(data);
 			break;
-		}			
+		}
 	}
 }
 /*************************************
@@ -604,7 +604,7 @@ READ8_MEMBER(cops_state::io1_lm_r)
 	switch( offset & 0x0f )
 	{
 		case 0x07:  /* WDI */
-			return 1;			
+			return 1;
 		case 0x08:  /* SW0 */
 			return ioport("SW0")->read();
 		case 0x09:  /* SW1 */
@@ -621,7 +621,7 @@ WRITE8_MEMBER(cops_state::io1_w)
 {
 	int i;
 	char output_name[16];
-	UINT16 display_data;
+	uint16_t display_data;
 
 	switch( offset & 0x0f )
 	{
@@ -632,9 +632,9 @@ WRITE8_MEMBER(cops_state::io1_w)
 			m_lcd_addr_h = data;
 			{
 				// update display
-				const UINT16 addrs_table[] = { 0x0004, 0x0008, 0x0010, 0x0020, 0x0040, 0x0002, 0x0001, 0x0080,
+				const uint16_t addrs_table[] = { 0x0004, 0x0008, 0x0010, 0x0020, 0x0040, 0x0002, 0x0001, 0x0080,
 												0x1000, 0x0800, 0x0400, 0x2000, 0x4000, 0x0200, 0x0100, 0x8000 };
-				UINT16 addr = m_lcd_addr_l | (m_lcd_addr_h << 8);
+				uint16_t addr = m_lcd_addr_l | (m_lcd_addr_h << 8);
 				for (i = 0; i < 16; i++ )
 				{
 					if (addr == addrs_table[i])
@@ -891,7 +891,7 @@ void cops_state::machine_reset()
 	m_irq = 0;
 	m_lcd_addr_l = m_lcd_addr_h = 0;
 	m_lcd_data_l = m_lcd_data_h = 0;
-	
+
 	m_dacia_cts = 0;
 	m_dacia_dcd = 0;
 
@@ -907,7 +907,7 @@ DRIVER_INIT_MEMBER(cops_state,cops)
 {
 	//The hardware is designed and programmed to use multiple system ROM banks, but for some reason it's hardwired to bank 2.
 	//For documentation's sake, here's the init
-	UINT8 *rom = memregion("system")->base();
+	uint8_t *rom = memregion("system")->base();
 	membank("sysbank1")->configure_entries(0, 4, &rom[0x0000], 0x2000);
 	membank("sysbank1")->set_entry(2);
 }
@@ -965,7 +965,7 @@ static MACHINE_CONFIG_START( revlatns, cops_state )
 	MCFG_VIA6522_CB1_HANDLER(WRITE8(cops_state, via1_cb1_w))
 
 	MCFG_DEVICE_ADD("rtc", MSM6242, XTAL_32_768kHz)
-	
+
 	/* acia (really a 65C52)*/
 
 	/* sound hardware */

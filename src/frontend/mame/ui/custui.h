@@ -162,7 +162,7 @@ private:
 	void inkey_special(const event *menu_event);
 
 	rgb_t           *m_color;
-	char            m_search[4];
+	std::string     m_search;
 	bool            m_key_active;
 	int             m_lock_ref;
 	std::string     m_title;
@@ -183,7 +183,7 @@ protected:
 
 private:
 	// draw palette menu
-	virtual void draw(UINT32 flags) override;
+	virtual void draw(uint32_t flags) override;
 
 	virtual void populate() override;
 	virtual void handle() override;

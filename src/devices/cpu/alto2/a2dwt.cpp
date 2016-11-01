@@ -10,32 +10,32 @@
 /*
  * Copied from ALTOCODE24.MU
  *
- *	;Display Word Task
+ *  ;Display Word Task
  *
- *	DWT:	T← DWA;
- *		T←-3+T+1;
- *		L← AECL+T,BUS=0,TASK;	AECL CONTAINS NWRDS AT THIS TIME
- *		AECL←L, :DWTZ;
+ *  DWT:    T← DWA;
+ *      T←-3+T+1;
+ *      L← AECL+T,BUS=0,TASK;   AECL CONTAINS NWRDS AT THIS TIME
+ *      AECL←L, :DWTZ;
  *
- *	DWTY:	BLOCK;
- *		TASK, :DWTF;
+ *  DWTY:   BLOCK;
+ *      TASK, :DWTF;
  *
- *	DWTZ:	L←HTAB-1, BUS=0,TASK;
- *		HTAB←L, :DOTAB;
+ *  DWTZ:   L←HTAB-1, BUS=0,TASK;
+ *      HTAB←L, :DOTAB;
  *
- *	DOTAB:	DDR←0, :DWTZ;
- *	NOTAB:	MAR←T←DWA;
- *		L←AECL-T-1;
- *		ALUCY, L←2+T;
- *		DWA←L, :XNOMORE;
+ *  DOTAB:  DDR←0, :DWTZ;
+ *  NOTAB:  MAR←T←DWA;
+ *      L←AECL-T-1;
+ *      ALUCY, L←2+T;
+ *      DWA←L, :XNOMORE;
  *
- *	DOMORE:	DDR←MD, TASK;
- *		DDR←MD, :NOTAB;
+ *  DOMORE: DDR←MD, TASK;
+ *      DDR←MD, :NOTAB;
  *
- *	XNOMORE:DDR← MD, BLOCK;
- *		DDR← MD, TASK;
+ *  XNOMORE:DDR← MD, BLOCK;
+ *      DDR← MD, TASK;
  *
- *	DWTF:	:DWT;
+ *  DWTF:   :DWT;
  */
 
 //! PROM a38 bit O1 is STOPWAKE' (stop DWT if bit is zero)
@@ -67,7 +67,7 @@ void alto2_cpu_device::f2_late_load_ddr()
 	LOG((this,LOG_DWT,2,"    DDR<- BUS (%#o)\n", m_bus));
 	m_dsp.fifo[m_dsp.wa] = m_bus;
 	m_dsp.wa = (m_dsp.wa + 1) % A2_DISP_FIFO;
-	UINT8 a38 = m_disp_a38[m_dsp.ra * 16 + m_dsp.wa];
+	uint8_t a38 = m_disp_a38[m_dsp.ra * 16 + m_dsp.wa];
 	if (FIFO_STOPWAKE(a38))
 		m_task_wakeup &= ~(1 << task_dwt);
 	LOG((this,LOG_DWT,2, "   DWT push %04x into FIFO[%02o]%s\n",

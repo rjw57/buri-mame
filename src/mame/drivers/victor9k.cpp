@@ -113,7 +113,7 @@ public:
 	required_device<rs232_port_device> m_rs232b;
 	required_device<palette_device> m_palette;
 	required_memory_region m_rom;
-	required_shared_ptr<UINT8> m_video_ram;
+	required_shared_ptr<uint8_t> m_video_ram;
 
 	virtual void machine_start() override;
 	virtual void machine_reset() override;
@@ -232,8 +232,8 @@ INPUT_PORTS_END
 
 #define DC_SECRET   0x1000
 #define DC_UNDLN    0x2000
-#define DC_LOWINT  	0x4000
-#define DC_RVS  	0x8000
+#define DC_LOWINT   0x4000
+#define DC_RVS      0x8000
 
 MC6845_UPDATE_ROW( victor9k_state::crtc_update_row )
 {
@@ -250,16 +250,16 @@ MC6845_UPDATE_ROW( victor9k_state::crtc_update_row )
 
 	address_space &program = m_maincpu->space(AS_PROGRAM);
 	const rgb_t *palette = m_palette->palette()->entry_list_raw();
-	
+
 	int x = hbp;
 
 	offs_t aa = (ma & 0x7ff) << 1;
 
 	for (int sx = 0; sx < x_count; sx++)
 	{
-		UINT16 dc = (m_video_ram[aa + 1] << 8) | m_video_ram[aa];
+		uint16_t dc = (m_video_ram[aa + 1] << 8) | m_video_ram[aa];
 		offs_t ab = (dot_addr << 15) | ((dc & 0x7ff) << 4) | (ra & 0x0f);
-		UINT16 dd = program.read_word(ab << 1);
+		uint16_t dd = program.read_word(ab << 1);
 
 		int cursor = (sx == cursor_x) ? 1 : 0;
 		int undln = !((dc & DC_UNDLN) && BIT(dd, 15)) ? 2 : 0;
@@ -273,7 +273,7 @@ MC6845_UPDATE_ROW( victor9k_state::crtc_update_row )
 
 			switch (rvs | undln | cursor)
 			{
-			case 0:	case 5:
+			case 0: case 5:
 				pixel = 1;
 				break;
 
@@ -679,7 +679,7 @@ static MACHINE_CONFIG_START( victor9k, victor9k_state )
 	MCFG_CPU_IRQ_ACKNOWLEDGE_DEVICE(I8259A_TAG, pic8259_device, inta_cb)
 
 	// video hardware
-	MCFG_SCREEN_ADD_MONOCHROME(SCREEN_TAG, RASTER, rgb_t::green)
+	MCFG_SCREEN_ADD_MONOCHROME(SCREEN_TAG, RASTER, rgb_t::green())
 	MCFG_SCREEN_REFRESH_RATE(50)
 	MCFG_SCREEN_VBLANK_TIME(ATTOSECONDS_IN_USEC(2500)) // not accurate
 	MCFG_SCREEN_UPDATE_DEVICE(HD46505S_TAG, hd6845_device, screen_update)

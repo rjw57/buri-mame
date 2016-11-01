@@ -29,6 +29,13 @@
       "bad\\
       tbehaviour"
 
+    Known Lua limitations:
+    * Whitespace normalisation is applied inside long string literals
+      which can cause changes in behaviour
+    * Disabled code inside long comments gets no special treatment and
+      may have spacing adjusted in a way that affects behaviour when
+      uncommented
+
     Known XML limitations:
     * No special handling for CDATA
     * No special handling for processing instructions
@@ -88,47 +95,55 @@ public:
 	virtual void summarise(std::ostream &os) const;
 
 protected:
-	static constexpr unicode_char HORIZONTAL_TAB        = 0x0000'0009U;
-	static constexpr unicode_char LINE_FEED             = 0x0000'000aU;
-	static constexpr unicode_char SPACE                 = 0x0000'0020U;
+	static constexpr char32_t HORIZONTAL_TAB            = 0x0000'0009U;
+	static constexpr char32_t LINE_FEED                 = 0x0000'000aU;
+	static constexpr char32_t VERTICAL_TAB              = 0x0000'000bU;
+	static constexpr char32_t SPACE                     = 0x0000'0020U;
+	static constexpr char32_t DOUBLE_QUOTE              = 0x0000'0022U;
+	static constexpr char32_t SINGLE_QUOTE              = 0x0000'0027U;
+	static constexpr char32_t HYPHEN_MINUS              = 0x0000'002dU;
+	static constexpr char32_t QUESTION_MARK             = 0x0000'003fU;
+	static constexpr char32_t BACKSLASH                 = 0x0000'005cU;
+	static constexpr char32_t BASIC_LATIN_LAST          = 0x0000'007fU;
+	static constexpr char32_t CYRILLIC_SUPPLEMENT_LAST  = 0x0000'052fU;
 
 	template <typename OutputIt>
 	cleaner_base(OutputIt &&output, newline newline_mode, unsigned tab_width);
 
-	void output_character(unicode_char ch);
+	void output_character(char32_t ch);
 
 	void set_tab_limit();
 	void reset_tab_limit();
 
 private:
-	static constexpr unicode_char CARRIAGE_RETURN       = 0x0000'000dU;
-	static constexpr unicode_char HIGH_SURROGATE_FIRST  = 0x0000'd800U;
-	static constexpr unicode_char HIGH_SURROGATE_LAST   = 0x0000'dbffU;
-	static constexpr unicode_char LOW_SURROGATE_FIRST   = 0x0000'dc00U;
-	static constexpr unicode_char LOW_SURROGATE_LAST    = 0x0000'dfffU;
-	static constexpr unicode_char NONCHARACTER_FIRST    = 0x0000'fdd0U;
-	static constexpr unicode_char NONCHARACTER_LAST     = 0x0000'fdefU;
-	static constexpr unicode_char ZERO_WIDTH_NB_SPACE   = 0x0000'feffU;
-	static constexpr unicode_char REPLACEMENT_CHARACTER = 0x0000'fffdU;
-	static constexpr unicode_char SUPPLEMENTARY_FIRST   = 0x0001'0000U;
-	static constexpr unicode_char SUPPLEMENTARY_LAST    = 0x0010'ffffU;
+	static constexpr char32_t CARRIAGE_RETURN       = 0x0000'000dU;
+	static constexpr char32_t HIGH_SURROGATE_FIRST  = 0x0000'd800U;
+	static constexpr char32_t HIGH_SURROGATE_LAST   = 0x0000'dbffU;
+	static constexpr char32_t LOW_SURROGATE_FIRST   = 0x0000'dc00U;
+	static constexpr char32_t LOW_SURROGATE_LAST    = 0x0000'dfffU;
+	static constexpr char32_t NONCHARACTER_FIRST    = 0x0000'fdd0U;
+	static constexpr char32_t NONCHARACTER_LAST     = 0x0000'fdefU;
+	static constexpr char32_t ZERO_WIDTH_NB_SPACE   = 0x0000'feffU;
+	static constexpr char32_t REPLACEMENT_CHARACTER = 0x0000'fffdU;
+	static constexpr char32_t SUPPLEMENTARY_FIRST   = 0x0001'0000U;
+	static constexpr char32_t SUPPLEMENTARY_LAST    = 0x0010'ffffU;
 
-	static constexpr unicode_char CODE_LENGTH_THRESHOLDS[6]{
+	static constexpr char32_t CODE_LENGTH_THRESHOLDS[6]{
 			0x0000'0000U, 0x0000'0080U, 0x0000'0800U, 0x0001'0000U, 0x0020'0000U, 0x0400'0000 };
 
 	typedef std::function<void (char)> output_function;
 
-	virtual void process_characters(unicode_char const *begin, unicode_char const *end) = 0;
+	virtual void process_characters(char32_t const *begin, char32_t const *end) = 0;
 	virtual void input_complete() = 0;
 
 	void flush_whitespace();
-	void output_utf8(unicode_char ch);
-	void commit_character(unicode_char ch);
+	void output_utf8(char32_t ch);
+	void commit_character(char32_t ch);
 	void process_if_full();
 	void handle_lead_byte(std::uint8_t ch);
-	void handle_codepoint(unicode_char cp);
+	void handle_codepoint(char32_t cp);
 
-	static constexpr bool is_character(unicode_char ch)
+	static constexpr bool is_character(char32_t ch)
 	{
 		return
 				(ch <= SUPPLEMENTARY_LAST) &&
@@ -136,17 +151,17 @@ private:
 				((ch & 0x0000'fffeU) != 0x0000'fffeU);
 	}
 
-	static constexpr bool is_high_surrogate(unicode_char ch)
+	static constexpr bool is_high_surrogate(char32_t ch)
 	{
 		return (ch >= HIGH_SURROGATE_FIRST) && (ch <= HIGH_SURROGATE_LAST);
 	}
 
-	static constexpr bool is_low_surrogate(unicode_char ch)
+	static constexpr bool is_low_surrogate(char32_t ch)
 	{
 		return (ch >= LOW_SURROGATE_FIRST) && (ch <= LOW_SURROGATE_LAST);
 	}
 
-	static constexpr unicode_char combine_surrogates(unicode_char high, unicode_char low)
+	static constexpr char32_t combine_surrogates(char32_t high, char32_t low)
 	{
 		return SUPPLEMENTARY_FIRST + (((high & 0x0000'03ffU) << 10U) | (low & 0x0000'03ffU));
 	}
@@ -160,16 +175,16 @@ private:
 	unsigned                    m_output_column = 0U;
 	unsigned                    m_indent;
 	unsigned                    m_tab_limit     = std::numeric_limits<unsigned>::max();
-	std::vector<unicode_char>   m_whitespace;
+	std::vector<char32_t>   m_whitespace;
 
 	// input state management
-	unicode_char    m_buffer[1024];
+	char32_t    m_buffer[1024];
 	bool            m_stream_start      = true;
 	std::size_t     m_position          = 0U;
-	unicode_char    m_surrogate         = 0U;
+	char32_t    m_surrogate         = 0U;
 	unsigned        m_code_length       = 0U;
 	unsigned        m_required_bytes    = 0U;
-	unicode_char    m_newline_lead      = 0U;
+	char32_t    m_newline_lead      = 0U;
 
 	// statistics
 	std::uint64_t   m_overlong              = 0U;
@@ -192,7 +207,7 @@ private:
 	bool            m_final_newline         = false;
 };
 
-constexpr unicode_char cleaner_base::CODE_LENGTH_THRESHOLDS[6];
+constexpr char32_t cleaner_base::CODE_LENGTH_THRESHOLDS[6];
 
 
 /*--------------------------------------------------
@@ -211,7 +226,7 @@ void cleaner_base::process(InputIt begin, InputIt end)
 			if ((byte & 0xc0U) == 0x80U)
 			{
 				m_buffer[m_position] <<= 6U;
-				m_buffer[m_position] |= unicode_char(byte & 0x3fU);
+				m_buffer[m_position] |= char32_t(byte & 0x3fU);
 				--m_required_bytes;
 			}
 			else
@@ -386,7 +401,7 @@ cleaner_base::cleaner_base(
     normalisation and line ending translation
 --------------------------------------------------*/
 
-void cleaner_base::output_character(unicode_char ch)
+void cleaner_base::output_character(char32_t ch)
 {
 	switch (ch)
 	{
@@ -440,7 +455,7 @@ void cleaner_base::set_tab_limit()
 	if (!m_output_column)
 	{
 		unsigned limit(0U);
-		for (unicode_char ch : m_whitespace)
+		for (char32_t ch : m_whitespace)
 			limit += (HORIZONTAL_TAB == ch) ? (m_tab_width - (limit % m_tab_width)) : 1U;
 		m_tab_limit = limit;
 	}
@@ -473,7 +488,7 @@ void cleaner_base::flush_whitespace()
 	bool const  set_indent(!m_output_column);
 	bool        expand(m_output_column);
 	unsigned    space_count(0U);
-	for (unicode_char space : m_whitespace)
+	for (char32_t space : m_whitespace)
 	{
 		assert(!expand || !space_count);
 		assert(space_count < m_tab_width);
@@ -547,7 +562,7 @@ void cleaner_base::flush_whitespace()
     convert codepoint to UFF-8 and send to output
 --------------------------------------------------*/
 
-void cleaner_base::output_utf8(unicode_char ch)
+void cleaner_base::output_utf8(char32_t ch)
 {
 	if (0x0000'0080U > ch)
 	{
@@ -574,7 +589,7 @@ void cleaner_base::output_utf8(unicode_char ch)
     replacing noncharacters
 --------------------------------------------------*/
 
-void cleaner_base::commit_character(unicode_char ch)
+void cleaner_base::commit_character(char32_t ch)
 {
 	assert(ARRAY_LENGTH(m_buffer) > m_position);
 	assert(1U <= m_code_length);
@@ -701,7 +716,7 @@ void cleaner_base::handle_lead_byte(std::uint8_t byte)
 	m_code_length = m_required_bytes + 1U;
 	if (m_required_bytes)
 	{
-		m_buffer[m_position] = ((unicode_char(1U) << (6U - m_required_bytes)) - 1) & unicode_char(byte);
+		m_buffer[m_position] = ((char32_t(1U) << (6U - m_required_bytes)) - 1) & char32_t(byte);
 	}
 	else if ((byte & 0xc0U) == 0x80U)
 	{
@@ -726,7 +741,7 @@ void cleaner_base::handle_lead_byte(std::uint8_t byte)
     surrogates
 --------------------------------------------------*/
 
-void cleaner_base::handle_codepoint(unicode_char cp)
+void cleaner_base::handle_codepoint(char32_t cp)
 {
 	if (m_surrogate)
 	{
@@ -775,7 +790,7 @@ public:
 	}
 
 private:
-	virtual void process_characters(unicode_char const *begin, unicode_char const *end) override
+	virtual void process_characters(char32_t const *begin, char32_t const *end) override
 	{
 		while (begin != end)
 			output_character(*begin++);
@@ -802,35 +817,29 @@ public:
 	virtual void summarise(std::ostream &os) const override;
 
 protected:
-	void output_character(unicode_char ch);
+	void output_character(char32_t ch);
 
 private:
-	static constexpr unicode_char DOUBLE_QUOTE              = 0x0000'0022U;
-	static constexpr unicode_char SINGLE_QUOTE              = 0x0000'0027U;
-	static constexpr unicode_char ASTERISK                  = 0x0000'002aU;
-	static constexpr unicode_char SLASH                     = 0x0000'002fU;
-	static constexpr unicode_char QUESTION_MARK             = 0x0000'003fU;
-	static constexpr unicode_char UPPERCASE_FIRST           = 0x0000'0041U;
-	static constexpr unicode_char UPPERCASE_B               = 0x0000'0042U;
-	static constexpr unicode_char UPPERCASE_X               = 0x0000'0058U;
-	static constexpr unicode_char UPPERCASE_LAST            = 0x0000'005aU;
-	static constexpr unicode_char BACKSLASH                 = 0x0000'005cU;
-	static constexpr unicode_char UNDERSCORE                = 0x0000'005fU;
-	static constexpr unicode_char LOWERCASE_FIRST           = 0x0000'0061U;
-	static constexpr unicode_char LOWERCASE_B               = 0x0000'0062U;
-	static constexpr unicode_char LOWERCASE_X               = 0x0000'0078U;
-	static constexpr unicode_char LOWERCASE_LAST            = 0x0000'007aU;
-	static constexpr unicode_char BASIC_LATIN_LAST          = 0x0000'007fU;
-	static constexpr unicode_char CYRILLIC_SUPPLEMENT_LAST  = 0x0000'052fU;
+	static constexpr char32_t ASTERISK              = 0x0000'002aU;
+	static constexpr char32_t SLASH                 = 0x0000'002fU;
+	static constexpr char32_t UPPERCASE_FIRST       = 0x0000'0041U;
+	static constexpr char32_t UPPERCASE_B           = 0x0000'0042U;
+	static constexpr char32_t UPPERCASE_X           = 0x0000'0058U;
+	static constexpr char32_t UPPERCASE_LAST        = 0x0000'005aU;
+	static constexpr char32_t UNDERSCORE            = 0x0000'005fU;
+	static constexpr char32_t LOWERCASE_FIRST       = 0x0000'0061U;
+	static constexpr char32_t LOWERCASE_B           = 0x0000'0062U;
+	static constexpr char32_t LOWERCASE_X           = 0x0000'0078U;
+	static constexpr char32_t LOWERCASE_LAST        = 0x0000'007aU;
 
-	static constexpr unicode_char DIGIT_FIRST               = 0x0000'0030U;
-	static constexpr unicode_char DIGIT_BINARY_LAST         = 0x0000'0031U;
-	static constexpr unicode_char DIGIT_OCTAL_LAST          = 0x0000'0037U;
-	static constexpr unicode_char DIGIT_DECIMAL_LAST        = 0x0000'0039U;
-	static constexpr unicode_char DIGIT_HEX_UPPER_FIRST     = 0x0000'0041U;
-	static constexpr unicode_char DIGIT_HEX_UPPER_LAST      = 0x0000'0046U;
-	static constexpr unicode_char DIGIT_HEX_LOWER_FIRST     = 0x0000'0061U;
-	static constexpr unicode_char DIGIT_HEX_LOWER_LAST      = 0x0000'0066U;
+	static constexpr char32_t DIGIT_FIRST           = 0x0000'0030U;
+	static constexpr char32_t DIGIT_BINARY_LAST     = 0x0000'0031U;
+	static constexpr char32_t DIGIT_OCTAL_LAST      = 0x0000'0037U;
+	static constexpr char32_t DIGIT_DECIMAL_LAST    = 0x0000'0039U;
+	static constexpr char32_t DIGIT_HEX_UPPER_FIRST = 0x0000'0041U;
+	static constexpr char32_t DIGIT_HEX_UPPER_LAST  = 0x0000'0046U;
+	static constexpr char32_t DIGIT_HEX_LOWER_FIRST = 0x0000'0061U;
+	static constexpr char32_t DIGIT_HEX_LOWER_LAST  = 0x0000'0066U;
 
 	enum class parse_state
 	{
@@ -843,17 +852,17 @@ private:
 		NUMERIC_CONSTANT
 	};
 
-	virtual void process_characters(unicode_char const *begin, unicode_char const *end) override;
+	virtual void process_characters(char32_t const *begin, char32_t const *end) override;
 	virtual void input_complete() override;
 
-	void process_default(unicode_char ch);
-	void process_comment(unicode_char ch);
-	void process_line_comment(unicode_char ch);
-	void process_token(unicode_char ch);
-	void process_text(unicode_char ch);
-	void process_numeric(unicode_char ch);
+	void process_default(char32_t ch);
+	void process_comment(char32_t ch);
+	void process_line_comment(char32_t ch);
+	void process_token(char32_t ch);
+	void process_text(char32_t ch);
+	void process_numeric(char32_t ch);
 
-	bool tail_is(unicode_char ch) const
+	bool tail_is(char32_t ch) const
 	{
 		return !m_tail.empty() && (m_tail.front() == ch);
 	}
@@ -864,7 +873,7 @@ private:
 			m_tail.pop_front();
 	}
 
-	void replace_tail(unicode_char ch)
+	void replace_tail(char32_t ch)
 	{
 		assert(!m_tail.empty());
 		*m_tail.begin() = ch;
@@ -872,12 +881,12 @@ private:
 
 	void flush_tail()
 	{
-		for (unicode_char tail : m_tail)
+		for (char32_t tail : m_tail)
 			cleaner_base::output_character(tail);
 		m_tail.clear();
 	}
 
-	static constexpr bool is_token_lead(unicode_char ch)
+	static constexpr bool is_token_lead(char32_t ch)
 	{
 		return
 				((UPPERCASE_FIRST <= ch) && (UPPERCASE_LAST >= ch)) ||
@@ -885,34 +894,34 @@ private:
 				(UNDERSCORE == ch);
 	}
 
-	static constexpr bool is_token_continuation(unicode_char ch)
+	static constexpr bool is_token_continuation(char32_t ch)
 	{
 		return
 				is_token_lead(ch) ||
 				((DIGIT_FIRST <= ch) && (DIGIT_DECIMAL_LAST >= ch));
 	}
 
-	static constexpr bool is_numeric_lead(unicode_char ch)
+	static constexpr bool is_numeric_lead(char32_t ch)
 	{
 		return (DIGIT_FIRST <= ch) && (DIGIT_DECIMAL_LAST >= ch);
 	}
 
-	static constexpr bool is_binary_digit(unicode_char ch)
+	static constexpr bool is_binary_digit(char32_t ch)
 	{
 		return (DIGIT_FIRST <= ch) && (DIGIT_BINARY_LAST >= ch);
 	}
 
-	static constexpr bool is_octal_digit(unicode_char ch)
+	static constexpr bool is_octal_digit(char32_t ch)
 	{
 		return (DIGIT_FIRST <= ch) && (DIGIT_OCTAL_LAST >= ch);
 	}
 
-	static constexpr bool is_decimal_digit(unicode_char ch)
+	static constexpr bool is_decimal_digit(char32_t ch)
 	{
 		return (DIGIT_FIRST <= ch) && (DIGIT_DECIMAL_LAST >= ch);
 	}
 
-	static constexpr bool is_hexadecimal_digit(unicode_char ch)
+	static constexpr bool is_hexadecimal_digit(char32_t ch)
 	{
 		return
 				((DIGIT_FIRST <= ch) && (DIGIT_DECIMAL_LAST >= ch)) ||
@@ -923,9 +932,9 @@ private:
 	parse_state                 m_parse_state;
 	std::uint64_t               m_input_line;
 	bool                        m_escape;
-	std::deque<unicode_char>    m_tail;
+	std::deque<char32_t>    m_tail;
 	std::uint64_t               m_comment_line;
-	unicode_char                m_lead_digit;
+	char32_t                m_lead_digit;
 	unsigned                    m_radix;
 
 	std::uint64_t   m_tabs_escaped                  = 0U;
@@ -981,7 +990,7 @@ void cpp_cleaner::summarise(std::ostream &os) const
 }
 
 
-void cpp_cleaner::output_character(unicode_char ch)
+void cpp_cleaner::output_character(char32_t ch)
 {
 	switch (m_parse_state)
 	{
@@ -1023,11 +1032,11 @@ void cpp_cleaner::output_character(unicode_char ch)
 }
 
 
-void cpp_cleaner::process_characters(unicode_char const *begin, unicode_char const *end)
+void cpp_cleaner::process_characters(char32_t const *begin, char32_t const *end)
 {
 	while (begin != end)
 	{
-		unicode_char const ch(*begin++);
+		char32_t const ch(*begin++);
 		switch (m_parse_state)
 		{
 		case parse_state::DEFAULT:
@@ -1060,12 +1069,21 @@ void cpp_cleaner::process_characters(unicode_char const *begin, unicode_char con
 void cpp_cleaner::input_complete()
 {
 	flush_tail();
-	if (parse_state::COMMENT == m_parse_state)
+	switch (m_parse_state)
+	{
+	case parse_state::COMMENT:
 		throw std::runtime_error(util::string_format("unterminated multi-line comment beginning on line %1$u", m_comment_line));
+	case parse_state::CHARACTER_CONSTANT:
+		throw std::runtime_error(util::string_format("unterminated character literal on line %1$u", m_input_line));
+	case parse_state::STRING_CONSTANT:
+		throw std::runtime_error(util::string_format("unterminated string literal on line %1$u", m_input_line));
+	default:
+		break;
+	}
 }
 
 
-void cpp_cleaner::process_default(unicode_char ch)
+void cpp_cleaner::process_default(char32_t ch)
 {
 	switch (ch)
 	{
@@ -1105,7 +1123,7 @@ void cpp_cleaner::process_default(unicode_char ch)
 }
 
 
-void cpp_cleaner::process_comment(unicode_char ch)
+void cpp_cleaner::process_comment(char32_t ch)
 {
 	switch (ch)
 	{
@@ -1126,7 +1144,7 @@ void cpp_cleaner::process_comment(unicode_char ch)
 }
 
 
-void cpp_cleaner::process_line_comment(unicode_char ch)
+void cpp_cleaner::process_line_comment(char32_t ch)
 {
 	switch (ch)
 	{
@@ -1147,7 +1165,7 @@ void cpp_cleaner::process_line_comment(unicode_char ch)
 }
 
 
-void cpp_cleaner::process_token(unicode_char ch)
+void cpp_cleaner::process_token(char32_t ch)
 {
 	if (is_token_continuation(ch))
 	{
@@ -1161,7 +1179,7 @@ void cpp_cleaner::process_token(unicode_char ch)
 }
 
 
-void cpp_cleaner::process_text(unicode_char ch)
+void cpp_cleaner::process_text(char32_t ch)
 {
 	switch (ch)
 	{
@@ -1169,7 +1187,7 @@ void cpp_cleaner::process_text(unicode_char ch)
 		++m_tabs_escaped;
 		if (!m_escape)
 			output_character(BACKSLASH);
-		output_character(unicode_char(std::uint8_t('t')));
+		output_character(char32_t(std::uint8_t('t')));
 		break;
 	case LINE_FEED:
 		if (parse_state::CHARACTER_CONSTANT == m_parse_state)
@@ -1188,6 +1206,12 @@ void cpp_cleaner::process_text(unicode_char ch)
 			throw std::runtime_error(util::string_format("unterminated string literal on line %1$u", m_input_line));
 		}
 		break;
+	case VERTICAL_TAB:
+		++m_tabs_escaped;
+		if (!m_escape)
+			output_character(BACKSLASH);
+		output_character(char32_t(std::uint8_t('v')));
+		break;
 	default:
 		output_character(ch);
 		if (!m_escape && (((parse_state::STRING_CONSTANT == m_parse_state) ? DOUBLE_QUOTE : SINGLE_QUOTE) == ch))
@@ -1197,7 +1221,7 @@ void cpp_cleaner::process_text(unicode_char ch)
 }
 
 
-void cpp_cleaner::process_numeric(unicode_char ch)
+void cpp_cleaner::process_numeric(char32_t ch)
 {
 	if (!m_lead_digit)
 	{
@@ -1300,6 +1324,324 @@ void cpp_cleaner::process_numeric(unicode_char ch)
 
 
 /***************************************************************************
+    LUA SOURCE CLEANER CLASS
+***************************************************************************/
+
+class lua_cleaner : public cleaner_base
+{
+public:
+	template <typename OutputIt>
+	lua_cleaner(OutputIt &&output, newline newline_mode, unsigned tab_width);
+
+	virtual bool affected() const override;
+	virtual void summarise(std::ostream &os) const override;
+
+protected:
+	void output_character(char32_t ch);
+
+private:
+	static constexpr char32_t EQUALS        = 0x0000'003dU;
+	static constexpr char32_t LEFT_BRACKET  = 0x0000'005bU;
+	static constexpr char32_t RIGHT_BRACKET = 0x0000'005dU;
+
+	enum class parse_state
+	{
+		DEFAULT,
+		SHORT_COMMENT,
+		LONG_COMMENT,
+		STRING_CONSTANT,
+		LONG_STRING_CONSTANT
+	};
+
+	virtual void process_characters(char32_t const *begin, char32_t const *end) override;
+	virtual void input_complete() override;
+
+	void process_default(char32_t ch);
+	void process_short_comment(char32_t ch);
+	void process_long_comment(char32_t ch);
+	void process_string_constant(char32_t ch);
+	void process_long_string_constant(char32_t ch);
+
+	parse_state     m_parse_state;
+	std::uint64_t   m_input_line;
+	int             m_long_bracket_level;
+	bool            m_escape;
+	std::uint32_t   m_block_line;
+	int             m_block_level;
+	bool            m_comment_start;
+	char32_t    m_string_quote;
+
+	std::uint64_t   m_tabs_escaped      = 0U;
+	std::uint64_t   m_newlines_escaped  = 0U;
+	std::uint64_t   m_non_ascii         = 0U;
+};
+
+
+template <typename OutputIt>
+lua_cleaner::lua_cleaner(
+		OutputIt &&output,
+		newline newline_mode,
+		unsigned tab_width)
+	: cleaner_base(std::forward<OutputIt>(output), newline_mode, tab_width)
+	, m_parse_state(parse_state::DEFAULT)
+	, m_input_line(1U)
+	, m_long_bracket_level(-1)
+	, m_escape(false)
+	, m_block_line(0U)
+	, m_block_level(0)
+	, m_comment_start(false)
+	, m_string_quote(0U)
+{
+}
+
+
+bool lua_cleaner::affected() const
+{
+	return
+			cleaner_base::affected() ||
+			m_tabs_escaped ||
+			m_newlines_escaped ||
+			m_non_ascii;
+}
+
+
+void lua_cleaner::summarise(std::ostream &os) const
+{
+	cleaner_base::summarise(os);
+	if (m_tabs_escaped)
+		util::stream_format(os, "%1$u tab(s) escaped\n", m_tabs_escaped);
+	if (m_newlines_escaped)
+		util::stream_format(os, "%1$u escaped line ending(s) converted\n", m_newlines_escaped);
+	if (m_non_ascii)
+		util::stream_format(os, "%1$u non-ASCII character(s) replaced\n", m_non_ascii);
+}
+
+
+void lua_cleaner::output_character(char32_t ch)
+{
+	switch (m_parse_state)
+	{
+	case parse_state::DEFAULT:
+		if (BASIC_LATIN_LAST < ch)
+		{
+			++m_non_ascii;
+			ch = QUESTION_MARK;
+		}
+		break;
+	case parse_state::SHORT_COMMENT:
+	case parse_state::LONG_COMMENT:
+		break;
+	case parse_state::STRING_CONSTANT:
+	case parse_state::LONG_STRING_CONSTANT:
+		if (CYRILLIC_SUPPLEMENT_LAST < ch)
+		{
+			++m_non_ascii;
+			ch = QUESTION_MARK;
+		}
+		break;
+	}
+
+	cleaner_base::output_character(ch);
+}
+
+
+void lua_cleaner::process_characters(char32_t const *begin, char32_t const *end)
+{
+	while (begin != end)
+	{
+		char32_t const ch(*begin++);
+		switch (m_parse_state)
+		{
+		case parse_state::DEFAULT:
+			process_default(ch);
+			break;
+		case parse_state::SHORT_COMMENT:
+			process_short_comment(ch);
+			break;
+		case parse_state::LONG_COMMENT:
+			process_long_comment(ch);
+			break;
+		case parse_state::STRING_CONSTANT:
+			process_string_constant(ch);
+			break;
+		case parse_state::LONG_STRING_CONSTANT:
+			process_long_string_constant(ch);
+			break;
+		}
+
+		if (LINE_FEED == ch)
+			++m_input_line;
+	}
+}
+
+
+void lua_cleaner::input_complete()
+{
+	switch (m_parse_state)
+	{
+	case parse_state::LONG_COMMENT:
+		throw std::runtime_error(util::string_format("unterminated long comment beginning on line %1$u", m_block_line));
+	case parse_state::STRING_CONSTANT:
+		throw std::runtime_error(util::string_format("unterminated string literal on line %1$u", m_input_line));
+	case parse_state::LONG_STRING_CONSTANT:
+		throw std::runtime_error(util::string_format("unterminated long string literal beginning on line %1$u", m_block_line));
+	default:
+		break;
+	}
+}
+
+
+void lua_cleaner::process_default(char32_t ch)
+{
+	switch (ch)
+	{
+	case DOUBLE_QUOTE:
+	case SINGLE_QUOTE:
+		m_string_quote = ch;
+		m_parse_state = parse_state::STRING_CONSTANT;
+		break;
+	case HYPHEN_MINUS:
+		if (m_escape)
+		{
+			m_comment_start = true;
+			m_parse_state = parse_state::SHORT_COMMENT;
+		}
+		break;
+	default:
+		break;
+	}
+	if (0 <= m_long_bracket_level)
+	{
+		switch (ch)
+		{
+		case EQUALS:
+			++m_long_bracket_level;
+			break;
+		case LEFT_BRACKET:
+			m_block_line = m_input_line;
+			m_block_level = m_long_bracket_level;
+			m_parse_state = parse_state::LONG_STRING_CONSTANT;
+		default:
+			m_long_bracket_level = -1;
+		}
+	}
+	else if (LEFT_BRACKET == ch)
+	{
+		m_long_bracket_level = 0;
+	}
+	m_escape = (HYPHEN_MINUS == ch) && !m_escape;
+	output_character(ch);
+}
+
+
+void lua_cleaner::process_short_comment(char32_t ch)
+{
+	if (0 <= m_long_bracket_level)
+	{
+		switch (ch)
+		{
+		case EQUALS:
+			++m_long_bracket_level;
+			break;
+		case LEFT_BRACKET:
+			m_block_line = m_input_line;
+			m_block_level = m_long_bracket_level;
+			m_parse_state = parse_state::LONG_COMMENT;
+			set_tab_limit();
+		default:
+			m_long_bracket_level = -1;
+		}
+	}
+	else if (m_comment_start && (LEFT_BRACKET == ch))
+	{
+		m_long_bracket_level = 0;
+	}
+	else if (LINE_FEED == ch)
+	{
+		m_parse_state = parse_state::DEFAULT;
+	}
+	m_comment_start = false;
+	output_character(ch);
+}
+
+
+void lua_cleaner::process_long_comment(char32_t ch)
+{
+	if (0 <= m_long_bracket_level)
+	{
+		switch (ch)
+		{
+		case EQUALS:
+			++m_long_bracket_level;
+			break;
+		case RIGHT_BRACKET:
+			if (m_long_bracket_level == m_block_level)
+			{
+				m_parse_state = parse_state::DEFAULT;
+				reset_tab_limit();
+			}
+			else
+			{
+				m_long_bracket_level = 0;
+			}
+			break;
+		default:
+			m_long_bracket_level = -1;
+		}
+	}
+	else if (RIGHT_BRACKET == ch)
+	{
+		m_long_bracket_level = 0;
+	}
+	output_character(ch);
+}
+
+
+void lua_cleaner::process_string_constant(char32_t ch)
+{
+	switch (ch)
+	{
+	case HORIZONTAL_TAB:
+		++m_tabs_escaped;
+		if (!m_escape)
+			output_character(BACKSLASH);
+		output_character(char32_t(std::uint8_t('t')));
+		break;
+	case LINE_FEED:
+		if (m_escape)
+		{
+			++m_newlines_escaped;
+			output_character(char32_t(std::uint8_t('n')));
+		}
+		else
+		{
+			throw std::runtime_error(util::string_format("unterminated string literal on line %1$u", m_input_line));
+		}
+		break;
+	case VERTICAL_TAB:
+		++m_tabs_escaped;
+		if (!m_escape)
+			output_character(BACKSLASH);
+		output_character(char32_t(std::uint8_t('v')));
+		break;
+	default:
+		output_character(ch);
+		if (!m_escape && (m_string_quote == ch))
+			m_parse_state = parse_state::DEFAULT;
+	}
+	m_escape = (BACKSLASH == ch) && !m_escape;
+}
+
+
+void lua_cleaner::process_long_string_constant(char32_t ch)
+{
+	// this works because they're both closed by a matching long bracket
+	process_long_comment(ch);
+}
+
+
+
+/***************************************************************************
     XML DATA CLEANER CLASS
 ***************************************************************************/
 
@@ -1310,10 +1652,9 @@ public:
 	xml_cleaner(OutputIt &&output, newline newline_mode, unsigned tab_width);
 
 private:
-	constexpr static unicode_char EXCLAMATION           = 0x0000'0021U;
-	constexpr static unicode_char HYPHEN                = 0x0000'002dU;
-	constexpr static unicode_char LEFT_ANGLE_BRACKET    = 0x0000'003cU;
-	constexpr static unicode_char RIGHT_ANGLE_BRACKET   = 0x0000'003eU;
+	static constexpr char32_t EXCLAMATION           = 0x0000'0021U;
+	static constexpr char32_t LEFT_ANGLE_BRACKET    = 0x0000'003cU;
+	static constexpr char32_t RIGHT_ANGLE_BRACKET   = 0x0000'003eU;
 
 	enum class parse_state
 	{
@@ -1321,11 +1662,11 @@ private:
 		COMMENT
 	};
 
-	virtual void process_characters(unicode_char const *begin, unicode_char const *end) override;
+	virtual void process_characters(char32_t const *begin, char32_t const *end) override;
 	virtual void input_complete() override;
 
-	void process_default(unicode_char ch);
-	void process_comment(unicode_char ch);
+	void process_default(char32_t ch);
+	void process_comment(char32_t ch);
 
 	parse_state     m_parse_state;
 	std::uint64_t   m_input_line;
@@ -1348,11 +1689,11 @@ xml_cleaner::xml_cleaner(
 }
 
 
-void xml_cleaner::process_characters(unicode_char const *begin, unicode_char const *end)
+void xml_cleaner::process_characters(char32_t const *begin, char32_t const *end)
 {
 	while (begin != end)
 	{
-		unicode_char const ch(*begin++);
+		char32_t const ch(*begin++);
 		switch (m_parse_state)
 		{
 		case parse_state::DEFAULT:
@@ -1376,7 +1717,7 @@ void xml_cleaner::input_complete()
 }
 
 
-void xml_cleaner::process_default(unicode_char ch)
+void xml_cleaner::process_default(char32_t ch)
 {
 	assert(4U > m_escape);
 
@@ -1390,7 +1731,7 @@ void xml_cleaner::process_default(unicode_char ch)
 		break;
 	case 2U:
 	case 3U:
-		m_escape = (HYPHEN == ch) ? (m_escape + 1U) : 0U;
+		m_escape = (HYPHEN_MINUS == ch) ? (m_escape + 1U) : 0U;
 		break;
 	}
 	output_character(ch);
@@ -1405,7 +1746,7 @@ void xml_cleaner::process_default(unicode_char ch)
 }
 
 
-void xml_cleaner::process_comment(unicode_char ch)
+void xml_cleaner::process_comment(char32_t ch)
 {
 	assert(3U > m_escape);
 
@@ -1413,10 +1754,10 @@ void xml_cleaner::process_comment(unicode_char ch)
 	{
 	case 0U:
 	case 1U:
-		m_escape = (HYPHEN == ch) ? (m_escape + 1U) : 0U;
+		m_escape = (HYPHEN_MINUS == ch) ? (m_escape + 1U) : 0U;
 		break;
 	case 2U:
-		m_escape = (RIGHT_ANGLE_BRACKET == ch) ? (m_escape + 1U) : (HYPHEN == ch) ? m_escape : 0U;
+		m_escape = (RIGHT_ANGLE_BRACKET == ch) ? (m_escape + 1U) : (HYPHEN_MINUS == ch) ? m_escape : 0U;
 		break;
 	}
 	output_character(ch);
@@ -1448,6 +1789,13 @@ bool is_c_source_extension(char const *ext)
 			!core_stricmp(ext, ".hxx") ||
 			!core_stricmp(ext, ".ixx") ||
 			!core_stricmp(ext, ".lst");
+}
+
+
+bool is_lua_source_extension(char const *ext)
+{
+	return
+			!core_stricmp(ext, ".lua");
 }
 
 
@@ -1526,12 +1874,15 @@ int main(int argc, char *argv[])
 		try
 		{
 			// instantiate appropriate cleaner implementation
-			char const *const ext(std::strrchr(argv[1], '.'));
+			char const *const ext(std::strrchr(argv[i], '.'));
 			bool const is_c_file(ext && is_c_source_extension(ext));
+			bool const is_lua_file(ext && is_lua_source_extension(ext));
 			bool const is_xml_file(ext && is_xml_extension(ext));
 			std::unique_ptr<cleaner_base> cleaner;
 			if (is_c_file)
 				cleaner = std::make_unique<cpp_cleaner>(std::back_inserter(output), newline_mode, 4U);
+			else if (is_lua_file)
+				cleaner = std::make_unique<lua_cleaner>(std::back_inserter(output), newline_mode, 4U);
 			else if (is_xml_file)
 				cleaner = std::make_unique<xml_cleaner>(std::back_inserter(output), newline_mode, 4U);
 			else
@@ -1571,31 +1922,31 @@ int main(int argc, char *argv[])
 				if (!dry_run)
 				{
 					using namespace std::string_literals;
-					std::string const backup(argv[1] + ".orig"s);
+					std::string const backup(argv[i] + ".orig"s);
 					std::remove(backup.c_str());
-					if (std::rename(argv[1], backup.c_str()))
+					if (std::rename(argv[i], backup.c_str()))
 					{
-						util::stream_format(std::cerr, "Error moving %1$s to backup location\n", argv[1]);
+						util::stream_format(std::cerr, "Error moving %1$s to backup location\n", argv[i]);
 						++failures;
 					}
 					else
 					{
-						std::ofstream outfile(argv[1], std::ios_base::binary | std::ios_base::out | std::ios_base::trunc);
+						std::ofstream outfile(argv[i], std::ios_base::binary | std::ios_base::out | std::ios_base::trunc);
 						outfile.write(&output[0], output.size());
 						outfile.flush();
 						if (!outfile)
 						{
-							util::stream_format(std::cerr, "Error writing output to %1$s\n", argv[1]);
+							util::stream_format(std::cerr, "Error writing output to %1$s\n", argv[i]);
 							++failures;
 							outfile.close();
-							if (std::rename(backup.c_str(), argv[1]))
-								util::stream_format(std::cerr, "Error restoring backup of %1$s\n", argv[1]);
+							if (std::rename(backup.c_str(), argv[i]))
+								util::stream_format(std::cerr, "Error restoring backup of %1$s\n", argv[i]);
 						}
 						else if (!keep_backup)
 						{
 							if (std::remove(backup.c_str()))
 							{
-								util::stream_format(std::cerr, "Error removing backup of %1$s\n", argv[1]);
+								util::stream_format(std::cerr, "Error removing backup of %1$s\n", argv[i]);
 								++failures;
 							}
 						}

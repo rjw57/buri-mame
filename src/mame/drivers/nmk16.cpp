@@ -55,7 +55,6 @@ TODO:
 
 - Hacha Mecha Fighter: mcu simulation is wrong/incorrect (see notes).
 
-- Music timing in nouryoku is a little off.
 - In Bioship, there's an occasional flicker of one of the sprites composing big
   ships. Increasing CPU speed from 12 to 16 MHz improved it, but it's still not
   100% fixed. (the CPU speed has been verified to be 10Mhz??)
@@ -195,7 +194,7 @@ WRITE16_MEMBER(nmk16_state::nmk16_bioship_x0016_w)
 WRITE16_MEMBER(nmk16_state::nmk16_mainram_strange_w)
 {
 #if 0
-	UINT16* dstram;
+	uint16_t* dstram;
 
 	dstram = m_mainram;
 
@@ -247,7 +246,7 @@ READ16_MEMBER(nmk16_state::tharrier_mcu_r)
 	    all word accesses are to the input port */
 	if (ACCESSING_BITS_8_15 && !ACCESSING_BITS_0_7)
 	{
-		static const UINT8 to_main[] =
+		static const uint8_t to_main[] =
 		{
 			0x82,0xc7,0x00,0x2c,0x6c,0x00,0x9f,0xc7,0x00,0x29,0x69,0x00,0x8b,0xc7,0x00
 		};
@@ -737,11 +736,11 @@ WRITE16_MEMBER(nmk16_state::tdragon_mainram_w)
 }
 
 /*coin setting MCU simulation*/
-void nmk16_state::mcu_run(UINT8 dsw_setting)
+void nmk16_state::mcu_run(uint8_t dsw_setting)
 {
-	UINT16 coin_input;
-	UINT8 dsw[2];
-	UINT8 i;
+	uint16_t coin_input;
+	uint8_t dsw[2];
+	uint8_t i;
 
 	/*Accept the start button but needs some m68k processing first,otherwise you can't start a play with 1 credit inserted*/
 	if(m_start_helper & 1 && m_mainram[0x9000/2] & 0x0200) /*start 1 */
@@ -4682,9 +4681,9 @@ static MACHINE_CONFIG_START( manybloc, nmk16_state )
 MACHINE_CONFIG_END
 
 
-UINT8 nmk16_state::decode_byte(UINT8 src, const UINT8 *bitp)
+uint8_t nmk16_state::decode_byte(uint8_t src, const uint8_t *bitp)
 {
-	UINT8 ret, i;
+	uint8_t ret, i;
 
 	ret = 0;
 	for (i=0; i<8; i++)
@@ -4693,15 +4692,15 @@ UINT8 nmk16_state::decode_byte(UINT8 src, const UINT8 *bitp)
 	return ret;
 }
 
-UINT32 nmk16_state::bjtwin_address_map_bg0(UINT32 addr)
+uint32_t nmk16_state::bjtwin_address_map_bg0(uint32_t addr)
 {
 	return ((addr&0x00004)>> 2) | ((addr&0x00800)>> 10) | ((addr&0x40000)>>16);
 }
 
 
-UINT16 nmk16_state::decode_word(UINT16 src, const UINT8 *bitp)
+uint16_t nmk16_state::decode_word(uint16_t src, const uint8_t *bitp)
 {
-	UINT16 ret, i;
+	uint16_t ret, i;
 
 	ret=0;
 	for (i=0; i<16; i++)
@@ -4711,7 +4710,7 @@ UINT16 nmk16_state::decode_word(UINT16 src, const UINT8 *bitp)
 }
 
 
-UINT32 nmk16_state::bjtwin_address_map_sprites(UINT32 addr)
+uint32_t nmk16_state::bjtwin_address_map_sprites(uint32_t addr)
 {
 	return ((addr&0x00010)>> 4) | ((addr&0x20000)>>16) | ((addr&0x100000)>>18);
 }
@@ -4720,10 +4719,10 @@ UINT32 nmk16_state::bjtwin_address_map_sprites(UINT32 addr)
 void nmk16_state::decode_gfx()
 {
 	/* GFX are scrambled.  We decode them here.  (BIG Thanks to Antiriad for descrambling info) */
-	UINT8 *rom;
+	uint8_t *rom;
 	int A, len;
 
-	static const UINT8 decode_data_bg[8][8] =
+	static const uint8_t decode_data_bg[8][8] =
 	{
 		{0x3,0x0,0x7,0x2,0x5,0x1,0x4,0x6},
 		{0x1,0x2,0x6,0x5,0x4,0x0,0x3,0x7},
@@ -4735,7 +4734,7 @@ void nmk16_state::decode_gfx()
 		{0x3,0x4,0x7,0x6,0x2,0x0,0x5,0x1},
 	};
 
-	static const UINT8 decode_data_sprite[8][16] =
+	static const uint8_t decode_data_sprite[8][16] =
 	{
 		{0x9,0x3,0x4,0x5,0x7,0x1,0xb,0x8,0x0,0xd,0x2,0xc,0xe,0x6,0xf,0xa},
 		{0x1,0x3,0xc,0x4,0x0,0xf,0xb,0xa,0x8,0x5,0xe,0x6,0xd,0x2,0x7,0x9},
@@ -4762,7 +4761,7 @@ void nmk16_state::decode_gfx()
 	len = memregion("sprites")->bytes();
 	for (A = 0;A < len;A += 2)
 	{
-		UINT16 tmp = decode_word( rom[A+1]*256 + rom[A], decode_data_sprite[bjtwin_address_map_sprites(A)]);
+		uint16_t tmp = decode_word( rom[A+1]*256 + rom[A], decode_data_sprite[bjtwin_address_map_sprites(A)]);
 		rom[A+1] = tmp >> 8;
 		rom[A] = tmp & 0xff;
 	}
@@ -4773,17 +4772,17 @@ void nmk16_state::decode_tdragonb()
 	/* Descrambling Info Again Taken from Raine, Huge Thanks to Antiriad and the Raine Team for
 	   going Open Source, best of luck in future development. */
 
-	UINT8 *rom;
+	uint8_t *rom;
 	int A, len;
 
 	/* The Main 68k Program of the Bootleg is Bitswapped */
-	static const UINT8 decode_data_tdragonb[1][16] =
+	static const uint8_t decode_data_tdragonb[1][16] =
 	{
 		{0xe,0xc,0xa,0x8,0x7,0x5,0x3,0x1,0xf,0xd,0xb,0x9,0x6,0x4,0x2,0x0},
 	};
 
 	/* Graphic Roms Could Also Do With Rearranging to make things simpler */
-	static const UINT8 decode_data_tdragonbgfx[1][8] =
+	static const uint8_t decode_data_tdragonbgfx[1][8] =
 	{
 		{0x7,0x6,0x5,0x3,0x4,0x2,0x1,0x0},
 	};
@@ -4793,7 +4792,7 @@ void nmk16_state::decode_tdragonb()
 	for (A = 0;A < len;A += 2)
 	{
 		int h = A+NATIVE_ENDIAN_VALUE_LE_BE(1,0), l = A+NATIVE_ENDIAN_VALUE_LE_BE(0,1);
-		UINT16 tmp = decode_word( rom[h]*256 + rom[l], decode_data_tdragonb[0]);
+		uint16_t tmp = decode_word( rom[h]*256 + rom[l], decode_data_tdragonb[0]);
 		rom[h] = tmp >> 8;
 		rom[l] = tmp & 0xff;
 	}
@@ -4816,11 +4815,11 @@ void nmk16_state::decode_tdragonb()
 void nmk16_state::decode_ssmissin()
 {
 	/* Like Thunder Dragon Bootleg without the Program Rom Swapping */
-	UINT8 *rom;
+	uint8_t *rom;
 	int A, len;
 
 	/* Graphic Roms Could Also Do With Rearranging to make things simpler */
-	static const UINT8 decode_data_tdragonbgfx[1][8] =
+	static const uint8_t decode_data_tdragonbgfx[1][8] =
 	{
 		{0x7,0x6,0x5,0x3,0x4,0x2,0x1,0x0},
 	};
@@ -4859,7 +4858,7 @@ DRIVER_INIT_MEMBER(nmk16_state,tharrier)
 
 DRIVER_INIT_MEMBER(nmk16_state,hachamf_prot)
 {
-	UINT16 *rom = (UINT16 *)memregion("maincpu")->base();
+	uint16_t *rom = (uint16_t *)memregion("maincpu")->base();
 
 	//rom[0x0006/2] = 0x7dc2;   /* replace reset vector with the "real" one */
 
@@ -4877,7 +4876,7 @@ DRIVER_INIT_MEMBER(nmk16_state,tdragonb)
 
 DRIVER_INIT_MEMBER(nmk16_state,tdragon_prot)
 {
-	UINT16 *rom = (UINT16 *)memregion("maincpu")->base();
+	uint16_t *rom = (uint16_t *)memregion("maincpu")->base();
 
 	//rom[0x94b0/2] = 0; /* Patch out JMP to shared memory (protection) */
 	//rom[0x94b2/2] = 0x92f4;
@@ -4914,7 +4913,7 @@ DRIVER_INIT_MEMBER(nmk16_state,bjtwin)
  *  008F7E: 207C 000F 9000           movea.l #$f9000, A0
  */
 #if 0
-	UINT16 *rom = (UINT16 *)memregion("maincpu")->base();
+	uint16_t *rom = (uint16_t *)memregion("maincpu")->base();
 	rom[0x09172/2] = 0x6006;    /* patch checksum error */
 	rom[0x08f74/2] = 0x4e71;
 #endif
@@ -5025,9 +5024,9 @@ ADDRESS_MAP_END
 WRITE8_MEMBER(nmk16_state::spec2k_oki1_banking_w)
 {
 	if(data == 0xfe)
-		m_oki2->set_bank_base(0);
+		m_oki2->set_rom_bank(0);
 	else if(data == 0xff)
-		m_oki2->set_bank_base(0x40000);
+		m_oki2->set_rom_bank(1);
 }
 
 static ADDRESS_MAP_START( afega_sound_cpu, AS_PROGRAM, 8, nmk16_state )
@@ -5053,7 +5052,7 @@ ADDRESS_MAP_END
 
 WRITE8_MEMBER(nmk16_state::twinactn_oki_bank_w)
 {
-	m_oki1->set_bank_base((data & 3) * 0x40000);
+	m_oki1->set_rom_bank(data & 3);
 
 	if (data & (~3))
 		logerror("%s: invalid oki bank %02x\n", machine().describe_context(), data);
@@ -5317,9 +5316,9 @@ static void decryptcode( running_machine &machine, int a23, int a22, int a21, in
 	int a11, int a10, int a9, int a8, int a7, int a6, int a5, int a4, int a3, int a2, int a1, int a0 )
 {
 	int i;
-	UINT8 *RAM = machine.root_device().memregion( "maincpu" )->base();
+	uint8_t *RAM = machine.root_device().memregion( "maincpu" )->base();
 	size_t  size = machine.root_device().memregion( "maincpu" )->bytes();
-	dynamic_buffer buffer( size );
+	std::vector<uint8_t> buffer( size );
 
 	memcpy( &buffer[0], RAM, size );
 	for( i = 0; i < size; i++ )
@@ -6687,6 +6686,33 @@ ROM_START( bjtwinp )
 	ROM_LOAD( "bottom.ic27",    0x0c0000, 0x80000, CRC(6ebeb9e4) SHA1(b547b2fbcc0a35d6183dd4f19684b04839690a2b) )
 ROM_END
 
+
+ROM_START( bjtwinpa )
+	ROM_REGION( 0x80000, "maincpu", 0 )  /* 68000 code */
+	ROM_LOAD16_BYTE( "ic76.bin",  0x00000, 0x20000, CRC(81106d1e) SHA1(81c195173cf859f6266c160ee94ac4734edef085) )
+	ROM_LOAD16_BYTE( "ic75.bin",  0x00001, 0x20000, CRC(7c99b97f) SHA1(36e34b7a5bb876b7bbee46ace7acc03faeee211e) )
+
+	ROM_REGION( 0x010000, "fgtile", 0 )
+	ROM_LOAD( "ic35.bin",  0x000000, 0x010000, CRC(aa13df7c) SHA1(162d4f12364c68028e86fe97ee75c262daa4c699) ) /* 8x8 tiles */
+
+	ROM_REGION( 0x200000, "bgtile", 0 )
+	ROM_LOAD( "ic32_1.bin", 0x000000, 0x080000, CRC(e2d2b331) SHA1(d8fdbff497303a00fc866f0ef07ba74b369c0636) )
+	ROM_LOAD( "ic32_2.bin", 0x080000, 0x080000, CRC(28a3a845) SHA1(4daf71dce5e598ee7ee7e09bb08ec1b2f06f2b01) )
+	ROM_LOAD( "ic32_3.bin", 0x100000, 0x080000, CRC(ecce80c9) SHA1(ae7410f47e911988f654e78d585d78cf40e0ae5e) )
+
+	ROM_REGION( 0x100000, "sprites", 0 )
+	ROM_LOAD16_BYTE( "ic100_1.bin", 0x000000, 0x080000, CRC(2ea7e460) SHA1(b8dc13994ae2433fc7c38412c9ea6f10f945bca5) )
+	ROM_LOAD16_BYTE( "ic100_2.bin", 0x000001, 0x080000, CRC(ec85e1b7) SHA1(2f9a60ad2beb22d1b41dab7db3634b8e36cfce3e) )
+
+	ROM_REGION( 0x140000, "oki1", 0 ) /* OKIM6295 samples */
+	ROM_LOAD( "bottom.ic30",    0x040000, 0x80000, CRC(b5ef197f) SHA1(89d675f921dead585c2fef44105a7aea2f1f399c) ) /* all banked */
+	ROM_LOAD( "top.ic30",       0x0c0000, 0x80000, CRC(ab50531d) SHA1(918987f01a8b1b007721d2b365e2b2fc536bd676) )
+
+	ROM_REGION( 0x140000, "oki2", 0 ) /* OKIM6295 samples */
+	ROM_LOAD( "top.ic27",       0x040000, 0x80000, CRC(adb2f256) SHA1(ab7bb6683799203d0f46705f2fd241c6de914e77) ) /* all banked */
+	ROM_LOAD( "bottom.ic27",    0x0c0000, 0x80000, CRC(6ebeb9e4) SHA1(b547b2fbcc0a35d6183dd4f19684b04839690a2b) )
+ROM_END
+
 ROM_START( atombjt ) // based off bjtwina set
 	ROM_REGION( 0x40000, "maincpu", 0 )  /* 68000 code */
 	ROM_LOAD16_BYTE( "22.u67",  0x00000, 0x20000, CRC(bead8c70) SHA1(2694bb0639f6b94119c21faf3810f00ef20b50da) )
@@ -7812,12 +7838,12 @@ ROM_END
 
 
 GAME( 1989, tharrier,  0,       tharrier, tharrier, nmk16_state, tharrier,   ROT270, "UPL",                          "Task Force Harrier", 0 )
-GAME( 1989, tharrieru, tharrier,tharrier, tharrier, nmk16_state, tharrier,   ROT270, "UPL (American Sammy license)", "Task Force Harrier (US?)", 0 )
+GAME( 1989, tharrieru, tharrier,tharrier, tharrier, nmk16_state, tharrier,   ROT270, "UPL (American Sammy license)", "Task Force Harrier (US)", 0 ) // US version but no regional notice
 
 GAME( 1990, mustang,  0,        mustang,  mustang, driver_device,  0,        ROT0,   "UPL",                          "US AAF Mustang (25th May. 1990)", 0 )
 GAME( 1990, mustangs, mustang,  mustang,  mustang, driver_device,  0,        ROT0,   "UPL (Seoul Trading license)",  "US AAF Mustang (25th May. 1990 / Seoul Trading)", 0 )
 
-GAME( 1990, bioship,  0,        bioship,  bioship, driver_device,  0,        ROT0,   "UPL (American Sammy license)", "Bio-ship Paladin", 0 )
+GAME( 1990, bioship,  0,        bioship,  bioship, driver_device,  0,        ROT0,   "UPL (American Sammy license)", "Bio-ship Paladin", 0 ) // US version but no regional notice
 GAME( 1990, sbsgomo,  bioship,  bioship,  bioship, driver_device,  0,        ROT0,   "UPL",                          "Space Battle Ship Gomorrah", 0 )
 
 GAME( 1990, vandyke,    0,       vandyke,  vandyke, driver_device, 0,        ROT270, "UPL",                          "Vandyke (Japan)",  0 )
@@ -7862,8 +7888,9 @@ GAME( 1992, cactus,   sabotenb, bjtwin,   sabotenb, nmk16_state, nmk,      ROT0,
 
 GAME( 1993, bjtwin,   0,        bjtwin,   bjtwin, nmk16_state,   bjtwin,   ROT270, "NMK",                          "Bombjack Twin (set 1)", MACHINE_NO_COCKTAIL )
 GAME( 1993, bjtwina,  bjtwin,   bjtwin,   bjtwin, nmk16_state,   bjtwin,   ROT270, "NMK",                          "Bombjack Twin (set 2)", MACHINE_NO_COCKTAIL )
-GAME( 1993, bjtwinp,  bjtwin,   bjtwin,   bjtwin, driver_device, 0,        ROT270, "NMK",                          "Bombjack Twin (prototype? with adult pictures)", MACHINE_NO_COCKTAIL ) // Genuine NMK PCB but GFX aren't encrypted
-GAME( 1993, atombjt,  bjtwin,   atombjt,  bjtwin, driver_device, 0,        ROT270, "bootleg",                      "Atom (bootleg of Bombjack Twin)", MACHINE_NO_COCKTAIL | MACHINE_NOT_WORKING ) // some non-trivial mods to the gfx and sound hw
+GAME( 1993, bjtwinp,  bjtwin,   bjtwin,   bjtwin, driver_device, 0,        ROT270, "NMK",                          "Bombjack Twin (prototype? with adult pictures, set 1)", MACHINE_NO_COCKTAIL ) // Cheap looking PCB, but Genuine NMK PCB, GFX aren't encrypted (maybe Korean version not proto?)
+GAME( 1993, bjtwinpa, bjtwin,   bjtwin,   bjtwin, nmk16_state,   bjtwin,   ROT270, "NMK",                          "Bombjack Twin (prototype? with adult pictures, set 2)", MACHINE_NO_COCKTAIL ) // same PCB as above, different program revision, GFX are encrypted
+GAME( 1993, atombjt,  bjtwin,   atombjt,  bjtwin, driver_device, 0,        ROT270, "bootleg",                      "Atom (bootleg of Bombjack Twin)", MACHINE_NO_COCKTAIL | MACHINE_NOT_WORKING ) // some non-trivial mods to the gfx and sound hw (playmark hardware?)
 
 
 GAME( 1995, nouryoku, 0,        bjtwin,   nouryoku, nmk16_state,   nmk,      ROT0,   "Tecmo",                        "Nouryoku Koujou Iinkai", MACHINE_NO_COCKTAIL )

@@ -6,40 +6,40 @@
 
 **********************************************************************
 
-	Pin 	COMMON	RAM 	OPTROM 				Mask ROM
-							32k	64k	128k
-	1		A16
-	2		A15
-	3				VBB		VPP	NC	VPP 		NC
-	4		A12
-	5		A7
-	6		A6
-	7		A5
-	8		A4
-	9		A3
-	10		A2
-	11		A1
-	12		A0
-	13		D0
-	14		D1
-	15		D2
-	16		GND
-	17		D3
-	18		D4
-	19		D5
-	20		D6
-	21		D7
-	22		CE
-	23		A10
-	24				OE 		OE 	OE/VPP			OE 		OE
-	25		A11	
-	26		A9
-	27		A8
-	28		A13
-	29		A14
-	30				WE 		NC	NC				PGM 	NC
-	31		VCC
-	32		CDET
+    Pin     COMMON  RAM     OPTROM              Mask ROM
+                            32k 64k 128k
+    1       A16
+    2       A15
+    3               VBB     VPP NC  VPP         NC
+    4       A12
+    5       A7
+    6       A6
+    7       A5
+    8       A4
+    9       A3
+    10      A2
+    11      A1
+    12      A0
+    13      D0
+    14      D1
+    15      D2
+    16      GND
+    17      D3
+    18      D4
+    19      D5
+    20      D6
+    21      D7
+    22      CE
+    23      A10
+    24              OE      OE  OE/VPP          OE      OE
+    25      A11
+    26      A9
+    27      A8
+    28      A13
+    29      A14
+    30              WE      NC  NC              PGM     NC
+    31      VCC
+    32      CDET
 
 **********************************************************************/
 
@@ -91,12 +91,12 @@ public:
 
 	virtual bool cdet() { return 1; }
 
-	virtual UINT8 nrdi_r(address_space &space, offs_t offset) { return 0xff; };
-	virtual void nwri_w(address_space &space, offs_t offset, UINT8 data) { };
+	virtual uint8_t nrdi_r(address_space &space, offs_t offset) { return 0xff; };
+	virtual void nwri_w(address_space &space, offs_t offset, uint8_t data) { };
 
 protected:
-	optional_shared_ptr<UINT8> m_rom;
-	optional_shared_ptr<UINT8> m_nvram;
+	optional_shared_ptr<uint8_t> m_rom;
+	optional_shared_ptr<uint8_t> m_nvram;
 
 	portfolio_memory_card_slot_t *m_slot;
 };
@@ -106,11 +106,11 @@ protected:
 
 class portfolio_memory_card_slot_t : public device_t,
 									 public device_slot_interface,
-								     public device_image_interface
+									 public device_image_interface
 {
 public:
 	// construction/destruction
-	portfolio_memory_card_slot_t(const machine_config &mconfig, const char *tag, device_t *owner, UINT32 clock);
+	portfolio_memory_card_slot_t(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
 	virtual ~portfolio_memory_card_slot_t() { }
 
 	// computer interface

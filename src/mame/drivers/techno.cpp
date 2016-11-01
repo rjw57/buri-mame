@@ -25,7 +25,7 @@ public:
 	techno_state(const machine_config &mconfig, device_type type, const char *tag)
 		: driver_device(mconfig, type, tag)
 		, m_maincpu(*this, "maincpu")
-		, m_switch(*this, "SWITCH")
+		, m_switch(*this, "SWITCH.%u", 0)
 	{ }
 
 	DECLARE_READ16_MEMBER(key_r);
@@ -42,9 +42,9 @@ public:
 	INTERRUPT_GEN_MEMBER(techno_intgen);
 private:
 	bool m_digwait;
-	UINT8 m_keyrow;
-	UINT16 m_digit;
-	UINT8 m_vector;
+	uint8_t m_keyrow;
+	uint16_t m_digit;
+	uint8_t m_vector;
 	virtual void machine_reset() override;
 	required_device<cpu_device> m_maincpu;
 	required_ioport_array<8> m_switch;

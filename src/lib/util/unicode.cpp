@@ -16,9 +16,36 @@
 //  character is a legitimate unicode character
 //-------------------------------------------------
 
-bool uchar_isvalid(unicode_char uchar)
+bool uchar_isvalid(char32_t uchar)
 {
 	return (uchar < 0x110000) && !((uchar >= 0xd800) && (uchar <= 0xdfff));
+}
+
+
+//-------------------------------------------------
+//  uchar_is_printable - tests to see if a unicode
+//  char is printable
+//-------------------------------------------------
+
+bool uchar_is_printable(char32_t uchar)
+{
+	return
+		!(0x0001f >= uchar) &&                            // C0 control
+		!((0x0007f <= uchar) && (0x0009f >= uchar)) &&    // DEL and C1 control
+		!((0x0fdd0 <= uchar) && (0x0fddf >= uchar)) &&    // noncharacters
+		!(0x0fffe == (uchar & 0x0ffff)) &&                // byte-order detection noncharacter
+		!(0x0ffff == (uchar & 0x0ffff));                  // the other noncharacter
+}
+
+
+//-------------------------------------------------
+//  uchar_is_digit - tests to see if a unicode
+//  char is a digit
+//-------------------------------------------------
+
+bool uchar_is_digit(char32_t uchar)
+{
+	return uchar >= '0' && uchar <= '9';
 }
 
 
@@ -27,9 +54,9 @@ bool uchar_isvalid(unicode_char uchar)
 //  into a unicode character
 //-----------------------------------------------
 
-int uchar_from_utf8(unicode_char *uchar, const char *utf8char, size_t count)
+int uchar_from_utf8(char32_t *uchar, const char *utf8char, size_t count)
 {
-	unicode_char c, minchar;
+	char32_t c, minchar;
 	int auxlen, i;
 	char auxchar;
 
@@ -122,7 +149,7 @@ int uchar_from_utf8(unicode_char *uchar, const char *utf8char, size_t count)
 //  into a unicode character
 //-------------------------------------------------
 
-int uchar_from_utf16(unicode_char *uchar, const utf16_char *utf16char, size_t count)
+int uchar_from_utf16(char32_t *uchar, const char16_t *utf16char, size_t count)
 {
 	int rc = -1;
 
@@ -157,9 +184,9 @@ int uchar_from_utf16(unicode_char *uchar, const utf16_char *utf16char, size_t co
 //  byte order
 //-------------------------------------------------
 
-int uchar_from_utf16f(unicode_char *uchar, const utf16_char *utf16char, size_t count)
+int uchar_from_utf16f(char32_t *uchar, const char16_t *utf16char, size_t count)
 {
-	utf16_char buf[2] = {0};
+	char16_t buf[2] = {0};
 	if (count > 0)
 		buf[0] = flipendian_int16(utf16char[0]);
 	if (count > 1)
@@ -173,7 +200,7 @@ int uchar_from_utf16f(unicode_char *uchar, const utf16_char *utf16char, size_t c
 //  into a UTF-8 sequence
 //-------------------------------------------------
 
-int utf8_from_uchar(char *utf8string, size_t count, unicode_char uchar)
+int utf8_from_uchar(char *utf8string, size_t count, char32_t uchar)
 {
 	int rc = 0;
 
@@ -251,7 +278,7 @@ int utf8_from_uchar(char *utf8string, size_t count, unicode_char uchar)
 //  into a UTF-8 sequence
 //-------------------------------------------------
 
-std::string utf8_from_uchar(unicode_char uchar)
+std::string utf8_from_uchar(char32_t uchar)
 {
 	char buffer[UTF8_CHAR_MAX];
 	auto len = utf8_from_uchar(buffer, ARRAY_LENGTH(buffer), uchar);
@@ -264,7 +291,7 @@ std::string utf8_from_uchar(unicode_char uchar)
 //  into a UTF-16 sequence
 //-------------------------------------------------
 
-int utf16_from_uchar(utf16_char *utf16string, size_t count, unicode_char uchar)
+int utf16_from_uchar(char16_t *utf16string, size_t count, char32_t uchar)
 {
 	int rc;
 
@@ -277,7 +304,7 @@ int utf16_from_uchar(utf16_char *utf16string, size_t count, unicode_char uchar)
 		// single word case
 		if (count < 1)
 			return -1;
-		utf16string[0] = (utf16_char) uchar;
+		utf16string[0] = (char16_t) uchar;
 		rc = 1;
 	}
 	else if (uchar < 0x100000)
@@ -303,10 +330,10 @@ int utf16_from_uchar(utf16_char *utf16string, size_t count, unicode_char uchar)
 //  into a UTF-16 sequence with flipped endianness
 //-------------------------------------------------
 
-int utf16f_from_uchar(utf16_char *utf16string, size_t count, unicode_char uchar)
+int utf16f_from_uchar(char16_t *utf16string, size_t count, char32_t uchar)
 {
 	int rc;
-	utf16_char buf[2] = { 0, 0 };
+	char16_t buf[2] = { 0, 0 };
 
 	rc = utf16_from_uchar(buf, count, uchar);
 
@@ -363,7 +390,7 @@ bool utf8_is_valid_string(const char *utf8string)
 
 	while (*utf8string != 0)
 	{
-		unicode_char uchar = 0;
+		char32_t uchar = 0;
 		int charlen;
 
 		// extract the current character and verify it

@@ -2,9 +2,9 @@
 // copyright-holders:Nicola Salmoria,Aaron Giles
 /*********************************************************************
 
-	romentry.cpp
+    romentry.cpp
 
-	ROM loading functions.
+    ROM loading functions.
 
 *********************************************************************/
 
@@ -13,13 +13,13 @@
 
 
 /***************************************************************************
-	HELPERS
+    HELPERS
 ***************************************************************************/
 
 //-------------------------------------------------
 //  hashdata_from_tiny_rom_entry - calculates the
-//	proper hashdata string from the value in the
-//	tiny_rom_entry
+//  proper hashdata string from the value in the
+//  tiny_rom_entry
 //-------------------------------------------------
 
 static std::string hashdata_from_tiny_rom_entry(const tiny_rom_entry &ent)
@@ -29,8 +29,8 @@ static std::string hashdata_from_tiny_rom_entry(const tiny_rom_entry &ent)
 	{
 	case ROMENTRYTYPE_FILL:
 	case ROMENTRYTYPE_COPY:
-		// for these types, tiny_rom_entry::hashdata is an integer typecasted to a pointer 
-		result = string_format("0x%x", (unsigned)(FPTR)ent.hashdata);
+		// for these types, tiny_rom_entry::hashdata is an integer typecasted to a pointer
+		result = string_format("0x%x", (unsigned)(uintptr_t)ent.hashdata);
 		break;
 
 	default:
@@ -43,14 +43,14 @@ static std::string hashdata_from_tiny_rom_entry(const tiny_rom_entry &ent)
 
 
 /***************************************************************************
-	ROM ENTRY
+    ROM ENTRY
 ***************************************************************************/
 
 //-------------------------------------------------
 //  ctor (with move constructors)
 //-------------------------------------------------
 
-rom_entry::rom_entry(std::string &&name, std::string &&hashdata, UINT32 offset, UINT32 length, UINT32 flags)
+rom_entry::rom_entry(std::string &&name, std::string &&hashdata, uint32_t offset, uint32_t length, uint32_t flags)
 	: m_name(std::move(name))
 	, m_hashdata(std::move(hashdata))
 	, m_offset(offset)

@@ -33,7 +33,7 @@
 
 PALETTE_INIT_MEMBER(hyperspt_state, hyperspt)
 {
-	const UINT8 *color_prom = memregion("proms")->base();
+	const uint8_t *color_prom = memregion("proms")->base();
 	static const int resistances_rg[3] = { 1000, 470, 220 };
 	static const int resistances_b[2] = { 470, 220 };
 	double rweights[3], gweights[3], bweights[2];
@@ -77,14 +77,14 @@ PALETTE_INIT_MEMBER(hyperspt_state, hyperspt)
 	/* sprites */
 	for (i = 0; i < 0x100; i++)
 	{
-		UINT8 ctabentry = color_prom[i] & 0x0f;
+		uint8_t ctabentry = color_prom[i] & 0x0f;
 		palette.set_pen_indirect(i, ctabentry);
 	}
 
 	/* characters */
 	for (i = 0x100; i < 0x200; i++)
 	{
-		UINT8 ctabentry = (color_prom[i] & 0x0f) | 0x10;
+		uint8_t ctabentry = (color_prom[i] & 0x0f) | 0x10;
 		palette.set_pen_indirect(i, ctabentry);
 	}
 }
@@ -121,13 +121,13 @@ TILE_GET_INFO_MEMBER(hyperspt_state::get_bg_tile_info)
 
 void hyperspt_state::video_start()
 {
-	m_bg_tilemap = &machine().tilemap().create(m_gfxdecode, tilemap_get_info_delegate(FUNC(hyperspt_state::get_bg_tile_info),this), TILEMAP_SCAN_ROWS, 8, 8, 64, 32);
+	m_bg_tilemap = &machine().tilemap().create(*m_gfxdecode, tilemap_get_info_delegate(FUNC(hyperspt_state::get_bg_tile_info),this), TILEMAP_SCAN_ROWS, 8, 8, 64, 32);
 	m_bg_tilemap->set_scroll_rows(32);
 }
 
 void hyperspt_state::draw_sprites( bitmap_ind16 &bitmap, const rectangle &cliprect )
 {
-	UINT8 *spriteram = m_spriteram;
+	uint8_t *spriteram = m_spriteram;
 	int offs;
 
 	for (offs = m_spriteram.bytes() - 4;offs >= 0;offs -= 4)
@@ -168,7 +168,7 @@ void hyperspt_state::draw_sprites( bitmap_ind16 &bitmap, const rectangle &clipre
 	}
 }
 
-UINT32 hyperspt_state::screen_update_hyperspt(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect)
+uint32_t hyperspt_state::screen_update_hyperspt(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect)
 {
 	int row;
 
@@ -196,6 +196,6 @@ TILE_GET_INFO_MEMBER(hyperspt_state::roadf_get_bg_tile_info)
 
 VIDEO_START_MEMBER(hyperspt_state,roadf)
 {
-	m_bg_tilemap = &machine().tilemap().create(m_gfxdecode, tilemap_get_info_delegate(FUNC(hyperspt_state::roadf_get_bg_tile_info),this), TILEMAP_SCAN_ROWS, 8, 8, 64, 32);
+	m_bg_tilemap = &machine().tilemap().create(*m_gfxdecode, tilemap_get_info_delegate(FUNC(hyperspt_state::roadf_get_bg_tile_info),this), TILEMAP_SCAN_ROWS, 8, 8, 64, 32);
 	m_bg_tilemap->set_scroll_rows(32);
 }

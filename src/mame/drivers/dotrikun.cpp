@@ -46,16 +46,16 @@ public:
 
 	required_device<cpu_device> m_maincpu;
 	required_device<screen_device> m_screen;
-	required_shared_ptr<UINT8> m_vram;
+	required_shared_ptr<uint8_t> m_vram;
 	required_device<timer_device> m_interrupt_timer;
 	required_device<timer_device> m_scanline_off_timer;
 
-	UINT8 m_vram_latch;
-	UINT8 m_color;
+	uint8_t m_vram_latch;
+	uint8_t m_color;
 
 	DECLARE_WRITE8_MEMBER(vram_w);
 	DECLARE_WRITE8_MEMBER(color_w);
-	UINT32 screen_update(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
+	uint32_t screen_update(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
 	TIMER_DEVICE_CALLBACK_MEMBER(interrupt);
 	TIMER_DEVICE_CALLBACK_MEMBER(scanline_off);
 	TIMER_DEVICE_CALLBACK_MEMBER(scanline_on);
@@ -66,7 +66,7 @@ public:
 
 TIMER_DEVICE_CALLBACK_MEMBER(dotrikun_state::interrupt)
 {
-	generic_pulse_irq_line(m_maincpu, 0, 1);
+	generic_pulse_irq_line(*m_maincpu, 0, 1);
 }
 
 TIMER_DEVICE_CALLBACK_MEMBER(dotrikun_state::scanline_off)
@@ -82,7 +82,7 @@ TIMER_DEVICE_CALLBACK_MEMBER(dotrikun_state::scanline_on)
 		m_maincpu->set_unscaled_clock(XTAL_4MHz * 0.75);
 		m_scanline_off_timer->adjust(m_screen->time_until_pos(param, 128));
 	}
-	
+
 	// vblank interrupt
 	if (param == 191)
 		m_interrupt_timer->adjust(m_screen->time_until_pos(param, 128+64));
@@ -111,7 +111,7 @@ WRITE8_MEMBER(dotrikun_state::color_w)
 }
 
 
-UINT32 dotrikun_state::screen_update(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect)
+uint32_t dotrikun_state::screen_update(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect)
 {
 	for (int y = cliprect.min_y; y <= cliprect.max_y; y++)
 	{
@@ -120,7 +120,7 @@ UINT32 dotrikun_state::screen_update(screen_device &screen, bitmap_ind16 &bitmap
 			// vram fetch
 			if ((x & 7) == 0)
 				m_vram_latch = m_vram[x >> 3 | y >> 1 << 4];
-			
+
 			bitmap.pix16(y, x) = (m_vram_latch >> (~x & 7) & 1) ? m_color & 7 : m_color >> 3;
 		}
 	}

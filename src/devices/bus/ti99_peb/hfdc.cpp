@@ -87,7 +87,7 @@
 /*
    Constructor for the HFDC card.
 */
-myarc_hfdc_device::myarc_hfdc_device(const machine_config &mconfig, const char *tag, device_t *owner, UINT32 clock)
+myarc_hfdc_device::myarc_hfdc_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 	: ti_expansion_card_device(mconfig, TI99_HFDC, "Myarc Hard and Floppy Disk Controller", tag, owner, clock, "ti99_hfdc", __FILE__), m_motor_on_timer(nullptr),
 		m_hdc9234(*this, FDC_TAG),
 		m_clock(*this, CLOCK_TAG), m_current_floppy(nullptr),
@@ -149,7 +149,7 @@ SETADDRESS_DBIN_MEMBER( myarc_hfdc_device::setaddress_dbin )
     Access for debugger. This is a stripped-down version of the
     main methods below. We only allow ROM and RAM access.
 */
-void myarc_hfdc_device::debug_read(offs_t offset, UINT8* value)
+void myarc_hfdc_device::debug_read(offs_t offset, uint8_t* value)
 {
 	if (((offset & m_select_mask)==m_select_value) && m_selected)
 	{
@@ -168,7 +168,7 @@ void myarc_hfdc_device::debug_read(offs_t offset, UINT8* value)
 	}
 }
 
-void myarc_hfdc_device::debug_write(offs_t offset, UINT8 data)
+void myarc_hfdc_device::debug_write(offs_t offset, uint8_t data)
 {
 	if (((offset & m_select_mask)==m_select_value) && m_selected)
 	{
@@ -369,7 +369,7 @@ WRITE8_MEMBER( myarc_hfdc_device::write )
 */
 READ8Z_MEMBER(myarc_hfdc_device::crureadz)
 {
-	UINT8 reply;
+	uint8_t reply;
 	if ((offset & 0xff00)==m_cru_base)
 	{
 		if ((offset & 0x00ff)==0)  // CRU bits 0-7
@@ -546,7 +546,7 @@ void myarc_hfdc_device::harddisk_skcom_callback(mfm_harddisk_device *harddisk, i
 	signal_drive_status();
 }
 
-void myarc_hfdc_device::set_bits(UINT8& byte, int mask, bool set)
+void myarc_hfdc_device::set_bits(uint8_t& byte, int mask, bool set)
 {
 	if (set) byte |= mask;
 	else byte &= ~mask;
@@ -570,7 +570,7 @@ int myarc_hfdc_device::bit_to_index(int value)
 */
 void myarc_hfdc_device::signal_drive_status()
 {
-	UINT8 reply = 0;
+	uint8_t reply = 0;
 	// Status byte as defined by HDC9234
 	// +------+------+------+------+------+------+------+------+
 	// | ECC  |Index | SeekC| Tr00 | User | WrPrt| Ready|Fault |
@@ -853,7 +853,7 @@ READ8_MEMBER( myarc_hfdc_device::read_buffer )
 {
 	if (TRACE_DMA) logerror("Read access to onboard SRAM at %04x\n", m_dma_address);
 	if (m_dma_address > 0x8000) logerror("Read access beyond RAM size: %06x\n", m_dma_address);
-	UINT8 value = m_buffer_ram->pointer()[m_dma_address & 0x7fff];
+	uint8_t value = m_buffer_ram->pointer()[m_dma_address & 0x7fff];
 	m_dma_address = (m_dma_address+1) & 0x7fff;
 	return value;
 }
@@ -876,6 +876,38 @@ void myarc_hfdc_device::device_start()
 	// The HFDC does not use READY; it has on-board RAM for DMA
 	m_current_floppy = nullptr;
 	m_current_harddisk = nullptr;
+
+	// Parent class members
+	save_item(NAME(m_senila));
+	save_item(NAME(m_senilb));
+	save_item(NAME(m_selected));
+	save_item(NAME(m_genmod));
+	save_item(NAME(m_cru_base));
+	save_item(NAME(m_select_mask));
+	save_item(NAME(m_select_value));
+
+	// Own members
+	save_item(NAME(m_see_switches));
+	save_item(NAME(m_irq));
+	save_item(NAME(m_dip));
+	save_item(NAME(m_motor_running));
+	save_item(NAME(m_inDsrArea));
+	save_item(NAME(m_HDCsel));
+	save_item(NAME(m_RTCsel));
+	save_item(NAME(m_tapesel));
+	save_item(NAME(m_RAMsel));
+	save_item(NAME(m_ROMsel));
+	save_item(NAME(m_address));
+	save_item(NAME(m_wait_for_hd1));
+	save_item(NAME(m_rom_page));
+	save_pointer(NAME(m_ram_page),4);
+	save_item(NAME(m_status_latch));
+	save_item(NAME(m_dma_address));
+	save_item(NAME(m_output1_latch));
+	save_item(NAME(m_output2_latch));
+	save_item(NAME(m_lastval));
+	save_item(NAME(m_MOTOR_ON));
+	save_item(NAME(m_readyflags));
 }
 
 void myarc_hfdc_device::device_reset()
@@ -987,22 +1019,22 @@ INPUT_PORTS_START( ti99_hfdc )
 		PORT_DIPSETTING( 0x1f00, "1F00" )
 
 	PORT_START( "HFDCDIP" )
-	PORT_DIPNAME( 0x0c, 0x00, "HFDC drive 1 config" )
+	PORT_DIPNAME( 0x0c, 0x08, "HFDC drive 1 config" )
 		PORT_DIPSETTING( 0x00, "40 track, 16 ms")
 		PORT_DIPSETTING( 0x08, "40 track, 8 ms")
 		PORT_DIPSETTING( 0x04, "80 track, 2 ms")
 		PORT_DIPSETTING( 0x0c, "80 track HD, 2 ms")
-	PORT_DIPNAME( 0x03, 0x00, "HFDC drive 2 config" )
+	PORT_DIPNAME( 0x03, 0x02, "HFDC drive 2 config" )
 		PORT_DIPSETTING( 0x00, "40 track, 16 ms")
 		PORT_DIPSETTING( 0x02, "40 track, 8 ms")
 		PORT_DIPSETTING( 0x01, "80 track, 2 ms")
 		PORT_DIPSETTING( 0x03, "80 track HD, 2 ms")
-	PORT_DIPNAME( 0xc0, 0x00, "HFDC drive 3 config" )
+	PORT_DIPNAME( 0xc0, 0x80, "HFDC drive 3 config" )
 		PORT_DIPSETTING( 0x00, "40 track, 16 ms")
 		PORT_DIPSETTING( 0x80, "40 track, 8 ms")
 		PORT_DIPSETTING( 0x40, "80 track, 2 ms")
 		PORT_DIPSETTING( 0xc0, "80 track HD, 2 ms")
-	PORT_DIPNAME( 0x30, 0x00, "HFDC drive 4 config" )
+	PORT_DIPNAME( 0x30, 0x20, "HFDC drive 4 config" )
 		PORT_DIPSETTING( 0x00, "40 track, 16 ms")
 		PORT_DIPSETTING( 0x20, "40 track, 8 ms")
 		PORT_DIPSETTING( 0x10, "80 track, 2 ms")

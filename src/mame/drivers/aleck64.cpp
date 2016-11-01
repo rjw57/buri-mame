@@ -5,11 +5,14 @@
 /*
 
 TODO:
-- starsldr: credit display is busted, it displays a 0 if credit is between 0 and 9. Silly protection/core bug?
-- mtetrisc: a black square covers the playfield, n64 version works fine so it's protection related.
+- eeprom (tested failure in mtetrisc and srmvs)
+- mtetrisc: finish E90 hookup, understand how it actually draws gfxs.
+- kurufev: column scrolling garbage on map and matchup screens. (btanb?)
+- mayjin3: static noise during gameplay.
+- starsldr: credit display is busted, it displays a 0 if credit is between 0 and 9. Silly protection/core bug? <- fixed as per 060916
 
-If you want to boot eleven beat on any n64 emu ?(tested on nemu, 1964
-and project64) patch the rom :
+
+If you want to boot eleven beat on any n64 emu ?(tested on nemu, 1964 and project64) patch the rom :
 write 0 to offset $67b,$67c,$67d,$67e
 
 */
@@ -190,14 +193,14 @@ public:
 	DECLARE_READ16_MEMBER(e90_prot_r);
 	DECLARE_WRITE16_MEMBER(e90_prot_w);
 
-	UINT32 screen_update_e90(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect);
+	uint32_t screen_update_e90(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect);
 
 protected:
-	optional_shared_ptr<UINT32> m_e90_vram;
-	optional_shared_ptr<UINT32> m_e90_pal;
+	optional_shared_ptr<uint32_t> m_e90_vram;
+	optional_shared_ptr<uint32_t> m_e90_pal;
 
 private:
-	UINT32 m_dip_read_offset;
+	uint32_t m_dip_read_offset;
 };
 
 
@@ -233,7 +236,7 @@ READ32_MEMBER(aleck64_state::aleck_dips_r)
 		return (ioport("IN1")->read());
 	case 2:
 		{
-			UINT32 const val = ioport("INMJ")->read();
+			uint32_t const val = ioport("INMJ")->read();
 
 			switch( m_dip_read_offset >> 8 & 0xff )
 			{
@@ -876,7 +879,7 @@ static MACHINE_CONFIG_START( aleck64, aleck64_state )
 	MCFG_N64_PERIPHS_ADD("rcp");
 MACHINE_CONFIG_END
 
-UINT32 aleck64_state::screen_update_e90(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect)
+uint32_t aleck64_state::screen_update_e90(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect)
 {
 	bitmap.fill(0, cliprect);
 	screen_update_n64(screen,bitmap,cliprect);
@@ -887,10 +890,10 @@ UINT32 aleck64_state::screen_update_e90(screen_device &screen, bitmap_rgb32 &bit
 		int r,g,b;
 		int pal_offs;
 		int pal_shift;
-		//UINT16 tile = m_e90_vram[offs] >> 16;
-		UINT16 pal = m_e90_vram[offs] & 0xff; // guess: 0x1000 entries / word / 4bpp = 0x7f, divided by two below (TODO: why?)
-		INT16 x = m_e90_vram[offs+1] >> 16;
-		INT16 y = m_e90_vram[offs+1] & 0xffff;
+		//uint16_t tile = m_e90_vram[offs] >> 16;
+		uint16_t pal = m_e90_vram[offs] & 0xff; // guess: 0x1000 entries / word / 4bpp = 0x7f, divided by two below (TODO: why?)
+		int16_t x = m_e90_vram[offs+1] >> 16;
+		int16_t y = m_e90_vram[offs+1] & 0xffff;
 		pal>>=1;
 		x>>=1;
 		pal_offs = (pal*0x20);
@@ -929,7 +932,7 @@ MACHINE_CONFIG_END
 
 DRIVER_INIT_MEMBER(aleck64_state,aleck64)
 {
-	UINT8 *rom = memregion("user2")->base();
+	uint8_t *rom = memregion("user2")->base();
 
 	rom[0x67c] = 0;
 	rom[0x67d] = 0;
@@ -1166,13 +1169,13 @@ ROM_END
 GAME( 1998, aleck64,  0,        aleck64, aleck64, aleck64_state,  aleck64, ROT0, "Nintendo / Seta", "Aleck64 PIF BIOS", MACHINE_IS_BIOS_ROOT)
 
 // games
-GAME( 1998, 11beat,   aleck64,  aleck64, 11beat, aleck64_state,   aleck64, ROT0, "Hudson", "Eleven Beat", MACHINE_NOT_WORKING ) // crashes at kick off / during attract with DRC
-GAME( 1998, mtetrisc, aleck64,  a64_e90, mtetrisc, aleck64_state, aleck64, ROT0, "Capcom", "Magical Tetris Challenge (981009 Japan)", MACHINE_NOT_WORKING|MACHINE_IMPERFECT_GRAPHICS )
+GAME( 1998, 11beat,   aleck64,  aleck64, 11beat, aleck64_state,   aleck64, ROT0, "Hudson", "Eleven Beat", MACHINE_IMPERFECT_GRAPHICS ) // crashes at kick off / during attract with DRC
+GAME( 1998, mtetrisc, aleck64,  a64_e90, mtetrisc, aleck64_state, aleck64, ROT0, "Capcom", "Magical Tetris Challenge (981009 Japan)", MACHINE_NOT_WORKING|MACHINE_IMPERFECT_GRAPHICS ) // missing E90 gfxs (playfield)
 GAME( 1998, starsldr, aleck64,  aleck64, starsldr, aleck64_state, aleck64, ROT0, "Hudson / Seta", "Star Soldier: Vanishing Earth", MACHINE_IMPERFECT_GRAPHICS )
 GAME( 1998, vivdolls, aleck64,  aleck64, aleck64, aleck64_state,  aleck64, ROT0, "Visco", "Vivid Dolls", MACHINE_IMPERFECT_GRAPHICS )
-GAME( 1999, srmvs,    aleck64,  aleck64, srmvs, aleck64_state,    aleck64, ROT0, "Seta", "Super Real Mahjong VS", MACHINE_NOT_WORKING|MACHINE_IMPERFECT_GRAPHICS )
-GAME( 2003, twrshaft, aleck64,  aleck64, twrshaft, aleck64_state, aleck64, ROT0, "Aruze", "Tower & Shaft", MACHINE_NOT_WORKING|MACHINE_IMPERFECT_GRAPHICS )
-GAME( 2003, hipai,    aleck64,  aleck64, hipai, aleck64_state,    aleck64, ROT0, "Aruze / Seta", "Hi Pai Paradise", MACHINE_NOT_WORKING|MACHINE_IMPERFECT_GRAPHICS )
-GAME( 2003, doncdoon, aleck64,  aleck64, doncdoon, aleck64_state, aleck64, ROT0, "Aruze", "Hanabi de Doon! - Don-chan Puzzle", MACHINE_NOT_WORKING|MACHINE_IMPERFECT_GRAPHICS )
-GAME( 2003, kurufev,  aleck64,  aleck64, kurufev, aleck64_state,  aleck64, ROT0, "Aruze / Takumi", "Kurukuru Fever", MACHINE_NOT_WORKING|MACHINE_IMPERFECT_GRAPHICS )
-GAME( 2000, mayjin3,  aleck64,  aleck64, aleck64, aleck64_state,  aleck64, ROT0, "Seta / Able Corporation", "Mayjinsen 3", MACHINE_NOT_WORKING|MACHINE_IMPERFECT_GRAPHICS )
+GAME( 1999, srmvs,    aleck64,  aleck64, srmvs, aleck64_state,    aleck64, ROT0, "Seta", "Super Real Mahjong VS", MACHINE_IMPERFECT_GRAPHICS )
+GAME( 2000, mayjin3,  aleck64,  aleck64, aleck64, aleck64_state,  aleck64, ROT0, "Seta / Able Corporation", "Mayjinsen 3", MACHINE_IMPERFECT_SOUND|MACHINE_IMPERFECT_GRAPHICS )
+GAME( 2003, twrshaft, aleck64,  aleck64, twrshaft, aleck64_state, aleck64, ROT0, "Aruze", "Tower & Shaft", MACHINE_IMPERFECT_GRAPHICS )
+GAME( 2003, hipai,    aleck64,  aleck64, hipai, aleck64_state,    aleck64, ROT0, "Aruze / Seta", "Hi Pai Paradise", MACHINE_IMPERFECT_GRAPHICS )
+GAME( 2003, doncdoon, aleck64,  aleck64, doncdoon, aleck64_state, aleck64, ROT0, "Aruze", "Hanabi de Doon! - Don-chan Puzzle", MACHINE_IMPERFECT_GRAPHICS )
+GAME( 2003, kurufev,  aleck64,  aleck64, kurufev, aleck64_state,  aleck64, ROT0, "Aruze / Takumi", "Kurukuru Fever", MACHINE_IMPERFECT_GRAPHICS )

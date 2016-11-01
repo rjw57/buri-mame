@@ -48,7 +48,7 @@ const device_type MC6852 = &device_creator<mc6852_device>;
 //  mc6852_device - constructor
 //-------------------------------------------------
 
-mc6852_device::mc6852_device(const machine_config &mconfig, const char *tag, device_t *owner, UINT32 clock) :
+mc6852_device::mc6852_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
 	device_t(mconfig, MC6852, "MC6852", tag, owner, clock, "mc6852", __FILE__),
 	device_serial_interface(mconfig, *this),
 	m_write_tx_data(*this),
@@ -101,8 +101,8 @@ void mc6852_device::device_start()
 
 void mc6852_device::device_reset()
 {
-	m_rx_fifo = std::queue<UINT8>();
-	m_tx_fifo = std::queue<UINT8>();
+	m_rx_fifo = std::queue<uint8_t>();
+	m_tx_fifo = std::queue<uint8_t>();
 
 	receive_register_reset();
 	transmit_register_reset();
@@ -163,7 +163,7 @@ void mc6852_device::rcv_complete()
 
 READ8_MEMBER( mc6852_device::read )
 {
-	UINT8 data = 0;
+	uint8_t data = 0;
 
 	if (BIT(offset, 0))
 	{
@@ -196,7 +196,7 @@ WRITE8_MEMBER( mc6852_device::write )
 			/* control 2 */
 			if (LOG) logerror("MC6852 '%s' Control 2 %02x\n", tag(), data);
 			m_cr[1] = data;
-			
+
 			int data_bit_count = 0;
 			parity_t parity = PARITY_NONE;
 			stop_bits_t stop_bits = STOP_BITS_1;
@@ -242,7 +242,7 @@ WRITE8_MEMBER( mc6852_device::write )
 	else
 	{
 		if (LOG) logerror("MC6852 '%s' Control 1 %02x\n", tag(), data);
-		
+
 		/* receiver reset */
 		if (data & C1_RX_RS)
 		{
@@ -273,7 +273,7 @@ WRITE8_MEMBER( mc6852_device::write )
 			if (LOG) logerror("MC6852 '%s' Transmitter Reset\n", tag());
 
 			m_status &= ~(S_TUF | S_CTS | S_TDRA);
-	
+
 			transmit_register_reset();
 		}
 

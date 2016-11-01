@@ -36,7 +36,7 @@ class ms7004_device : public device_t //, public device_serial_interface
 {
 public:
 	// construction/destruction
-	ms7004_device(const machine_config &mconfig, const char *tag, device_t *owner, UINT32 clock);
+	ms7004_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
 
 	template<class _Object> static devcb_base &set_tx_handler(device_t &device, _Object wr) { return downcast<ms7004_device &>(device).m_tx_handler.set_callback(wr); }
 	template<class _Object> static devcb_base &set_rts_handler(device_t &device, _Object wr) { return downcast<ms7004_device &>(device).m_rts_handler.set_callback(wr); }
@@ -61,26 +61,11 @@ private:
 	required_device<beep_device> m_speaker;
 	required_device<i8243_device> m_i8243;
 
-	required_ioport m_kbd0;
-	required_ioport m_kbd1;
-	required_ioport m_kbd2;
-	required_ioport m_kbd3;
-	required_ioport m_kbd4;
-	required_ioport m_kbd5;
-	required_ioport m_kbd6;
-	required_ioport m_kbd7;
-	required_ioport m_kbd8;
-	required_ioport m_kbd9;
-	required_ioport m_kbd10;
-	required_ioport m_kbd11;
-	required_ioport m_kbd12;
-	required_ioport m_kbd13;
-	required_ioport m_kbd14;
-	required_ioport m_kbd15;
+	required_ioport_array<16> m_kbd;
 
 	int m_keylatch;                 // keyboard row latch
-	UINT8 m_p1;
-	UINT8 m_p2;
+	uint8_t m_p1;
+	uint8_t m_p2;
 
 	devcb_write_line m_tx_handler;
 	devcb_write_line m_rts_handler;

@@ -39,7 +39,7 @@ protected:
 
 private:
 	// draw dats menu
-	virtual void draw(UINT32 flags) override;
+	virtual void draw(uint32_t flags) override;
 
 	virtual void populate() override;
 	virtual void handle() override;
@@ -51,7 +51,6 @@ private:
 	std::string m_list, m_short, m_long, m_parent;
 	void get_data();
 	void get_data_sw();
-	void init_items();
 	bool m_issoft;
 	struct list_items
 	{

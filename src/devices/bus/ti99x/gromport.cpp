@@ -130,7 +130,7 @@
 #define GKRACKER_ROM_TAG "gkracker_rom"
 #define GKRACKER_NVRAM_TAG "gkracker_nvram"
 
-gromport_device::gromport_device(const machine_config &mconfig, const char *tag, device_t *owner, UINT32 clock)
+gromport_device::gromport_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 	:   bus8z_device(mconfig, GROMPORT, "Cartridge port", tag, owner, clock, "gromport", __FILE__),
 		device_slot_interface(mconfig, *this),
 		m_connector(nullptr),
@@ -211,6 +211,8 @@ void gromport_device::device_start()
 {
 	m_console_ready.resolve();
 	m_console_reset.resolve();
+
+	save_item(NAME(m_romgq));
 }
 
 void gromport_device::device_reset()
@@ -232,6 +234,18 @@ void gromport_device::cartridge_inserted()
 		m_console_reset(ASSERT_LINE);
 		m_console_reset(CLEAR_LINE);
 	}
+}
+
+/*
+    Find out whether the GROMs in the cartridge are idle. In that case,
+    cut the clock line.
+*/
+bool gromport_device::is_grom_idle()
+{
+	if (m_connector != nullptr)
+		return m_connector->is_grom_idle();
+	else
+		return false;
 }
 
 void gromport_device::device_config_complete()
@@ -279,7 +293,7 @@ const device_type GROMPORT_SINGLE = &device_creator<single_conn_device>;
 const device_type GROMPORT_MULTI = &device_creator<multi_conn_device>;
 const device_type GROMPORT_GK = &device_creator<gkracker_device>;
 
-ti99_cartridge_connector_device::ti99_cartridge_connector_device(const machine_config &mconfig, device_type type, const char *name, const char *tag, device_t *owner, UINT32 clock, const char *shortname, const char *source)
+ti99_cartridge_connector_device::ti99_cartridge_connector_device(const machine_config &mconfig, device_type type, const char *name, const char *tag, device_t *owner, uint32_t clock, const char *shortname, const char *source)
 	: bus8z_device(mconfig, type, name, tag, owner, clock, shortname, source),
 	m_gromport(nullptr)
 {
@@ -295,7 +309,7 @@ void ti99_cartridge_connector_device::device_config_complete()
 	m_gromport = static_cast<gromport_device*>(owner());
 }
 
-single_conn_device::single_conn_device(const machine_config &mconfig, const char *tag, device_t *owner, UINT32 clock)
+single_conn_device::single_conn_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 	: ti99_cartridge_connector_device(mconfig, GROMPORT_SINGLE, "Standard cartridge connector", tag, owner, clock, "single", __FILE__),
 	m_cartridge(nullptr)
 {
@@ -345,6 +359,14 @@ WRITE_LINE_MEMBER(single_conn_device::gclock_in)
 {
 	// Pass through
 	m_cartridge->gclock_in(state);
+}
+
+/*
+    Check whether the GROMs are idle.
+*/
+bool single_conn_device::is_grom_idle()
+{
+	return m_cartridge->is_grom_idle();
 }
 
 void single_conn_device::device_start()
@@ -410,7 +432,7 @@ machine_config_constructor single_conn_device::device_mconfig_additions() const
 
 #define AUTO -1
 
-multi_conn_device::multi_conn_device(const machine_config &mconfig, const char *tag, device_t *owner, UINT32 clock)
+multi_conn_device::multi_conn_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 	: ti99_cartridge_connector_device(mconfig, GROMPORT_MULTI, "Multi-cartridge extender", tag, owner, clock, "multi", __FILE__),
 	m_active_slot(0),
 	m_fixed_slot(0),
@@ -549,7 +571,7 @@ READ8Z_MEMBER(multi_conn_device::readz)
 		{
 			if (m_cartridge[i] != nullptr)
 			{
-				UINT8 newval = *value;
+				uint8_t newval = *value;
 				m_cartridge[i]->readz(space, offset, &newval, 0xff);
 				if (i==slot)
 				{
@@ -619,6 +641,22 @@ WRITE8_MEMBER(multi_conn_device::cruwrite)
 	}
 }
 
+/*
+    Check whether the GROMs are idle. Just ask the currently
+    active cartridge.
+*/
+bool multi_conn_device::is_grom_idle()
+{
+	/* Sanity check. Higher slots are always empty. */
+	if (m_active_slot >= NUMBER_OF_CARTRIDGE_SLOTS)
+		return false;
+
+	if (m_cartridge[m_active_slot] != nullptr)
+		return m_cartridge[m_active_slot]->is_grom_idle();
+
+	return false;
+}
+
 void multi_conn_device::device_start()
 {
 	m_next_free_slot = 0;
@@ -627,6 +665,10 @@ void multi_conn_device::device_start()
 	{
 		elem = nullptr;
 	}
+	save_item(NAME(m_readrom));
+	save_item(NAME(m_active_slot));
+	save_item(NAME(m_fixed_slot));
+	save_item(NAME(m_next_free_slot));
 }
 
 void multi_conn_device::device_reset(void)
@@ -650,7 +692,7 @@ machine_config_constructor multi_conn_device::device_mconfig_additions() const
 
 INPUT_CHANGED_MEMBER( multi_conn_device::switch_changed )
 {
-	if (TRACE_CHANGE) logerror("Slot changed %d - %d\n", (int)((UINT64)param & 0x07), newval);
+	if (TRACE_CHANGE) logerror("Slot changed %d - %d\n", (int)((uint64_t)param & 0x07), newval);
 	m_active_slot = m_fixed_slot = newval - 1;
 }
 
@@ -784,7 +826,7 @@ enum
 #define GKSWITCH4_TAG "GKSWITCH4"
 #define GKSWITCH5_TAG "GKSWITCH5"
 
-gkracker_device::gkracker_device(const machine_config &mconfig, const char *tag, device_t *owner, UINT32 clock)
+gkracker_device::gkracker_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 	:   ti99_cartridge_connector_device(mconfig, GROMPORT_GK, "GRAMKracker", tag, owner, clock, "ti99_gkracker", __FILE__),
 		device_nvram_interface(mconfig, *this),
 		m_romspace_selected(false),
@@ -816,6 +858,14 @@ WRITE8_MEMBER(gkracker_device::set_gromlines)
 WRITE_LINE_MEMBER(gkracker_device::gclock_in)
 {
 	if (m_cartridge != nullptr) m_cartridge->gclock_in(state);
+}
+
+/*
+    Check whether the GROMs are idle.
+*/
+bool gkracker_device::is_grom_idle()
+{
+	return (m_cartridge != nullptr)? m_cartridge->is_grom_idle() : false;
 }
 
 READ8Z_MEMBER(gkracker_device::readz)
@@ -868,7 +918,7 @@ READ8Z_MEMBER(gkracker_device::readz)
 	if (m_cartridge != nullptr)
 	{
 		// For debugging
-		UINT8 val1 = *value;
+		uint8_t val1 = *value;
 
 		// Read from the guest cartridge.
 		m_cartridge->readz(space, offset, value, mem_mask);
@@ -961,8 +1011,8 @@ WRITE8_MEMBER( gkracker_device::cruwrite )
 
 INPUT_CHANGED_MEMBER( gkracker_device::gk_changed )
 {
-	if (TRACE_GKRACKER) logerror("Input changed %d - %d\n", (int)((UINT64)param & 0x07), newval);
-	m_gk_switch[(UINT64)param & 0x07] = newval;
+	if (TRACE_GKRACKER) logerror("Input changed %d - %d\n", (int)((uint64_t)param & 0x07), newval);
+	m_gk_switch[(uint64_t)param & 0x07] = newval;
 }
 
 void gkracker_device::insert(int index, ti99_cartridge_device* cart)
@@ -983,12 +1033,12 @@ void gkracker_device::remove(int index)
 void gkracker_device::gk_install_menu(const char* menutext, int len, int ptr, int next, int start)
 {
 	const int base = 0x0000;
-	m_ram_ptr[base + ptr] = (UINT8)((next >> 8) & 0xff);
-	m_ram_ptr[base + ptr+1] = (UINT8)(next & 0xff);
-	m_ram_ptr[base + ptr+2] = (UINT8)((start >> 8) & 0xff);
-	m_ram_ptr[base + ptr+3] = (UINT8)(start & 0xff);
+	m_ram_ptr[base + ptr] = (uint8_t)((next >> 8) & 0xff);
+	m_ram_ptr[base + ptr+1] = (uint8_t)(next & 0xff);
+	m_ram_ptr[base + ptr+2] = (uint8_t)((start >> 8) & 0xff);
+	m_ram_ptr[base + ptr+3] = (uint8_t)(start & 0xff);
 
-	m_ram_ptr[base + ptr+4] = (UINT8)(len & 0xff);
+	m_ram_ptr[base + ptr+4] = (uint8_t)(len & 0xff);
 	memcpy(m_ram_ptr + base + ptr+5, menutext, len);
 }
 
@@ -1043,6 +1093,11 @@ void gkracker_device::device_start()
 	m_grom_ptr = memregion(GKRACKER_ROM_TAG)->base();
 	m_cartridge = nullptr;
 	for (int i=1; i < 6; i++) m_gk_switch[i] = 0;
+	save_pointer(NAME(m_gk_switch),6);
+	save_item(NAME(m_romspace_selected));
+	save_item(NAME(m_ram_page));
+	save_item(NAME(m_grom_address));
+	save_item(NAME(m_waddr_LSB));
 }
 
 void gkracker_device::device_reset()
@@ -1170,7 +1225,7 @@ static const pcb_type sw_pcbdefs[] =
 	{ 0, nullptr}
 };
 
-ti99_cartridge_device::ti99_cartridge_device(const machine_config &mconfig, const char *tag, device_t *owner, UINT32 clock)
+ti99_cartridge_device::ti99_cartridge_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 :   bus8z_device(mconfig, TI99CART, "TI-99 cartridge", tag, owner, clock, "cartridge", __FILE__),
 	device_image_interface(mconfig, *this),
 	m_pcbtype(0),
@@ -1185,8 +1240,8 @@ void ti99_cartridge_device::prepare_cartridge()
 {
 	int rom2_length;
 
-	UINT8* grom_ptr;
-	UINT8* rom_ptr;
+	uint8_t* grom_ptr;
+	uint8_t* rom_ptr;
 
 	memory_region *regg;
 	memory_region *regr;
@@ -1466,6 +1521,11 @@ WRITE_LINE_MEMBER(ti99_cartridge_device::gclock_in)
 	if (m_pcb != nullptr) m_pcb->gclock_in(state);
 }
 
+bool ti99_cartridge_device::is_grom_idle()
+{
+	return (m_pcb != nullptr)? m_pcb->is_grom_idle() : false;
+}
+
 void ti99_cartridge_device::device_config_complete()
 {
 	update_names();
@@ -1527,6 +1587,7 @@ const device_type TI99CART = &device_creator<ti99_cartridge_device>;
 
 ti99_cartridge_pcb::ti99_cartridge_pcb()
 	: m_cart(nullptr),
+		m_grom_idle(false),
 		m_grom_size(0),
 		m_rom_size(0),
 		m_ram_size(0),
@@ -1629,13 +1690,25 @@ WRITE_LINE_MEMBER( ti99_cartridge_pcb::romgq_line )
 WRITE8_MEMBER(ti99_cartridge_pcb::set_gromlines)
 {
 	for (auto& elem : m_grom)
-		if (elem != nullptr) elem->set_lines(space, offset, data);
+	{
+		if (elem != nullptr)
+		{
+			elem->set_lines(space, offset, data);
+			if (data==ASSERT_LINE) m_grom_idle = false;
+		}
+	}
 }
 
 WRITE_LINE_MEMBER(ti99_cartridge_pcb::gclock_in)
 {
 	for (auto& elem : m_grom)
-		if (elem != nullptr) elem->gclock_in(state);
+	{
+		if (elem != nullptr)
+		{
+			elem->gclock_in(state);
+			m_grom_idle = elem->idle();
+		}
+	}
 }
 
 
@@ -1897,7 +1970,7 @@ READ8Z_MEMBER(ti99_super_cartridge::crureadz)
 	if ((offset & 0xfff0) == 0x0800)
 	{
 		if (TRACE_CRU) space.device().logerror("CRU accessed at %04x\n", offset);
-		UINT8 val = 0x02 << (m_ram_page << 1);
+		uint8_t val = 0x02 << (m_ram_page << 1);
 		*value = (val >> ((offset - 0x0800)>>1)) & 0xff;
 	}
 }
@@ -2447,7 +2520,7 @@ rpk::~rpk()
 /*
     Deliver the contents of the socket by name of the socket.
 */
-UINT8* rpk::get_contents_of_socket(const char *socket_name)
+uint8_t* rpk::get_contents_of_socket(const char *socket_name)
 {
 	auto socket = m_sockets.find(socket_name);
 	if (socket == m_sockets.end()) return nullptr;
@@ -2499,12 +2572,12 @@ void rpk::close()
     not a network socket)
 ***************************************************************/
 
-rpk_socket::rpk_socket(const char* id, int length, UINT8* contents, const char *pathname)
+rpk_socket::rpk_socket(const char* id, int length, uint8_t* contents, const char *pathname)
 : m_id(id), m_length(length), m_contents(contents), m_pathname(pathname)
 {
 }
 
-rpk_socket::rpk_socket(const char* id, int length, UINT8* contents)
+rpk_socket::rpk_socket(const char* id, int length, uint8_t* contents)
 : m_id(id), m_length(length), m_contents(contents), m_pathname(nullptr)
 {
 }
@@ -2512,7 +2585,7 @@ rpk_socket::rpk_socket(const char* id, int length, UINT8* contents)
 /*
     Locate a file in the ZIP container
 */
-int rpk_reader::find_file(util::archive_file &zip, const char *filename, UINT32 crc)
+int rpk_reader::find_file(util::archive_file &zip, const char *filename, uint32_t crc)
 {
 	for (int header = zip.first_file(); header >= 0; header = zip.next_file())
 	{
@@ -2548,9 +2621,9 @@ std::unique_ptr<rpk_socket> rpk_reader::load_rom_resource(util::archive_file &zi
 	const char* crcstr;
 	const char* sha1;
 	util::archive_file::error ziperr;
-	UINT32 crc;
+	uint32_t crc;
 	int length;
-	UINT8* contents;
+	uint8_t* contents;
 	int header;
 
 	// find the file attribute (required)
@@ -2576,7 +2649,7 @@ std::unique_ptr<rpk_socket> rpk_reader::load_rom_resource(util::archive_file &zi
 	length = zip.current_uncompressed_length();
 
 	// Allocate storage
-	contents = global_alloc_array_clear<UINT8>(length);
+	contents = global_alloc_array_clear<uint8_t>(length);
 	if (contents==nullptr) throw rpk_exception(RPK_OUT_OF_MEMORY);
 
 	// and unzip file from the zip file
@@ -2592,7 +2665,7 @@ std::unique_ptr<rpk_socket> rpk_reader::load_rom_resource(util::archive_file &zi
 	if (sha1 != nullptr)
 	{
 		util::hash_collection actual_hashes;
-		actual_hashes.compute((const UINT8 *)contents, length, util::hash_collection::HASH_TYPES_CRC_SHA1);
+		actual_hashes.compute((const uint8_t *)contents, length, util::hash_collection::HASH_TYPES_CRC_SHA1);
 
 		util::hash_collection expected_hashes;
 		expected_hashes.add_from_string(util::hash_collection::HASH_SHA1, sha1, strlen(sha1));
@@ -2614,7 +2687,7 @@ std::unique_ptr<rpk_socket> rpk_reader::load_ram_resource(emu_options &options, 
 	const char* ram_filename;
 	const char* ram_pname;
 	unsigned int length;
-	UINT8* contents;
+	uint8_t* contents;
 
 	// find the length attribute
 	length_string = xml_get_attribute_string(ram_resource_node, "length", nullptr);
@@ -2642,7 +2715,7 @@ std::unique_ptr<rpk_socket> rpk_reader::load_ram_resource(emu_options &options, 
 	}
 
 	// Allocate memory for this resource
-	contents = global_alloc_array_clear<UINT8>(length);
+	contents = global_alloc_array_clear<uint8_t>(length);
 	if (contents==nullptr) throw rpk_exception(RPK_OUT_OF_MEMORY);
 
 	if (TRACE_RPK) printf("gromport/RPK: Allocating RAM buffer (%d bytes) for socket '%s'\n", length, socketname);

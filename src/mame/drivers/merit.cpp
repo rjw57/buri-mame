@@ -97,14 +97,14 @@ public:
 
 	void dodge_nvram_init(nvram_device &nvram, void *base, size_t size);
 	pen_t m_pens[NUM_PENS];
-	required_shared_ptr<UINT8> m_ram_attr;
-	required_shared_ptr<UINT8> m_ram_video;
-	std::unique_ptr<UINT8[]> m_ram_palette;
-	UINT8 m_lscnblk;
+	required_shared_ptr<uint8_t> m_ram_attr;
+	required_shared_ptr<uint8_t> m_ram_video;
+	std::unique_ptr<uint8_t[]> m_ram_palette;
+	uint8_t m_lscnblk;
 	int m_extra_video_bank_bit;
 	int m_question_address;
 	int m_decryption_key;
-	optional_shared_ptr<UINT8> m_backup_ram;
+	optional_shared_ptr<uint8_t> m_backup_ram;
 	DECLARE_READ8_MEMBER(questions_r);
 	DECLARE_WRITE8_MEMBER(low_offset_w);
 	DECLARE_WRITE8_MEMBER(med_offset_w);
@@ -137,7 +137,7 @@ public:
 void merit_state::machine_start()
 {
 	m_question_address = 0;
-	m_ram_palette = std::make_unique<UINT8[]>(RAM_PALETTE_SIZE);
+	m_ram_palette = std::make_unique<uint8_t[]>(RAM_PALETTE_SIZE);
 
 	save_pointer(NAME(m_ram_palette.get()), RAM_PALETTE_SIZE);
 	save_item(NAME(m_lscnblk));
@@ -149,7 +149,7 @@ void merit_state::machine_start()
 
 READ8_MEMBER(merit_state::questions_r)
 {
-	UINT8 *questions = memregion("user1")->base();
+	uint8_t *questions = memregion("user1")->base();
 	int address;
 
 	switch(m_question_address >> 16)
@@ -258,8 +258,8 @@ MC6845_BEGIN_UPDATE( merit_state::crtc_begin_update )
 
 MC6845_UPDATE_ROW( merit_state::crtc_update_row )
 {
-	UINT8 *gfx[2];
-	UINT16 x = 0;
+	uint8_t *gfx[2];
+	uint16_t x = 0;
 	int rlen;
 
 	gfx[0] = memregion("gfx1")->base();
@@ -267,14 +267,14 @@ MC6845_UPDATE_ROW( merit_state::crtc_update_row )
 	rlen = memregion("gfx2")->bytes();
 
 	//ma = ma ^ 0x7ff;
-	for (UINT8 cx = 0; cx < x_count; cx++)
+	for (uint8_t cx = 0; cx < x_count; cx++)
 	{
 		int i;
 		int attr = m_ram_attr[ma & 0x7ff];
 		int region = (attr & 0x40) >> 6;
 		int addr = ((m_ram_video[ma & 0x7ff] | ((attr & 0x80) << 1) | (m_extra_video_bank_bit)) << 4) | (ra & 0x0f);
 		int colour = (attr & 0x7f) << 3;
-		UINT8   *data;
+		uint8_t   *data;
 
 		addr &= (rlen-1);
 		data = gfx[region];
@@ -1343,7 +1343,7 @@ INPUT_PORTS_END
 void merit_state::dodge_nvram_init(nvram_device &nvram, void *base, size_t size)
 {
 	memset(base, 0x00, size);
-	reinterpret_cast<UINT8 *>(base)[0x1040] = 0xc9; /* ret */
+	reinterpret_cast<uint8_t *>(base)[0x1040] = 0xc9; /* ret */
 }
 
 MACHINE_START_MEMBER(merit_state,casino5)
@@ -1633,7 +1633,7 @@ ROM_END
 ROM_START( chkndraw )
 	ROM_REGION( 0x10000, "maincpu", 0 )
 	ROM_LOAD( "2131-04_u5-1.u5", 0x0000, 0x2000, CRC(abc38151) SHA1(a56f7e535e265cbff697863fdfa5e5c2ef8b690a) ) /* 02131-10 U50 U60 U70 102984 */
-	ROM_LOAD( "2131-04_u6-0.u6", 0x2000, 0x2000, CRC(a0ad37b6) SHA1(f6722a8920d894cbce43fa78f2812cd81e5e9185) )
+	ROM_LOAD( "2131-04_u6-1.u6", 0x2000, 0x2000, CRC(a0ad37b6) SHA1(f6722a8920d894cbce43fa78f2812cd81e5e9185) ) /* Need to verify label, different then U6 rom from chkndrawa below */
 	ROM_LOAD( "2131-04_u7-0.u7", 0x4000, 0x2000, CRC(c8af231d) SHA1(97f36420c9f4dd75c673003b9fd8287517b948f0) )
 
 	ROM_REGION( 0x6000, "gfx1", 0 )
@@ -1645,6 +1645,21 @@ ROM_START( chkndraw )
 //  ROM_LOAD( "u40",  0x0000, 0x2000, BAD_DUMP CRC(01722f98) SHA1(c75c9511c07379ea087be5d75cbc3e705628c824) )
 //  ROM_LOAD( "u40a", 0x0000, 0x2000, BAD_DUMP CRC(03543d67) SHA1(5ae08dbc0f736c11070befb4cfad87ddaa24cef2) )
 	ROM_LOAD( "u40b", 0x0000, 0x2000, BAD_DUMP CRC(c53a9e90) SHA1(2076d045c279405083fec8949425532e7e7e7844) )
+ROM_END
+
+ROM_START( chkndrawa )
+	ROM_REGION( 0x10000, "maincpu", 0 )
+	ROM_LOAD( "2131-04_u5-0.u5", 0x0000, 0x2000, CRC(8edcd0a0) SHA1(e876061997b1577e6e06ab036de0b2b037372815) ) /* 02131-00D U50 U60 U70 102984 */
+	ROM_LOAD( "2131-04_u6-0.u6", 0x2000, 0x2000, CRC(491466d7) SHA1(42a374612720ab6b642313fa0075e96dd306d207) )
+	ROM_LOAD( "2131-04_u7-0.u7", 0x4000, 0x2000, CRC(c8af231d) SHA1(97f36420c9f4dd75c673003b9fd8287517b948f0) )
+
+	ROM_REGION( 0x6000, "gfx1", 0 )
+	ROM_LOAD( "chr5_u39.u39", 0x0000, 0x2000, CRC(b5a5f7da) SHA1(51a3cda89d514c0230f9dd85626ffefb87bae3a6) )
+	ROM_LOAD( "chr5_u38.u38", 0x2000, 0x2000, CRC(5c2cc495) SHA1(7b475d8bcbee5ecaadce48ae8e52a18c76b0b2ea) )
+	ROM_LOAD( "chr5_u37.u37", 0x4000, 0x2000, CRC(4c584ff0) SHA1(9718124577a2132b8c6a117b86b3699041417204) )
+
+	ROM_REGION( 0x2000, "gfx2", 0 )
+	ROM_LOAD( "chr5_u40.u40", 0x0000, 0x2000, CRC(45b84a7c) SHA1(e1d386dace8f73f07cf75fabb674668af6d8d833) )
 ROM_END
 
 ROM_START( riviera ) /* PAL16L8ANC labeled DEC-003 at U13 */
@@ -2367,7 +2382,7 @@ DRIVER_INIT_MEMBER(merit_state,key_7)
 
 DRIVER_INIT_MEMBER(merit_state,couple)
 {
-	UINT8 *ROM = memregion("maincpu")->base();
+	uint8_t *ROM = memregion("maincpu")->base();
 
 	#if 0 //quick rom compare test
 	{
@@ -2393,7 +2408,7 @@ DRIVER_INIT_MEMBER(merit_state,couple)
 DRIVER_INIT_MEMBER(merit_state,dtrvwz5)
 {
 	int i;
-	UINT8 *ROM = memregion("maincpu")->base();
+	uint8_t *ROM = memregion("maincpu")->base();
 	/* fill b000 - b0ff with ret 0xc9 */
 	for ( i = 0xb000; i < 0xb100; i++ )
 		ROM[i] = 0xc9;
@@ -2428,24 +2443,25 @@ GAME( 1983, pitbossc, pitboss, pitboss,  pitbossb, driver_device,  0,   ROT0,  "
 GAME( 1983, mdchoice, pitboss, pitboss,  mdchoice, driver_device,  0,   ROT0,  "Merit", "Dealer's Choice (E4A1)",            MACHINE_SUPPORTS_SAVE | MACHINE_NO_COCKTAIL | MACHINE_IMPERFECT_GRAPHICS ) /* Copyright year based on other Pit Boss sets */
 GAME( 1983, mpchoice, pitboss, pitboss,  mpchoice, driver_device,  0,   ROT0,  "Merit", "Player's Choice (M4C1)",            MACHINE_SUPPORTS_SAVE | MACHINE_NO_COCKTAIL | MACHINE_IMPERFECT_GRAPHICS )
 
-GAME( 1989, casino5,  0,       casino5,  casino5,  driver_device,  0,   ROT0,  "Merit", "Casino Five (3315-02, U5-2B)",      MACHINE_SUPPORTS_SAVE )
-GAME( 1984, casino5a, casino5, casino5,  casino5,  driver_device,  0,   ROT0,  "Merit", "Casino Five (3315-02, U5-0)",       MACHINE_SUPPORTS_SAVE )
+GAME( 1989, casino5,  0,       casino5,  casino5,   driver_device, 0,   ROT0,  "Merit", "Casino Five (3315-02, U5-2B)",      MACHINE_SUPPORTS_SAVE )
+GAME( 1984, casino5a, casino5, casino5,  casino5,   driver_device, 0,   ROT0,  "Merit", "Casino Five (3315-02, U5-0)",       MACHINE_SUPPORTS_SAVE )
 
-GAME( 1984, mroundup, 0,       pitboss,  mroundup, driver_device,  0,   ROT0,  "Merit", "The Round Up",                      MACHINE_SUPPORTS_SAVE | MACHINE_NO_COCKTAIL )
+GAME( 1984, mroundup, 0,         pitboss, mroundup, driver_device, 0,   ROT0,  "Merit", "The Round Up",                      MACHINE_SUPPORTS_SAVE | MACHINE_NO_COCKTAIL )
 
-GAME( 1984, chkndraw, 0,       pitboss,  chkndraw, driver_device,  0,   ROT0,  "Merit", "Chicken Draw (2131-04, U5-01)",     MACHINE_SUPPORTS_SAVE | MACHINE_IMPERFECT_GRAPHICS )
+GAME( 1984, chkndraw,  0,        pitboss, chkndraw, driver_device, 0,   ROT0,  "Merit", "Chicken Draw (2131-04, U5-1)",      MACHINE_SUPPORTS_SAVE | MACHINE_IMPERFECT_GRAPHICS )
+GAME( 1984, chkndrawa, chkndraw, pitboss, chkndraw, driver_device, 0,   ROT0,  "Merit", "Chicken Draw (2131-04, U5-0)",      MACHINE_SUPPORTS_SAVE | MACHINE_IMPERFECT_GRAPHICS )
 
-GAME( 1987, riviera,  0,       dodge,    riviera,  driver_device,  0,   ROT0,  "Merit", "Riviera Hi-Score (2131-08, U5-4A)", MACHINE_SUPPORTS_SAVE | MACHINE_IMPERFECT_GRAPHICS )
-GAME( 1986, rivieraa, riviera, dodge,    riviera,  driver_device,  0,   ROT0,  "Merit", "Riviera Hi-Score (2131-08, U5-4)",  MACHINE_SUPPORTS_SAVE | MACHINE_IMPERFECT_GRAPHICS )
-GAME( 1986, rivierab, riviera, dodge,    rivierab, driver_device,  0,   ROT0,  "Merit", "Riviera Hi-Score (2131-08, U5-2D)", MACHINE_SUPPORTS_SAVE | MACHINE_IMPERFECT_GRAPHICS )
+GAME( 1987, riviera,  0,       dodge,    riviera,   driver_device, 0,   ROT0,  "Merit", "Riviera Hi-Score (2131-08, U5-4A)", MACHINE_SUPPORTS_SAVE | MACHINE_IMPERFECT_GRAPHICS )
+GAME( 1986, rivieraa, riviera, dodge,    riviera,   driver_device, 0,   ROT0,  "Merit", "Riviera Hi-Score (2131-08, U5-4)",  MACHINE_SUPPORTS_SAVE | MACHINE_IMPERFECT_GRAPHICS )
+GAME( 1986, rivierab, riviera, dodge,    rivierab,  driver_device, 0,   ROT0,  "Merit", "Riviera Hi-Score (2131-08, U5-2D)", MACHINE_SUPPORTS_SAVE | MACHINE_IMPERFECT_GRAPHICS )
 
-GAME( 1986, bigappg,  0,       bigappg,  bigappg,  driver_device,  0,   ROT0,  "Big Apple Games / Merit", "The Big Apple (2131-13, U5-0)",   MACHINE_SUPPORTS_SAVE )
-GAME( 1986, misdraw,  0,       misdraw,  bigappg,  driver_device,  0,   ROT0,  "Big Apple Games / Merit", "Michigan Super Draw (2131-16, U5-2)",   MACHINE_SUPPORTS_SAVE )
-GAME( 1990, iowapp,   0,       dodge,    iowapp,   driver_device,  0,   ROT0,  "Merit",                   "Iowa Premium Player (2131-21, U5-1)",   MACHINE_SUPPORTS_SAVE ) /* Copyright year based on rom label */
+GAME( 1986, bigappg,  0,       bigappg,  bigappg,   driver_device, 0,   ROT0,  "Big Apple Games / Merit", "The Big Apple (2131-13, U5-0)",   MACHINE_SUPPORTS_SAVE )
+GAME( 1986, misdraw,  0,       misdraw,  bigappg,   driver_device, 0,   ROT0,  "Big Apple Games / Merit", "Michigan Super Draw (2131-16, U5-2)",   MACHINE_SUPPORTS_SAVE )
+GAME( 1990, iowapp,   0,       dodge,    iowapp,    driver_device, 0,   ROT0,  "Merit",                   "Iowa Premium Player (2131-21, U5-1)",   MACHINE_SUPPORTS_SAVE ) /* Copyright year based on rom label */
 
-GAME( 1986, dodgectya,dodgecty,dodge,    dodge,    driver_device,  0,   ROT0,  "Merit", "Dodge City (2131-82, U5-0D)",      MACHINE_SUPPORTS_SAVE | MACHINE_IMPERFECT_GRAPHICS | MACHINE_NOT_WORKING )
-GAME( 1986, dodgectyb,dodgecty,dodge,    dodge,    driver_device,  0,   ROT0,  "Merit", "Dodge City (2131-82, U5-50)",      MACHINE_SUPPORTS_SAVE | MACHINE_IMPERFECT_GRAPHICS | MACHINE_NOT_WORKING )
-GAME( 1986, dodgectyc,dodgecty,dodge,    dodge,    driver_device,  0,   ROT0,  "Merit", "Dodge City (2131-82, U5-0 GT)",    MACHINE_SUPPORTS_SAVE | MACHINE_IMPERFECT_GRAPHICS | MACHINE_NOT_WORKING )
+GAME( 1986, dodgectya,dodgecty,dodge,    dodge,     driver_device, 0,   ROT0,  "Merit", "Dodge City (2131-82, U5-0D)",      MACHINE_SUPPORTS_SAVE | MACHINE_IMPERFECT_GRAPHICS | MACHINE_NOT_WORKING )
+GAME( 1986, dodgectyb,dodgecty,dodge,    dodge,     driver_device, 0,   ROT0,  "Merit", "Dodge City (2131-82, U5-50)",      MACHINE_SUPPORTS_SAVE | MACHINE_IMPERFECT_GRAPHICS | MACHINE_NOT_WORKING )
+GAME( 1986, dodgectyc,dodgecty,dodge,    dodge,     driver_device, 0,   ROT0,  "Merit", "Dodge City (2131-82, U5-0 GT)",    MACHINE_SUPPORTS_SAVE | MACHINE_IMPERFECT_GRAPHICS | MACHINE_NOT_WORKING )
 
 /* Trivia and Word games */
 

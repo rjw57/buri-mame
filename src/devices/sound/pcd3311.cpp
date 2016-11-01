@@ -2,7 +2,7 @@
 // copyright-holders:Curt Coder
 /**********************************************************************
 
-	PCD3311 DTMF/modem/musical tone generator emulation
+    PCD3311 DTMF/modem/musical tone generator emulation
 
 **********************************************************************/
 
@@ -26,7 +26,7 @@ const device_type PCD3311 = &device_creator<pcd3311_t>;
 //  pcd3311_t - constructor
 //-------------------------------------------------
 
-pcd3311_t::pcd3311_t(const machine_config &mconfig, const char *tag, device_t *owner, UINT32 clock) :
+pcd3311_t::pcd3311_t(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
 	device_t(mconfig, PCD3311, "PCD3311", tag, owner, clock, "pcd3311", __FILE__),
 	device_sound_interface(mconfig, *this)
 {

@@ -354,8 +354,8 @@ WRITE8_MEMBER(maygay1b_state::reel12_w)
 	m_reel0->update( data     & 0x0F);
 	m_reel1->update((data>>4) & 0x0F);
 
-	awp_draw_reel(machine(),"reel1", m_reel0);
-	awp_draw_reel(machine(),"reel2", m_reel1);
+	awp_draw_reel(machine(),"reel1", *m_reel0);
+	awp_draw_reel(machine(),"reel2", *m_reel1);
 }
 
 WRITE8_MEMBER(maygay1b_state::reel34_w)
@@ -363,8 +363,8 @@ WRITE8_MEMBER(maygay1b_state::reel34_w)
 	m_reel2->update( data     & 0x0F);
 	m_reel3->update((data>>4) & 0x0F);
 
-	awp_draw_reel(machine(),"reel3", m_reel2);
-	awp_draw_reel(machine(),"reel4", m_reel3);
+	awp_draw_reel(machine(),"reel3", *m_reel2);
+	awp_draw_reel(machine(),"reel4", *m_reel3);
 }
 
 WRITE8_MEMBER(maygay1b_state::reel56_w)
@@ -372,8 +372,8 @@ WRITE8_MEMBER(maygay1b_state::reel56_w)
 	m_reel4->update( data     & 0x0F);
 	m_reel5->update((data>>4) & 0x0F);
 
-	awp_draw_reel(machine(),"reel5", m_reel4);
-	awp_draw_reel(machine(),"reel6", m_reel5);
+	awp_draw_reel(machine(),"reel5", *m_reel4);
+	awp_draw_reel(machine(),"reel6", *m_reel5);
 }
 
 READ8_MEMBER(maygay1b_state::m1_duart_r)
@@ -696,10 +696,10 @@ WRITE8_MEMBER(maygay1b_state::mcu_port0_w)
 {
 #ifdef USE_MCU
 // only during startup
-//	logerror("%s: mcu_port0_w %02x\n",machine().describe_context(),data);
+//  logerror("%s: mcu_port0_w %02x\n",machine().describe_context(),data);
 #endif
 }
-	
+
 WRITE8_MEMBER(maygay1b_state::mcu_port1_w)
 {
 #ifdef USE_MCU
@@ -718,7 +718,7 @@ WRITE8_MEMBER(maygay1b_state::mcu_port1_w)
 	}
 #endif
 }
-	
+
 WRITE8_MEMBER(maygay1b_state::mcu_port2_w)
 {
 #ifdef USE_MCU
@@ -726,7 +726,7 @@ WRITE8_MEMBER(maygay1b_state::mcu_port2_w)
 	logerror("%s: mcu_port2_w %02x\n",machine().describe_context(),data);
 #endif
 }
-	
+
 WRITE8_MEMBER(maygay1b_state::mcu_port3_w)
 {
 #ifdef USE_MCU
@@ -737,33 +737,29 @@ WRITE8_MEMBER(maygay1b_state::mcu_port3_w)
 
 READ8_MEMBER(maygay1b_state::mcu_port0_r)
 {
-	UINT8 ret = m_lamp_strobe;
+	uint8_t ret = m_lamp_strobe;
 #ifdef USE_MCU
 	// the MCU code checks to see if the input from this port is stable in
 	// the main loop
 	// it looks like it needs to read the strobe
-//	logerror("%s: mcu_port0_r returning %02x\n", machine().describe_context(), ret);
+//  logerror("%s: mcu_port0_r returning %02x\n", machine().describe_context(), ret);
 #endif
 	return ret;
 
 }
-	
+
 
 READ8_MEMBER(maygay1b_state::mcu_port2_r)
 {
 	// this is read in BOTH the external interrupts
 	// it seems that both the writes from the main cpu go here
 	// and the MCU knows which is is based on the interrupt level
-	UINT8 ret = m_main_to_mcu;
+	uint8_t ret = m_main_to_mcu;
 #ifdef USE_MCU
 	logerror("%s: mcu_port2_r returning %02x\n", machine().describe_context(), ret);
 #endif
 	return ret;
 }
-
-static ADDRESS_MAP_START( maygay_mcu_map, AS_PROGRAM, 8, maygay1b_state )
-	AM_RANGE(0x0000, 0x0fff) AM_ROM
-ADDRESS_MAP_END
 
 static ADDRESS_MAP_START( maygay_mcu_io, AS_IO, 8, maygay1b_state )
 	AM_RANGE(MCS51_PORT_P0, MCS51_PORT_P0) AM_READWRITE( mcu_port0_r, mcu_port0_w )
@@ -781,7 +777,6 @@ MACHINE_CONFIG_START( maygay_m1, maygay1b_state )
 	MCFG_CPU_PROGRAM_MAP(m1_memmap)
 
 	MCFG_CPU_ADD("mcu", I80C51, 2000000) //  EP840034.A-P-80C51AVW
-	MCFG_CPU_PROGRAM_MAP(maygay_mcu_map)
 	MCFG_CPU_IO_MAP(maygay_mcu_io)
 
 
@@ -810,12 +805,12 @@ MACHINE_CONFIG_START( maygay_m1, maygay1b_state )
 	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "rspeaker", 1.0)
 
 	MCFG_TIMER_DRIVER_ADD_PERIODIC("nmitimer", maygay1b_state, maygay1b_nmitimer_callback, attotime::from_hz(75)) // freq?
-	
+
 	MCFG_DEVICE_ADD("i8279", I8279, M1_MASTER_CLOCK/4)    // unknown clock
 	MCFG_I8279_OUT_SL_CB(WRITE8(maygay1b_state, scanlines_w))   // scan SL lines
 	MCFG_I8279_OUT_DISP_CB(WRITE8(maygay1b_state, lamp_data_w))     // display A&B
 	MCFG_I8279_IN_RL_CB(READ8(maygay1b_state, kbd_r))           // kbd RL lines
-	
+
 #ifndef USE_MCU
 	// on M1B there is a 2nd i8279, on M1 / M1A a 8051 handles this task!
 	MCFG_DEVICE_ADD("i8279_2", I8279, M1_MASTER_CLOCK/4)        // unknown clock
@@ -867,20 +862,20 @@ WRITE8_MEMBER(maygay1b_state::m1ab_no_oki_w)
 DRIVER_INIT_MEMBER(maygay1b_state,m1common)
 {
 	//Initialise paging for non-extended ROM space
-	UINT8 *rom = memregion("maincpu")->base();
+	uint8_t *rom = memregion("maincpu")->base();
 	membank("bank1")->configure_entries(0, 2, &rom[0x0e000], 0x10000);
 	membank("bank1")->set_entry(0);
 
 	// print out the rom id / header info to give us some hints
 	// note this isn't always correct, alley cat has 'Calpsyo' still in the ident string?
 	{
-		UINT8 *cpu = memregion( "maincpu" )->base();
+		uint8_t *cpu = memregion( "maincpu" )->base();
 		int base = 0xff20;
 		for (int i=0;i<14;i++)
 		{
 			for (int j=0;j<16;j++)
 			{
-				UINT8 rom = cpu[base];
+				uint8_t rom = cpu[base];
 
 				if ((rom>=0x20) && (rom<0x7f))
 				{
