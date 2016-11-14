@@ -16,15 +16,12 @@
 const char* MOS6551_TAG = "mos6551";
 const char* YM3812_TAG = "ym3812";
 const char* TMS9918_TAG = "tms9918";
-const char* NS16550_TAG = "ns16550";
 
 const char* UART1_TAG = "uart1";
-const char* UART2_TAG = "uart2";
 
 const int MOS6551_START = 0xDFFC;
 const int TMS9918_START = 0xDE00;
 const int YM3812_START = 0xDE02;
-const int NS16550_START = 0xDE10;
 
 class buri_state : public driver_device
 {
@@ -33,24 +30,20 @@ public:
 	           driver_device(mconfig, type, tag),
 	           m_maincpu(*this, "maincpu"),
 	           m_mos6551(*this, MOS6551_TAG),
-		   m_ns16550(*this, NS16550_TAG)
 	{
 		m_irqs.val = 0;
 	}
 
 	DECLARE_WRITE_LINE_MEMBER(mos6551_irq_w);
-	DECLARE_WRITE_LINE_MEMBER(ns16550_irq_w);
 	DECLARE_WRITE_LINE_MEMBER(tms9918a_irq_w);
 
 	required_device<cpu_device> m_maincpu;
 	optional_device<mos6551_device> m_mos6551;
-	optional_device<ns16550_device> m_ns16550;
 
 	union {
 		uint32_t val;
 		struct {
 			int mos6551 : 1;
-			int ns16550 : 1;
 			int tms9918a : 1;
 		} flags;
 	} m_irqs;
@@ -81,11 +74,6 @@ static ADDRESS_MAP_START(buri_mem, AS_PROGRAM, 8, buri_state)
 	// ACIA
 	AM_RANGE(MOS6551_START, MOS6551_START + 3)
 		AM_DEVREADWRITE(MOS6551_TAG, mos6551_device, read, write)
-
-	// UART2
-	AM_RANGE(NS16550_START, NS16550_START + 7)
-		AM_DEVREADWRITE(NS16550_TAG, ns16550_device,
-				ins8250_r, ins8250_w)
 
 	// SOUND
 	AM_RANGE(YM3812_START, YM3812_START + 1)
@@ -126,22 +114,6 @@ static MACHINE_CONFIG_START(buri, buri_state)
 	MCFG_DEVICE_CARD_DEVICE_INPUT_DEFAULTS("pty", terminal)
 	MCFG_DEVICE_CARD_DEVICE_INPUT_DEFAULTS("terminal", terminal)
 
-	MCFG_DEVICE_ADD(NS16550_TAG, NS16550, 0)
-	MCFG_INS8250_OUT_TX_CB(DEVWRITELINE(
-		UART2_TAG, rs232_port_device, write_txd))
-	MCFG_INS8250_OUT_INT_CB(WRITELINE(
-		buri_state, ns16550_irq_w))
-
-	MCFG_RS232_PORT_ADD(UART2_TAG, default_rs232_devices, "pty")
-	MCFG_RS232_RXD_HANDLER(
-		DEVWRITELINE(NS16550_TAG, ns16550_device, rx_w))
-	MCFG_RS232_DCD_HANDLER(
-		DEVWRITELINE(NS16550_TAG, ns16550_device, dcd_w))
-	MCFG_RS232_DSR_HANDLER(
-		DEVWRITELINE(NS16550_TAG, ns16550_device, dsr_w))
-	MCFG_RS232_CTS_HANDLER(
-		DEVWRITELINE(NS16550_TAG, ns16550_device, cts_w))
-
 	MCFG_DEVICE_ADD(TMS9918_TAG, TMS9918A, XTAL_10_738635MHz)
 	MCFG_TMS9928A_VRAM_SIZE(0x4000)
 	MCFG_TMS9928A_OUT_INT_LINE_CB(WRITELINE(buri_state, tms9918a_irq_w))
@@ -162,13 +134,6 @@ WRITE_LINE_MEMBER(buri_state::mos6551_irq_w)
 {
 	// MOS6551 IRQ line is active *low*
 	m_irqs.flags.mos6551 = (state == 0);
-	irqs_updated_();
-}
-
-WRITE_LINE_MEMBER(buri_state::ns16550_irq_w)
-{
-	// NS16550 IRQ line is active *high*
-	m_irqs.flags.ns16550 = (state != 0);
 	irqs_updated_();
 }
 
