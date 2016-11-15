@@ -10,12 +10,14 @@
 #include "cpu/g65816/g65816.h"
 #include "machine/ins8250.h"
 #include "machine/mos6551.h"
+#include "machine/pckeybrd.h"
 #include "sound/3812intf.h"
 #include "video/tms9928a.h"
 
 const char* MOS6551_TAG = "mos6551";
 const char* YM3812_TAG = "ym3812";
 const char* TMS9929_TAG = "tms9929";
+const char* KEYBOARD_TAG = "pc_keyboard";
 
 const char* UART1_TAG = "uart1";
 
@@ -26,21 +28,25 @@ const int YM3812_START = 0xDE02;
 class buri_state : public driver_device
 {
 public:
-	buri_state(const machine_config &mconfig, device_type type, const char *tag) :
+	buri_state(const machine_config &mconfig,
+	           device_type type, const char *tag) :
 	           driver_device(mconfig, type, tag),
 	           m_maincpu(*this, "maincpu"),
 	           m_mos6551(*this, MOS6551_TAG),
-	           m_tms2998a(*this, TMS9929_TAG)
+	           m_tms2998a(*this, TMS9929_TAG),
+	           m_keyboard(*this, KEYBOARD_TAG)
 	{
 		m_irqs.val = 0;
 	}
 
 	DECLARE_WRITE_LINE_MEMBER(mos6551_irq_w);
 	DECLARE_WRITE_LINE_MEMBER(tms9929a_irq_w);
+	DECLARE_WRITE_LINE_MEMBER(keyboard_data_ready);
 
 	required_device<cpu_device> m_maincpu;
-	optional_device<mos6551_device> m_mos6551;
-	optional_device<tms9929a_device> m_tms2998a;
+	required_device<mos6551_device> m_mos6551;
+	required_device<tms9929a_device> m_tms2998a;
+	required_device<pc_keyboard_device> m_keyboard;
 
 	union {
 		uint32_t val;
@@ -83,6 +89,7 @@ static ADDRESS_MAP_START(buri_mem, AS_PROGRAM, 8, buri_state)
 ADDRESS_MAP_END
 
 static INPUT_PORTS_START(buri)
+	PORT_INCLUDE(pc_keyboard)
 INPUT_PORTS_END
 
 static DEVICE_INPUT_DEFAULTS_START(terminal)
@@ -125,6 +132,8 @@ static MACHINE_CONFIG_START(buri, buri_state)
 	MCFG_SPEAKER_STANDARD_MONO("mono")
 	MCFG_SOUND_ADD(YM3812_TAG, YM3812, XTAL_3_579545MHz)
 	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "mono", 1.00)
+
+	MCFG_PC_KEYB_ADD(KEYBOARD_TAG, WRITELINE(buri_state, keyboard_data_ready))
 MACHINE_CONFIG_END
 
 ROM_START(buri)
@@ -144,6 +153,15 @@ WRITE_LINE_MEMBER(buri_state::tms9929a_irq_w)
 	// TMS9929A IRQ line is active *low*
 	m_irqs.flags.tms9929a = (state == 0);
 	irqs_updated_();
+}
+
+WRITE_LINE_MEMBER(buri_state::keyboard_data_ready)
+{
+	if(!state) { return; }
+
+	// Called when there is data to be read from the keyboard.
+	int v = m_keyboard->read(machine().dummy_space(), 0);
+	printf("keyboard: 0x%x\n", (int)v);
 }
 
 /*    YEAR  NAME    PARENT  COMPAT   MACHINE    INPUT    CLASS         INIT    COMPANY                FULLNAME               FLAGS */
