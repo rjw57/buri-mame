@@ -8,12 +8,14 @@
 
 #include "bus/rs232/rs232.h"
 #include "cpu/g65816/g65816.h"
+#include "machine/6522via.h"
 #include "machine/ins8250.h"
 #include "machine/mos6551.h"
 #include "machine/pckeybrd.h"
 #include "sound/3812intf.h"
 #include "video/tms9928a.h"
 
+const char* VIA6522_TAG = "via6522";
 const char* MOS6551_TAG = "mos6551";
 const char* YM3812_TAG = "ym3812";
 const char* TMS9929_TAG = "tms9929";
@@ -21,6 +23,7 @@ const char* KEYBOARD_TAG = "pc_keyboard";
 
 const char* UART1_TAG = "uart1";
 
+const int VIA6522_START = 0xDEF0;
 const int MOS6551_START = 0xDFFC;
 const int TMS9929_START = 0xDE00;
 const int YM3812_START = 0xDE02;
@@ -34,34 +37,40 @@ public:
 	           m_maincpu(*this, "maincpu"),
 	           m_mos6551(*this, MOS6551_TAG),
 	           m_tms2998a(*this, TMS9929_TAG),
-	           m_keyboard(*this, KEYBOARD_TAG)
+	           m_keyboard(*this, KEYBOARD_TAG),
+	           m_via6522(*this, VIA6522_TAG)
 	{
 		m_irqs.val = 0;
 	}
 
 	DECLARE_WRITE_LINE_MEMBER(mos6551_irq_w);
 	DECLARE_WRITE_LINE_MEMBER(tms9929a_irq_w);
+	DECLARE_WRITE_LINE_MEMBER(via6522_irq_w);
 	DECLARE_WRITE_LINE_MEMBER(keyboard_data_ready);
 
 	required_device<cpu_device> m_maincpu;
 	required_device<mos6551_device> m_mos6551;
 	required_device<tms9929a_device> m_tms2998a;
 	required_device<pc_keyboard_device> m_keyboard;
+	required_device<via6522_device> m_via6522;
 
 	union {
 		uint32_t val;
 		struct {
 			int mos6551 : 1;
 			int tms9929a : 1;
+			int via6522 : 1;
 		} flags;
 	} m_irqs;
 
 private:
+	// The PC keyboard is exposed via a '595 shift register.
+	uint8_t m_kbd_shift_reg;
+
 	void irqs_updated_() {
-		// NB IRQ line is active LOW
 		m_maincpu->set_input_line(
-			G65816_INT_IRQ,
-			m_irqs.val ? CLEAR_LINE : ASSERT_LINE);
+			G65816_LINE_IRQ,
+			m_irqs.val ? ASSERT_LINE : CLEAR_LINE);
 	}
 };
 
@@ -86,6 +95,10 @@ static ADDRESS_MAP_START(buri_mem, AS_PROGRAM, 8, buri_state)
 	// SOUND
 	AM_RANGE(YM3812_START, YM3812_START + 1)
 		AM_DEVREADWRITE(YM3812_TAG, ym3812_device, read, write)
+
+	// VIA
+	AM_RANGE(VIA6522_START, VIA6522_START + 15)
+		AM_DEVREADWRITE(VIA6522_TAG, via6522_device, read, write)
 ADDRESS_MAP_END
 
 static INPUT_PORTS_START(buri)
@@ -134,6 +147,9 @@ static MACHINE_CONFIG_START(buri, buri_state)
 	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "mono", 1.00)
 
 	MCFG_PC_KEYB_ADD(KEYBOARD_TAG, WRITELINE(buri_state, keyboard_data_ready))
+
+	MCFG_DEVICE_ADD(VIA6522_TAG, VIA6522, XTAL_2MHz)
+	MCFG_VIA6522_IRQ_HANDLER(WRITELINE(buri_state, via6522_irq_w))
 MACHINE_CONFIG_END
 
 ROM_START(buri)
@@ -143,25 +159,33 @@ ROM_END
 
 WRITE_LINE_MEMBER(buri_state::mos6551_irq_w)
 {
-	// MOS6551 IRQ line is active *low*
-	m_irqs.flags.mos6551 = (state == 0);
+	m_irqs.flags.mos6551 = (state != 0);
 	irqs_updated_();
 }
 
 WRITE_LINE_MEMBER(buri_state::tms9929a_irq_w)
 {
-	// TMS9929A IRQ line is active *low*
-	m_irqs.flags.tms9929a = (state == 0);
+	m_irqs.flags.tms9929a = (state != 0);
+	irqs_updated_();
+}
+
+WRITE_LINE_MEMBER(buri_state::via6522_irq_w)
+{
+	m_irqs.flags.via6522 = (state != 0);
 	irqs_updated_();
 }
 
 WRITE_LINE_MEMBER(buri_state::keyboard_data_ready)
 {
-	if(!state) { return; }
-
 	// Called when there is data to be read from the keyboard.
-	int v = m_keyboard->read(machine().dummy_space(), 0);
-	printf("keyboard: 0x%x\n", (int)v);
+	if(state) {
+		uint8_t v = m_keyboard->read(machine().dummy_space(), 0);
+		m_via6522->write_pa(machine().dummy_space(), 0, v);
+
+		// Pulse CA1
+		m_via6522->write_ca1(1);
+		m_via6522->write_ca1(0);
+	}
 }
 
 /*    YEAR  NAME    PARENT  COMPAT   MACHINE    INPUT    CLASS         INIT    COMPANY                FULLNAME               FLAGS */
