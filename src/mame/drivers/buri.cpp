@@ -64,9 +64,6 @@ public:
 	} m_irqs;
 
 private:
-	// The PC keyboard is exposed via a '595 shift register.
-	uint8_t m_kbd_shift_reg;
-
 	void irqs_updated_() {
 		m_maincpu->set_input_line(
 			G65816_LINE_IRQ,
