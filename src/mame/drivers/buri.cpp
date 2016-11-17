@@ -54,26 +54,6 @@ const int YM3812_START = 0xDE02;
 //
 //     1 - Keyboard
 
-class device_spi_interface : public device_interface
-{
-public:
-	// construction/destruction
-	device_spi_interface(const machine_config &mconfig, device_t &device);
-	virtual ~device_spi_interface();
-protected:
-	// derived class overrides
-	virtual uint8_t spi_exchange_byte(uint8_t recv_byte) = 0;
-};
-
-device_spi_interface::device_spi_interface(const machine_config &mconfig, device_t &device)
-	: device_interface(device, "SPI")
-{
-}
-
-device_spi_interface::~device_spi_interface()
-{
-}
-
 enum spi_mode_t { SPI_MODE0, SPI_MODE1, SPI_MODE2, SPI_MODE3 };
 enum spi_data_direction_t { SPI_MSB_FIRST, SPI_LSB_FIRST };
 
@@ -83,7 +63,7 @@ enum spi_data_direction_t { SPI_MSB_FIRST, SPI_LSB_FIRST };
 #define MCFG_SPI_MISO_CALLBACK(_miso) \
 	downcast<spi_device_t *>(device)->set_miso_callback(DEVCB_##_miso);
 
-class spi_device_t : public device_t, public device_spi_interface
+class spi_device_t : public device_t
 {
 public:
 	// construction/destruction
@@ -113,7 +93,7 @@ protected:
 	virtual void device_reset() override;
 
 	// Called when a byte has been exchanged. Return new byte to send.
-	virtual uint8_t spi_exchange_byte(uint8_t recv);
+	uint8_t spi_exchange_byte(uint8_t recv);
 
 private:
 	spi_mode_t m_mode;
@@ -146,7 +126,6 @@ const device_type SPI = &device_creator<spi_device_t>;
 spi_device_t::spi_device_t(const machine_config &mconfig, const char *tag,
                        device_t *owner, uint32_t clock )
 	: device_t(mconfig, SPI, "SPI Device", tag, owner, clock, "spi", __FILE__),
-	device_spi_interface(mconfig, *this),
 	m_mode(SPI_MODE0), m_data_dir(SPI_MSB_FIRST),
 	m_selected(false),
 	m_clk(0), m_mosi(0), m_miso(0),
