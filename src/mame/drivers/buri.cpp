@@ -51,7 +51,129 @@ const int YM3812_START = 0xDE02;
 //
 // Well known peripherals:
 //
-//     0 - Keyboard
+//     1 - Keyboard
+
+enum spi_mode_t { SPI_MODE0, SPI_MODE1, SPI_MODE2, SPI_MODE3 };
+enum spi_data_direction_t { SPI_MSB_FIRST, SPI_LSB_FIRST };
+
+class spi_bus
+{
+public:
+	spi_bus(spi_mode_t mode, spi_data_direction_t data_dir):
+		m_mode(mode), m_data_dir(data_dir),
+		m_selected(false),
+		m_clk(0), m_mosi(0), m_miso(0),
+		m_recv_byte(0), m_send_byte(0),
+		m_recv_count(0), m_send_count(0)
+	{ }
+
+	// Called when a byte has been exchanged. Return new byte to send.
+	virtual uint8_t exchange(uint8_t recv) = 0;
+
+	void clk_w(int state);
+	void select_w(int state);
+	void mosi_w(int state) { if(m_selected) { m_mosi = (state != 0); } }
+	int miso_r() { return m_miso; }
+
+private:
+	spi_mode_t m_mode;
+	spi_data_direction_t m_data_dir;
+	bool m_selected;
+	int m_clk;
+	int m_mosi;
+	int m_miso;
+
+	uint8_t m_recv_byte, m_send_byte;
+	int m_recv_count, m_send_count;
+
+	void clk_edge_(int is_idle_to_active);
+
+	inline int cpol() {
+		return ((m_mode == SPI_MODE2) || (m_mode == SPI_MODE3)) ? 1 : 0;
+	}
+
+	inline int cpha() {
+		return ((m_mode == SPI_MODE1) || (m_mode == SPI_MODE3)) ? 1 : 0;
+	}
+};
+
+void spi_bus::select_w(int state) {
+	if(state != m_selected) {
+		if(state) {
+			// newly selected, clear recv/send counts
+			m_recv_count = m_send_count = 0;
+		}
+	}
+	m_selected = (state != 0);
+}
+
+void spi_bus::clk_w(int state)
+{
+	// NOP if no change or not selected
+	if(!m_selected or (state == m_clk)) { return; }
+	m_clk = state;
+
+	if(state) {
+		// low to high
+		clk_edge_(cpol() ? 0 : 1);
+	} else {
+		// high to low
+		clk_edge_(cpol() ? 1 : 0);
+	}
+}
+
+void spi_bus::clk_edge_(int is_idle_to_active)
+{
+	int read_mosi = cpha() ? (!is_idle_to_active) : is_idle_to_active;
+	if(read_mosi) {
+		// Should read MOSI on this edge
+		if(m_data_dir == SPI_MSB_FIRST) {
+			m_recv_byte <<= 1;
+			m_recv_byte |= m_mosi ? 1 : 0;
+		} else {
+			m_recv_byte >>= 1;
+			m_recv_byte |= m_mosi ? 0x80 : 0x00;
+		}
+		++m_recv_count;
+	} else {
+		// Should set MISO on this edge
+		if(m_data_dir == SPI_MSB_FIRST) {
+			m_miso = (m_send_byte & 0x80) ? 1 : 0;
+			m_send_byte <<= 1;
+		} else {
+			m_miso = m_send_byte & 0x1;
+			m_send_byte >>= 1;
+		}
+		++m_send_count;
+	}
+
+	if((m_recv_count == 8) && (m_send_count == 8)) {
+		// sent and received an entire byte
+		m_send_byte = exchange(m_recv_byte);
+
+		// prepare MISO
+		if(m_data_dir == SPI_MSB_FIRST) {
+			m_miso = (m_send_byte & 0x80) ? 1 : 0;
+		} else {
+			m_miso = m_send_byte & 0x1;
+		}
+	}
+}
+
+class spi_keyboard : public spi_bus
+{
+public:
+	spi_keyboard() :
+		spi_bus(SPI_MODE0, SPI_MSB_FIRST)
+	{ }
+
+	virtual uint8_t exchange(uint8_t recv) {
+		uint8_t send = 0x23;
+		printf("keybd recv: 0x%02x, will send 0x%02x\n",
+			recv, send);
+		return send;
+	}
+};
 
 class buri_state : public driver_device
 {
@@ -66,7 +188,6 @@ public:
 	           m_via6522(*this, VIA6522_TAG)
 	{
 		m_irqs.val = 0;
-		m_spi_clk = 0;
 	}
 
 	DECLARE_WRITE_LINE_MEMBER(mos6551_irq_w);
@@ -98,7 +219,7 @@ private:
 			m_irqs.val ? ASSERT_LINE : CLEAR_LINE);
 	}
 
-	int m_spi_clk;
+	spi_keyboard m_spi_keyboard;
 };
 
 static ADDRESS_MAP_START(buri_mem, AS_PROGRAM, 8, buri_state)
@@ -219,12 +340,12 @@ WRITE_LINE_MEMBER(buri_state::keyboard_data_ready)
 WRITE8_MEMBER(buri_state::via_pa_w)
 {
 	int clk = data & 0x1;
-	//int device = (data & 0x1C) >> 2;
-	//int mosi = (data & 0x2) ? 1 : 0;
+	int device = (data & 0x1C) >> 2;
+	int mosi = (data & 0x2) ? 1 : 0;
 
-	if(m_spi_clk != clk) {
-		m_spi_clk = clk;
-	}
+	m_spi_keyboard.select_w(device == 1);
+	m_spi_keyboard.clk_w(clk);
+	m_spi_keyboard.mosi_w(mosi);
 }
 
 /*    YEAR  NAME    PARENT  COMPAT   MACHINE    INPUT    CLASS         INIT    COMPANY                FULLNAME               FLAGS */
