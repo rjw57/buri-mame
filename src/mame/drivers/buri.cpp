@@ -66,6 +66,7 @@ public:
 	           m_via6522(*this, VIA6522_TAG)
 	{
 		m_irqs.val = 0;
+		m_spi_clk = 0;
 	}
 
 	DECLARE_WRITE_LINE_MEMBER(mos6551_irq_w);
@@ -73,10 +74,7 @@ public:
 	DECLARE_WRITE_LINE_MEMBER(via6522_irq_w);
 	DECLARE_WRITE_LINE_MEMBER(keyboard_data_ready);
 
-	DECLARE_READ_LINE_MEMBER(spi_clk);
-	DECLARE_READ_LINE_MEMBER(spi_mosi);
-	DECLARE_WRITE_LINE_MEMBER(spi_miso);
-	DECLARE_WRITE_LINE_MEMBER(spi_irq);
+	DECLARE_WRITE8_MEMBER(via_pa_w);
 
 	required_device<cpu_device> m_maincpu;
 	required_device<mos6551_device> m_mos6551;
@@ -99,6 +97,8 @@ private:
 			G65816_LINE_IRQ,
 			m_irqs.val ? ASSERT_LINE : CLEAR_LINE);
 	}
+
+	int m_spi_clk;
 };
 
 static ADDRESS_MAP_START(buri_mem, AS_PROGRAM, 8, buri_state)
@@ -176,6 +176,7 @@ static MACHINE_CONFIG_START(buri, buri_state)
 	MCFG_PC_KEYB_ADD(KEYBOARD_TAG, WRITELINE(buri_state, keyboard_data_ready))
 
 	MCFG_DEVICE_ADD(VIA6522_TAG, VIA6522, XTAL_2MHz)
+	MCFG_VIA6522_WRITEPA_HANDLER(WRITE8(buri_state, via_pa_w))
 	MCFG_VIA6522_IRQ_HANDLER(WRITELINE(buri_state, via6522_irq_w))
 MACHINE_CONFIG_END
 
@@ -215,22 +216,15 @@ WRITE_LINE_MEMBER(buri_state::keyboard_data_ready)
 	}
 }
 
-READ_LINE_MEMBER(buri_state::spi_clk)
+WRITE8_MEMBER(buri_state::via_pa_w)
 {
-	return 0;
-}
+	int clk = data & 0x1;
+	//int device = (data & 0x1C) >> 2;
+	//int mosi = (data & 0x2) ? 1 : 0;
 
-READ_LINE_MEMBER(buri_state::spi_mosi)
-{
-	return 0;
-}
-
-WRITE_LINE_MEMBER(buri_state::spi_miso)
-{
-}
-
-WRITE_LINE_MEMBER(buri_state::spi_irq)
-{
+	if(m_spi_clk != clk) {
+		m_spi_clk = clk;
+	}
 }
 
 /*    YEAR  NAME    PARENT  COMPAT   MACHINE    INPUT    CLASS         INIT    COMPANY                FULLNAME               FLAGS */
