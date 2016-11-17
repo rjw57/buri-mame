@@ -28,6 +28,31 @@ const int MOS6551_START = 0xDFFC;
 const int TMS9929_START = 0xDE00;
 const int YM3812_START = 0xDE02;
 
+// Interesting wrinkles of Buri hardware
+// =====================================
+//
+// SPI
+// ---
+//
+// Buri exposes a SPI interface to peripherals via the 6522 VIA:
+//
+//           |     |
+//       PA0 |-->--| CLK
+// VIA   PA1 |-->--| MOSI   SPI peripheral
+//       PA7 |--<--| MISO
+//           |     |
+//
+// Lines PA2, PA3 and PA4 are connected to a 74138 3-to-8 decoder to provide the
+// chip select lines for the peripherals. Consequently there can be up to 8 SPI
+// peripherals attached.
+//
+// The CA1 line is used as a peripheral interrupt. A rising edge on the CA1 line
+// causes an interrupt on the processor.
+//
+// Well known peripherals:
+//
+//     0 - Keyboard
+
 class buri_state : public driver_device
 {
 public:
@@ -47,6 +72,11 @@ public:
 	DECLARE_WRITE_LINE_MEMBER(tms9929a_irq_w);
 	DECLARE_WRITE_LINE_MEMBER(via6522_irq_w);
 	DECLARE_WRITE_LINE_MEMBER(keyboard_data_ready);
+
+	DECLARE_READ_LINE_MEMBER(spi_clk);
+	DECLARE_READ_LINE_MEMBER(spi_mosi);
+	DECLARE_WRITE_LINE_MEMBER(spi_miso);
+	DECLARE_WRITE_LINE_MEMBER(spi_irq);
 
 	required_device<cpu_device> m_maincpu;
 	required_device<mos6551_device> m_mos6551;
@@ -177,12 +207,30 @@ WRITE_LINE_MEMBER(buri_state::keyboard_data_ready)
 	// Called when there is data to be read from the keyboard.
 	if(state) {
 		uint8_t v = m_keyboard->read(machine().dummy_space(), 0);
-		m_via6522->write_pa(machine().dummy_space(), 0, v);
+		m_via6522->write_pb(machine().dummy_space(), 0, v);
 
 		// Pulse CA1
-		m_via6522->write_ca1(1);
-		m_via6522->write_ca1(0);
+		m_via6522->write_cb1(1);
+		m_via6522->write_cb1(0);
 	}
+}
+
+READ_LINE_MEMBER(buri_state::spi_clk)
+{
+	return 0;
+}
+
+READ_LINE_MEMBER(buri_state::spi_mosi)
+{
+	return 0;
+}
+
+WRITE_LINE_MEMBER(buri_state::spi_miso)
+{
+}
+
+WRITE_LINE_MEMBER(buri_state::spi_irq)
+{
 }
 
 /*    YEAR  NAME    PARENT  COMPAT   MACHINE    INPUT    CLASS         INIT    COMPANY                FULLNAME               FLAGS */
