@@ -54,46 +54,74 @@ const int YM3812_START = 0xDE02;
 //
 //     1 - Keyboard
 
+// SPI slave device
+// ----------------
+//
+// A SPI slave device exposes three serial lines, MOSI, MISO and CLK which
+// understand the SPI protocol. There is also a select line which is used to
+// enable the device. Setting MOSI or CLK will have no effect when the select
+// line is 0. Two parameters are used to define the exact flavour of SPI:
+//
+// 1. SPI "mode": 0-3 defines clock idle and active states along with when data
+//    and commands are read.
+// 2. Data direction: whether bytes are sent most significant bit (MSB) first or
+//    least significant bit first (LSB).
+//
+// SPI is full duplex; each communication exchanges a byte from the master to
+// the slave and a byte from the slave to the master. Use set_next_send_byte()
+// to specify what the slave will send on the next exchange. This can be called
+// from the data receive callback. This callback is called when a byte from the
+// master has been received.
+
 enum spi_mode_t { SPI_MODE0, SPI_MODE1, SPI_MODE2, SPI_MODE3 };
 enum spi_data_direction_t { SPI_MSB_FIRST, SPI_LSB_FIRST };
 
 #define MCFG_SPI_ADD( _tag ) MCFG_DEVICE_ADD( _tag, SPI, 0 )
-#define MCFG_SPI_MODE( mode ) spi_device_t::set_mode(*device, mode);
-#define MCFG_SPI_DATA_DIRECTION( dir ) spi_device_t::set_data_direction(*device, dir);
+#define MCFG_SPI_MODE( mode ) spi_slave_device::set_mode(*device, mode);
+#define MCFG_SPI_DATA_DIRECTION( dir ) spi_slave_device::set_data_direction(*device, dir);
 #define MCFG_SPI_MISO_CALLBACK(_miso) \
-	downcast<spi_device_t *>(device)->set_miso_callback(DEVCB_##_miso);
+	downcast<spi_slave_device *>(device)->set_miso_callback(DEVCB_##_miso);
+#define MCFG_SPI_RECV_BYTE_CALLBACK(_recv_byte) \
+	downcast<spi_slave_device *>(device)->set_recv_byte_callback(DEVCB_##_recv_byte);
 
-class spi_device_t : public device_t
+class spi_slave_device : public device_t
 {
 public:
 	// construction/destruction
-	spi_device_t(const machine_config &mconfig, const char *tag,
+	spi_slave_device(const machine_config &mconfig, const char *tag,
 	           device_t *owner, uint32_t clock );
 
 	template<class _miso> void set_miso_callback(_miso miso) {
 		m_write_miso.set_callback(miso);
 	}
 
-	DECLARE_WRITE_LINE_MEMBER(write_clock);
+	template<class _recv_byte>
+	void set_recv_byte_callback(_recv_byte recv_byte) {
+		m_write_recv_byte.set_callback(recv_byte);
+	}
+
+	// Set the byte which is exchanged on the next communication. After the
+	// send and receive bytes are exchanged, the next send byte is set to
+	// zero.
+	void set_next_send_byte(uint8_t);
+
 	DECLARE_WRITE_LINE_MEMBER(write_select);
+	DECLARE_WRITE_LINE_MEMBER(write_clock);
 	DECLARE_WRITE_LINE_MEMBER(write_mosi);
 	DECLARE_READ_LINE_MEMBER(read_miso);
 
 	static void set_mode(device_t &device, spi_mode_t mode) {
-		downcast<spi_device_t &>(device).m_mode = mode;
+		downcast<spi_slave_device &>(device).m_mode = mode;
 	}
 
 	static void set_data_direction(device_t &device, spi_data_direction_t data_dir) {
-		downcast<spi_device_t &>(device).m_data_dir = data_dir;
+		downcast<spi_slave_device &>(device).m_data_dir = data_dir;
 	}
 
 protected:
 	// device-level overrides
 	virtual void device_start() override;
 	virtual void device_reset() override;
-
-	// Called when a byte has been exchanged. Return new byte to send.
-	uint8_t spi_exchange_byte(uint8_t recv);
 
 private:
 	spi_mode_t m_mode;
@@ -105,6 +133,7 @@ private:
 	int m_recv_count, m_send_count;
 
 	devcb_write_line m_write_miso;
+	devcb_write8 m_write_recv_byte;
 
 	void clk_edge_(int is_idle_to_active);
 
@@ -121,42 +150,41 @@ private:
 
 extern const device_type SPI;
 
-const device_type SPI = &device_creator<spi_device_t>;
+const device_type SPI = &device_creator<spi_slave_device>;
 
-spi_device_t::spi_device_t(const machine_config &mconfig, const char *tag,
+spi_slave_device::spi_slave_device(const machine_config &mconfig, const char *tag,
                        device_t *owner, uint32_t clock )
-	: device_t(mconfig, SPI, "SPI Device", tag, owner, clock, "spi", __FILE__),
+	: device_t(mconfig, SPI, "SPI slave", tag, owner, clock, "spislave", __FILE__),
 	m_mode(SPI_MODE0), m_data_dir(SPI_MSB_FIRST),
 	m_selected(false),
 	m_clk(0), m_mosi(0), m_miso(0),
 	m_recv_byte(0), m_send_byte(0),
 	m_recv_count(0), m_send_count(0),
-	m_write_miso(*this)
+	m_write_miso(*this), m_write_recv_byte(*this)
 {
 }
 
-uint8_t spi_device_t::spi_exchange_byte(ATTR_UNUSED uint8_t) { return 0; }
-
-void spi_device_t::device_start()
+void spi_slave_device::device_start()
 {
 	// resolve callbacks
 	m_write_miso.resolve_safe();
+	m_write_recv_byte.resolve_safe();
 }
 
-void spi_device_t::device_reset()
+void spi_slave_device::device_reset()
 {
 	m_recv_count = m_send_count = 0;
 	m_recv_byte = m_send_byte = 0;
 }
 
-WRITE_LINE_MEMBER(spi_device_t::write_mosi)
+WRITE_LINE_MEMBER(spi_slave_device::write_mosi)
 {
 	if(m_selected) {
 		m_mosi = (state != 0);
 	}
 }
 
-WRITE_LINE_MEMBER(spi_device_t::write_select)
+WRITE_LINE_MEMBER(spi_slave_device::write_select)
 {
 	if(state != m_selected) {
 		if(state) {
@@ -167,11 +195,16 @@ WRITE_LINE_MEMBER(spi_device_t::write_select)
 	m_selected = (state != 0);
 }
 
-WRITE_LINE_MEMBER(spi_device_t::write_clock)
+WRITE_LINE_MEMBER(spi_slave_device::write_clock)
 {
-	// NOP if no change or not selected
-	if(!m_selected or (state == m_clk)) { return; }
+	// Ignore no-change
+	if(m_clk == state) { return; }
+
+	// Update state
 	m_clk = state;
+
+	// That's it if we're not selected
+	if(!m_selected) { return; }
 
 	if(state) {
 		// low to high
@@ -182,12 +215,12 @@ WRITE_LINE_MEMBER(spi_device_t::write_clock)
 	}
 }
 
-READ_LINE_MEMBER(spi_device_t::read_miso)
+READ_LINE_MEMBER(spi_slave_device::read_miso)
 {
 	return m_miso;
 }
 
-void spi_device_t::clk_edge_(int is_idle_to_active)
+void spi_slave_device::clk_edge_(int is_idle_to_active)
 {
 	int read_mosi = cpha() ? (!is_idle_to_active) : is_idle_to_active;
 	if(read_mosi) {
@@ -214,14 +247,20 @@ void spi_device_t::clk_edge_(int is_idle_to_active)
 
 	if((m_recv_count == 8) && (m_send_count == 8)) {
 		// sent and received an entire byte
-		m_send_byte = spi_exchange_byte(m_recv_byte);
+		set_next_send_byte(0x00);
+		m_write_recv_byte(m_recv_byte);
+	}
+}
 
-		// prepare MISO
-		if(m_data_dir == SPI_MSB_FIRST) {
-			set_miso((m_send_byte & 0x80) ? 1 : 0);
-		} else {
-			set_miso(m_send_byte & 0x1);
-		}
+void spi_slave_device::set_next_send_byte(uint8_t send_byte)
+{
+	m_send_byte = send_byte;
+
+	// set MISO depending on data direction
+	if(m_data_dir == SPI_MSB_FIRST) {
+		set_miso((m_send_byte & 0x80) ? 1 : 0);
+	} else {
+		set_miso(m_send_byte & 0x1);
 	}
 }
 
@@ -253,7 +292,11 @@ public:
 	required_device<tms9929a_device> m_tms2998a;
 	required_device<pc_keyboard_device> m_keyboard;
 	required_device<via6522_device> m_via6522;
-	required_device<spi_device_t> m_spi_keyboard;
+	required_device<spi_slave_device> m_spi_keyboard;
+
+	WRITE8_MEMBER(spi_recv) {
+		printf("HACK: SPI recv 0x%02x\n", data);
+	}
 
 	union {
 		uint32_t val;
@@ -344,16 +387,17 @@ static MACHINE_CONFIG_START(buri, buri_state)
 	MCFG_SOUND_ADD(YM3812_TAG, YM3812, XTAL_3_579545MHz)
 	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "mono", 1.00)
 
-	MCFG_PC_KEYB_ADD(KEYBOARD_TAG, WRITELINE(buri_state, keyboard_data_ready))
-
 	MCFG_DEVICE_ADD(VIA6522_TAG, VIA6522, XTAL_2MHz)
 	MCFG_VIA6522_WRITEPA_HANDLER(WRITE8(buri_state, via_pa_w))
 	MCFG_VIA6522_IRQ_HANDLER(WRITELINE(buri_state, via6522_irq_w))
+
+	MCFG_PC_KEYB_ADD(KEYBOARD_TAG, WRITELINE(buri_state, keyboard_data_ready))
 
 	MCFG_SPI_ADD(SPI_KEYBOARD_TAG)
 	MCFG_SPI_MODE(SPI_MODE0)
 	MCFG_SPI_DATA_DIRECTION(SPI_MSB_FIRST)
 	MCFG_SPI_MISO_CALLBACK(DEVWRITELINE(VIA6522_TAG, via6522_device, write_pa7))
+	MCFG_SPI_RECV_BYTE_CALLBACK(WRITE8(buri_state, spi_recv))
 MACHINE_CONFIG_END
 
 ROM_START(buri)
