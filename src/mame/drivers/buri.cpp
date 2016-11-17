@@ -44,15 +44,12 @@ const int YM3812_START = 0xDE02;
 //           |     |
 //
 // Lines PA2, PA3 and PA4 are connected to a 74138 3-to-8 decoder to provide the
-// chip select lines for the peripherals. Consequently there can be up to 8 SPI
-// peripherals attached.
-//
-// The CA1 line is used as a peripheral interrupt. A rising edge on the CA1 line
-// causes an interrupt on the processor.
+// chip select lines for the peripherals. Consequently there can be up to 7 SPI
+// peripherals attached with device number 7 being reserved for "no device".
 //
 // Well known peripherals:
 //
-//     1 - Keyboard
+//     0 - Keyboard
 
 // SPI slave device
 // ----------------
