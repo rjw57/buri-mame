@@ -95,7 +95,9 @@ private:
 
 	void clk_edge_(int is_idle_to_active);
 
-	inline void set_miso(int state) { m_miso = state; m_write_miso(m_miso); }
+	inline void set_miso(int state) {
+		m_miso = state; m_write_miso(m_miso);
+	}
 
 	inline int cpol() {
 		return ((m_mode == SPI_MODE2) || (m_mode == SPI_MODE3)) ? 1 : 0;

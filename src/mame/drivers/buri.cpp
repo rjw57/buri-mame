@@ -168,7 +168,6 @@ void spi_kbd_device::spi_slave_deselect()
 
 void spi_kbd_device::spi_slave_mosi_byte(uint8_t recv_byte)
 {
-	printf("kbd recv: 0x%02x\n", recv_byte);
 	switch(m_state) {
 	case SPI_KBD_NEWLY_SELECTED:
 		if(recv_byte & 0x80) {
@@ -180,22 +179,21 @@ void spi_kbd_device::spi_slave_mosi_byte(uint8_t recv_byte)
 			// read
 			m_state = SPI_KBD_READY_TO_READ;
 			set_miso_byte(m_last_scancode);
+
+			// clear buffer
+			m_last_scancode = 0x00;
+			m_scancode_reg_full = false;
+			m_write_irq(0);
 		}
+		break;
 	case SPI_KBD_READY_TO_READ:
-		// clear scancode full flag
-		m_scancode_reg_full = false;
-		m_write_irq(0);
-		m_last_scancode = 0x00;
-		m_state = SPI_KBD_DONE;
-		set_miso_byte(0x00);
-		return;
 	case SPI_KBD_READY_TO_RESPOND:
 		m_state = SPI_KBD_DONE;
 		set_miso_byte(0x00);
-		return;
+		break;
 	default:
 		set_miso_byte(0x00);
-		return;
+		break;
 	}
 }
 
@@ -203,6 +201,7 @@ void spi_kbd_device::spi_slave_mosi_byte(uint8_t recv_byte)
 // control byte.
 uint8_t spi_kbd_device::control(uint8_t ctrl_byte)
 {
+	printf("kbd ctrl byte: 0x%02x\n", ctrl_byte);
 	switch(ctrl_byte) {
 	case 0x00:
 		return m_scancode_reg_full ? 0x00 : 0xFF;

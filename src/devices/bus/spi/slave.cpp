@@ -102,6 +102,7 @@ void spi_slave_device::clk_edge_(int is_idle_to_active)
 		// sent and received an entire byte
 		set_miso_byte(0x00); // reset send byte
 		spi_slave_mosi_byte(m_recv_byte);
+		m_recv_count = m_send_count = 0;
 	}
 }
 
@@ -109,11 +110,14 @@ void spi_slave_device::set_miso_byte(uint8_t send_byte)
 {
 	m_send_byte = send_byte;
 
-	// set MISO depending on data direction
-	if(m_data_dir == SPI_MSB_FIRST) {
-		set_miso((m_send_byte & 0x80) ? 1 : 0);
-	} else {
-		set_miso(m_send_byte & 0x1);
+	if(!cpha()) {
+		if(m_data_dir == SPI_MSB_FIRST) {
+			set_miso((m_send_byte & 0x80) ? 1 : 0);
+			m_send_byte <<= 1;
+		} else {
+			set_miso(m_send_byte & 0x1);
+			m_send_byte >>= 1;
+		}
 	}
 }
 
