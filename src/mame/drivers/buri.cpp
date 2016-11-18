@@ -168,8 +168,6 @@ void spi_kbd_device::spi_slave_deselected()
 
 uint8_t spi_kbd_device::spi_slave_exchange_byte(uint8_t recv_byte)
 {
-	printf("SPI recv 0x%02x\n", recv_byte);
-
 	switch(m_state) {
 	case SPI_KBD_NEWLY_SELECTED:
 		if(recv_byte & 0x80) {
