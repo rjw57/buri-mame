@@ -35,14 +35,32 @@ const int YM3812_START = 0xDE02;
 	MCFG_SPI_MODE(SPI_MODE0) \
 	MCFG_SPI_DATA_DIRECTION(SPI_MSB_FIRST)
 
+#define MCFG_SPI_KBD_IRQ_CALLBACK(_irq) \
+	downcast<spi_kbd_device *>(device)->set_irq_callback(DEVCB_##_irq);
+
 class spi_kbd_device : public spi_slave_device
 {
 public:
 	spi_kbd_device(const machine_config &mconfig, const char *tag,
 	               device_t *owner, uint32_t clock);
 
+	template<class _irq> void set_irq_callback(_irq irq) {
+		m_write_irq.set_callback(irq);
+	}
+
+	virtual machine_config_constructor device_mconfig_additions() const override;
+
+	DECLARE_WRITE_LINE_MEMBER( keyboard_w );
+
 protected:
+	virtual void device_start() override;
 	virtual uint8_t spi_slave_exchange_byte(uint8_t) override;
+
+	required_device<at_keyboard_device> m_keyboard_dev;
+
+	devcb_write_line m_write_irq;
+
+	uint8_t m_last_scancode;
 };
 
 extern const device_type SPI_KEYBOARD;
@@ -51,8 +69,37 @@ const device_type SPI_KEYBOARD = &device_creator<spi_kbd_device>;
 
 spi_kbd_device::spi_kbd_device(const machine_config &mconfig, const char *tag,
                                device_t *owner, uint32_t clock)
-	: spi_slave_device(mconfig, tag, owner, clock)
+	: spi_slave_device(mconfig, tag, owner, clock),
+	m_keyboard_dev(*this, "at_keyboard"),
+	m_write_irq(*this)
 { }
+
+static MACHINE_CONFIG_FRAGMENT( keyboard )
+	MCFG_AT_KEYB_ADD("at_keyboard", 1, WRITELINE(spi_kbd_device, keyboard_w))
+MACHINE_CONFIG_END
+
+machine_config_constructor spi_kbd_device::device_mconfig_additions() const
+{
+	return MACHINE_CONFIG_NAME( keyboard );
+}
+
+WRITE_LINE_MEMBER(spi_kbd_device::keyboard_w)
+{
+	// NOP if keyboard data ready line is 0
+	if(!state) { return; }
+
+	// Read keyboard scancode
+	m_last_scancode = m_keyboard_dev->read(machine().dummy_space(), 0);
+
+	// Indicate that we have data to read
+	m_write_irq(1);
+}
+
+void spi_kbd_device::device_start()
+{
+	spi_slave_device::device_start();
+	m_write_irq.resolve_safe();
+}
 
 uint8_t spi_kbd_device::spi_slave_exchange_byte(uint8_t recv_byte)
 {
@@ -102,6 +149,7 @@ public:
 	DECLARE_WRITE_LINE_MEMBER(mos6551_irq_w);
 	DECLARE_WRITE_LINE_MEMBER(tms9929a_irq_w);
 	DECLARE_WRITE_LINE_MEMBER(via6522_irq_w);
+	DECLARE_WRITE_LINE_MEMBER(spi_kbd_irq_w);
 	DECLARE_WRITE_LINE_MEMBER(keyboard_data_ready);
 	DECLARE_WRITE8_MEMBER(via_pa_w);
 
@@ -211,6 +259,7 @@ static MACHINE_CONFIG_START(buri, buri_state)
 
 	MCFG_SPI_KBD_ADD(SPI_KEYBOARD_TAG)
 	MCFG_SPI_MISO_CALLBACK(DEVWRITELINE(VIA6522_TAG, via6522_device, write_pa7))
+	MCFG_SPI_KBD_IRQ_CALLBACK(WRITELINE(buri_state, spi_kbd_irq_w));
 MACHINE_CONFIG_END
 
 ROM_START(buri)
@@ -258,6 +307,12 @@ WRITE8_MEMBER(buri_state::via_pa_w)
 	m_spi_keyboard->write_select(m_selected_spi_device == 0);
 	m_spi_keyboard->write_clock(clk);
 	m_spi_keyboard->write_mosi(mosi);
+}
+
+WRITE_LINE_MEMBER(buri_state::spi_kbd_irq_w)
+{
+	// NOP
+	// printf("SPI keyboard IRQ: %i\n", state);
 }
 
 /*    YEAR  NAME    PARENT  COMPAT   MACHINE    INPUT    CLASS         INIT    COMPANY                FULLNAME               FLAGS */

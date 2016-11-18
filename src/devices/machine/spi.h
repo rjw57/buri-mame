@@ -33,6 +33,8 @@ enum spi_data_direction_t { SPI_MSB_FIRST, SPI_LSB_FIRST };
 class spi_slave_device_interface
 {
 protected:
+	virtual void spi_slave_selected() = 0;
+	virtual void spi_slave_deselected() = 0;
 	virtual uint8_t spi_slave_exchange_byte(uint8_t) = 0;
 };
 
@@ -70,6 +72,8 @@ protected:
 	virtual void device_start() override;
 	virtual void device_reset() override;
 
+	virtual void spi_slave_selected() override;
+	virtual void spi_slave_deselected() override;
 	virtual uint8_t spi_slave_exchange_byte(uint8_t) override;
 
 private:

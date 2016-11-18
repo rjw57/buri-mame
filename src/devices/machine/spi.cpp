@@ -41,6 +41,9 @@ WRITE_LINE_MEMBER(spi_slave_device::write_select)
 		if(state) {
 			// newly selected, clear recv/send counts
 			m_recv_count = m_send_count = 0;
+			spi_slave_selected();
+		} else {
+			spi_slave_deselected();
 		}
 	}
 	m_selected = (state != 0);
@@ -113,6 +116,9 @@ void spi_slave_device::set_next_send_byte(uint8_t send_byte)
 		set_miso(m_send_byte & 0x1);
 	}
 }
+
+void spi_slave_device::spi_slave_selected() { }
+void spi_slave_device::spi_slave_deselected() { }
 
 uint8_t spi_slave_device::spi_slave_exchange_byte(ATTR_UNUSED uint8_t) {
 	return 0x00;
