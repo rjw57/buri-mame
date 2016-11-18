@@ -398,7 +398,7 @@ MACHINE_CONFIG_END
 
 ROM_START(buri)
 	ROM_REGION(0x2000, "maincpu", 0)
-	ROM_LOAD("burios.bin", 0x0000, 0x2000, CRC(e527d758))
+	ROM_LOAD("burios.bin", 0x0000, 0x2000, NO_DUMP)
 ROM_END
 
 WRITE_LINE_MEMBER(buri_state::mos6551_irq_w)
