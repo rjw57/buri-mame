@@ -31,6 +31,8 @@ files {
 	MAME_DIR .. "src/devices/machine/legscsi.h",
 	MAME_DIR .. "src/devices/machine/terminal.cpp",
 	MAME_DIR .. "src/devices/machine/terminal.h",
+	MAME_DIR .. "src/devices/machine/spi-slave.cpp",
+	MAME_DIR .. "src/devices/machine/spi-slave.h",
 }
 files {
 	MAME_DIR .. "src/devices/imagedev/bitbngr.cpp",
