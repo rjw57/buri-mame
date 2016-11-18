@@ -14,7 +14,7 @@
 // line is 0. Two parameters are used to define the exact flavour of SPI:
 //
 // 1. SPI "mode": 0-3 defines clock idle and active states along with when data
-//    and commands are read.
+//    is read and output sent.
 // 2. Data direction: whether bytes are sent most significant bit (MSB) first or
 //    least significant bit first (LSB).
 //
