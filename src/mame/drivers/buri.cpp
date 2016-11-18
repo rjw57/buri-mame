@@ -30,6 +30,45 @@ const int MOS6551_START = 0xDFFC;
 const int TMS9929_START = 0xDE00;
 const int YM3812_START = 0xDE02;
 
+// SPI keyboard controller
+// -----------------------
+//
+// The SPI keyboard controller talks to a hardware keyboard and presents an
+// AT-scancode set 1 keyboard over SPI. There are two modes: read scancode and
+// write control.
+//
+// After selecting the device, the master exchanges two bytes with the device.
+// Subsequent SPI exchanges are ignored with MISO set to 0.
+//
+// Read scancode
+// ~~~~~~~~~~~~~
+//
+// | MOSI | MISO     |
+// |======|==========|
+// | $00  | <X>      |
+// | <X>  | scancode |
+//
+// After the scancode is read, the internal scancode register is reset to $00.
+// Subsequent reads will therefore return $00.
+//
+// Write control
+// ~~~~~~~~~~~~~
+// Writing is indicated by sending a byte with the high bit set. The low 7 bits
+// are the control code. The control response is sent in the next byte.
+//
+// | MOSI       | MISO     |
+// |============|==========|
+// | $80 |<ctrl | <X>      |
+// | <X>        | response |
+//
+// Unknown control codes may have unintended effects and have undefined
+// responses.
+//
+// Control codes
+// ~~~~~~~~~~~~~
+//
+// $00 - responds $FF if scancode register is full or $00 if empty
+
 #define MCFG_SPI_KBD_ADD( _tag ) \
 	MCFG_DEVICE_ADD( _tag, SPI_KEYBOARD, 0 ) \
 	MCFG_SPI_MODE(SPI_MODE0) \
@@ -37,6 +76,14 @@ const int YM3812_START = 0xDE02;
 
 #define MCFG_SPI_KBD_IRQ_CALLBACK(_irq) \
 	downcast<spi_kbd_device *>(device)->set_irq_callback(DEVCB_##_irq);
+
+enum spi_kbd_state {
+	SPI_KBD_NOT_SELECTED,
+	SPI_KBD_NEWLY_SELECTED,
+	SPI_KBD_READY_TO_READ,
+	SPI_KBD_READY_TO_RESPOND,
+	SPI_KBD_DONE,
+};
 
 class spi_kbd_device : public spi_slave_device
 {
@@ -54,13 +101,19 @@ public:
 
 protected:
 	virtual void device_start() override;
+	virtual void spi_slave_selected() override;
+	virtual void spi_slave_deselected() override;
 	virtual uint8_t spi_slave_exchange_byte(uint8_t) override;
+
+	uint8_t control(uint8_t ctrl_byte);
 
 	required_device<at_keyboard_device> m_keyboard_dev;
 
 	devcb_write_line m_write_irq;
 
+	spi_kbd_state m_state;
 	uint8_t m_last_scancode;
+	bool m_scancode_reg_full;
 };
 
 extern const device_type SPI_KEYBOARD;
@@ -71,7 +124,8 @@ spi_kbd_device::spi_kbd_device(const machine_config &mconfig, const char *tag,
                                device_t *owner, uint32_t clock)
 	: spi_slave_device(mconfig, tag, owner, clock),
 	m_keyboard_dev(*this, "at_keyboard"),
-	m_write_irq(*this)
+	m_write_irq(*this), m_state(SPI_KBD_NOT_SELECTED),
+	m_last_scancode(0), m_scancode_reg_full(false)
 { }
 
 static MACHINE_CONFIG_FRAGMENT( keyboard )
@@ -92,6 +146,7 @@ WRITE_LINE_MEMBER(spi_kbd_device::keyboard_w)
 	m_last_scancode = m_keyboard_dev->read(machine().dummy_space(), 0);
 
 	// Indicate that we have data to read
+	m_scancode_reg_full = true;
 	m_write_irq(1);
 }
 
@@ -101,10 +156,56 @@ void spi_kbd_device::device_start()
 	m_write_irq.resolve_safe();
 }
 
+void spi_kbd_device::spi_slave_selected()
+{
+	m_state = SPI_KBD_NEWLY_SELECTED;
+}
+
+void spi_kbd_device::spi_slave_deselected()
+{
+	m_state = SPI_KBD_NOT_SELECTED;
+}
+
 uint8_t spi_kbd_device::spi_slave_exchange_byte(uint8_t recv_byte)
 {
 	printf("SPI recv 0x%02x\n", recv_byte);
-	return 0x0;
+
+	switch(m_state) {
+	case SPI_KBD_NEWLY_SELECTED:
+		if(recv_byte & 0x80) {
+			// control
+			m_state = SPI_KBD_READY_TO_RESPOND;
+			return control(recv_byte & 0x7F);
+		} else {
+			// read
+			m_state = SPI_KBD_READY_TO_READ;
+			return m_last_scancode;
+		}
+	case SPI_KBD_READY_TO_READ:
+		// clear scancode full flag
+		m_scancode_reg_full = false;
+		m_write_irq(0);
+		m_last_scancode = 0x00;
+		m_state = SPI_KBD_DONE;
+		return 0x00;
+	case SPI_KBD_READY_TO_RESPOND:
+		m_state = SPI_KBD_DONE;
+		return 0x00;
+	default:
+		return 0x00;
+	}
+}
+
+// Called when there is a new control byte. Returns the response from the
+// control byte.
+uint8_t spi_kbd_device::control(uint8_t ctrl_byte)
+{
+	switch(ctrl_byte) {
+	case 0x00:
+		return m_scancode_reg_full ? 0x00 : 0xFF;
+	default:
+		return 0x00;
+	}
 }
 
 // Interesting wrinkles of Buri hardware
