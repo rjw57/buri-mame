@@ -106,6 +106,6 @@ private:
 	}
 };
 
-extern const device_type SPI;
+extern const device_type SPI_SLAVE;
 
 #endif

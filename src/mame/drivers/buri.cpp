@@ -7,12 +7,12 @@
 #include "emu.h"
 
 #include "bus/rs232/rs232.h"
+#include "bus/spi/slave.h"
 #include "cpu/g65816/g65816.h"
 #include "machine/6522via.h"
 #include "machine/ins8250.h"
 #include "machine/mos6551.h"
 #include "machine/pckeybrd.h"
-#include "machine/spi.h"
 #include "sound/3812intf.h"
 #include "video/tms9928a.h"
 
@@ -367,7 +367,7 @@ MACHINE_CONFIG_END
 
 ROM_START(buri)
 	ROM_REGION(0x2000, "maincpu", 0)
-	ROM_LOAD("burios.bin", 0x0000, 0x2000, NO_DUMP)
+	ROM_LOAD("burios.bin", 0x0000, 0x2000, "")
 ROM_END
 
 WRITE_LINE_MEMBER(buri_state::mos6551_irq_w)

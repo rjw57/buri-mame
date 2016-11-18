@@ -1271,6 +1271,16 @@ if (BUSES["SPC1000"]~=null) then
 	}
 end
 
+---------------------------------------------------
+--
+--@src/devices/bus/spi/slave.h,BUSES["SPI"] = true
+---------------------------------------------------
+if (BUSES["SPI"]~=null) then
+	files {
+		MAME_DIR .. "src/devices/bus/spi/slave.cpp",
+		MAME_DIR .. "src/devices/bus/spi/slave.h",
+	}
+end
 
 ---------------------------------------------------
 --

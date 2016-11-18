@@ -1,12 +1,12 @@
 // license:BSD-3-Clause
 // copyright-holders:Rich Wreham
-#include "spi.h"
+#include "slave.h"
 
-const device_type SPI = &device_creator<spi_slave_device>;
+const device_type SPI_SLAVE = &device_creator<spi_slave_device>;
 
 spi_slave_device::spi_slave_device(const machine_config &mconfig, const char *tag,
                        device_t *owner, uint32_t clock )
-	: device_t(mconfig, SPI, "SPI slave", tag, owner, clock, "spislave", __FILE__),
+	: device_t(mconfig, SPI_SLAVE, "SPI slave", tag, owner, clock, "spislave", __FILE__),
 	m_mode(SPI_MODE0), m_data_dir(SPI_MSB_FIRST),
 	m_selected(false),
 	m_clk(0), m_mosi(0), m_miso(0),
