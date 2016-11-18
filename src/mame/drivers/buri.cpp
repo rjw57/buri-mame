@@ -71,7 +71,7 @@ const int YM3812_START = 0xDE02;
 
 #define MCFG_SPI_KBD_ADD( _tag ) \
 	MCFG_DEVICE_ADD( _tag, SPI_KEYBOARD, 0 ) \
-	MCFG_SPI_MODE(SPI_MODE0) \
+	MCFG_SPI_MODE(SPI_MODE1) \
 	MCFG_SPI_DATA_DIRECTION(SPI_MSB_FIRST)
 
 #define MCFG_SPI_KBD_IRQ_CALLBACK(_irq) \
@@ -168,6 +168,7 @@ void spi_kbd_device::spi_slave_deselect()
 
 void spi_kbd_device::spi_slave_mosi_byte(uint8_t recv_byte)
 {
+	printf("kbd recv: 0x%02x\n", recv_byte);
 	switch(m_state) {
 	case SPI_KBD_NEWLY_SELECTED:
 		if(recv_byte & 0x80) {

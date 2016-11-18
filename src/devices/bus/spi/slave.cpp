@@ -30,9 +30,7 @@ void spi_slave_device::device_reset()
 
 WRITE_LINE_MEMBER(spi_slave_device::write_mosi)
 {
-	if(m_selected) {
-		m_mosi = (state != 0);
-	}
+	m_mosi = (state != 0);
 }
 
 WRITE_LINE_MEMBER(spi_slave_device::write_select)
@@ -76,19 +74,20 @@ READ_LINE_MEMBER(spi_slave_device::read_miso)
 
 void spi_slave_device::clk_edge_(int is_idle_to_active)
 {
-	int read_mosi = cpha() ? (!is_idle_to_active) : is_idle_to_active;
-	if(read_mosi) {
-		// Should read MOSI on this edge
+	int data_stable = cpha() ? !is_idle_to_active : is_idle_to_active;
+
+	if(data_stable) {
+		// data is stable, read MOSI
 		if(m_data_dir == SPI_MSB_FIRST) {
 			m_recv_byte <<= 1;
-			m_recv_byte |= m_mosi ? 1 : 0;
+			m_recv_byte |= m_mosi ? 0x01 : 0x00;
 		} else {
 			m_recv_byte >>= 1;
 			m_recv_byte |= m_mosi ? 0x80 : 0x00;
 		}
 		++m_recv_count;
 	} else {
-		// Should set MISO on this edge
+		// data lines can be changed
 		if(m_data_dir == SPI_MSB_FIRST) {
 			set_miso((m_send_byte & 0x80) ? 1 : 0);
 			m_send_byte <<= 1;
