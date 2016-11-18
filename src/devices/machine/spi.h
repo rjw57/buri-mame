@@ -19,10 +19,7 @@
 //    least significant bit first (LSB).
 //
 // SPI is full duplex; each communication exchanges a byte from the master to
-// the slave and a byte from the slave to the master. Use set_next_send_byte()
-// to specify what the slave will send on the next exchange. This can be called
-// from the data receive callback. This callback is called when a byte from the
-// master has been received.
+// the slave and a byte from the slave to the master.
 
 enum spi_mode_t { SPI_MODE0, SPI_MODE1, SPI_MODE2, SPI_MODE3 };
 enum spi_data_direction_t { SPI_MSB_FIRST, SPI_LSB_FIRST };
@@ -32,10 +29,14 @@ enum spi_data_direction_t { SPI_MSB_FIRST, SPI_LSB_FIRST };
 #define MCFG_SPI_DATA_DIRECTION( dir ) spi_slave_device::set_data_direction(*device, dir);
 #define MCFG_SPI_MISO_CALLBACK(_miso) \
 	downcast<spi_slave_device *>(device)->set_miso_callback(DEVCB_##_miso);
-#define MCFG_SPI_RECV_BYTE_CALLBACK(_recv_byte) \
-	downcast<spi_slave_device *>(device)->set_recv_byte_callback(DEVCB_##_recv_byte);
 
-class spi_slave_device : public device_t
+class spi_slave_device_interface
+{
+protected:
+	virtual uint8_t spi_slave_exchange_byte(uint8_t) = 0;
+};
+
+class spi_slave_device : public device_t, public spi_slave_device_interface
 {
 public:
 	// construction/destruction
@@ -44,11 +45,6 @@ public:
 
 	template<class _miso> void set_miso_callback(_miso miso) {
 		m_write_miso.set_callback(miso);
-	}
-
-	template<class _recv_byte>
-	void set_recv_byte_callback(_recv_byte recv_byte) {
-		m_write_recv_byte.set_callback(recv_byte);
 	}
 
 	// Set the byte which is exchanged on the next communication. After the
@@ -74,6 +70,8 @@ protected:
 	virtual void device_start() override;
 	virtual void device_reset() override;
 
+	virtual uint8_t spi_slave_exchange_byte(uint8_t) override;
+
 private:
 	spi_mode_t m_mode;
 	spi_data_direction_t m_data_dir;
@@ -84,7 +82,6 @@ private:
 	int m_recv_count, m_send_count;
 
 	devcb_write_line m_write_miso;
-	devcb_write8 m_write_recv_byte;
 
 	void clk_edge_(int is_idle_to_active);
 

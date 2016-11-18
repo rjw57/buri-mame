@@ -12,7 +12,7 @@ spi_slave_device::spi_slave_device(const machine_config &mconfig, const char *ta
 	m_clk(0), m_mosi(0), m_miso(0),
 	m_recv_byte(0), m_send_byte(0),
 	m_recv_count(0), m_send_count(0),
-	m_write_miso(*this), m_write_recv_byte(*this)
+	m_write_miso(*this)
 {
 }
 
@@ -20,7 +20,6 @@ void spi_slave_device::device_start()
 {
 	// resolve callbacks
 	m_write_miso.resolve_safe();
-	m_write_recv_byte.resolve_safe();
 }
 
 void spi_slave_device::device_reset()
@@ -99,8 +98,7 @@ void spi_slave_device::clk_edge_(int is_idle_to_active)
 
 	if((m_recv_count == 8) && (m_send_count == 8)) {
 		// sent and received an entire byte
-		set_next_send_byte(0x00);
-		m_write_recv_byte(m_recv_byte);
+		set_next_send_byte(spi_slave_exchange_byte(m_recv_byte));
 	}
 }
 
@@ -114,4 +112,8 @@ void spi_slave_device::set_next_send_byte(uint8_t send_byte)
 	} else {
 		set_miso(m_send_byte & 0x1);
 	}
+}
+
+uint8_t spi_slave_device::spi_slave_exchange_byte(ATTR_UNUSED uint8_t) {
+	return 0x00;
 }

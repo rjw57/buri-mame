@@ -33,8 +33,7 @@ const int YM3812_START = 0xDE02;
 #define MCFG_SPI_KBD_ADD( _tag ) \
 	MCFG_DEVICE_ADD( _tag, SPI_KEYBOARD, 0 ) \
 	MCFG_SPI_MODE(SPI_MODE0) \
-	MCFG_SPI_DATA_DIRECTION(SPI_MSB_FIRST) \
-	MCFG_SPI_RECV_BYTE_CALLBACK(DEVWRITE8(_tag, spi_kbd_device, recv_byte))
+	MCFG_SPI_DATA_DIRECTION(SPI_MSB_FIRST)
 
 class spi_kbd_device : public spi_slave_device
 {
@@ -42,15 +41,11 @@ public:
 	spi_kbd_device(const machine_config &mconfig, const char *tag,
 	               device_t *owner, uint32_t clock);
 
-	DECLARE_WRITE8_MEMBER(recv_byte);
+protected:
+	virtual uint8_t spi_slave_exchange_byte(uint8_t) override;
 };
 
 extern const device_type SPI_KEYBOARD;
-
-WRITE8_MEMBER(spi_kbd_device::recv_byte)
-{
-	printf("gottit: SPI recv 0x%02x\n", data);
-}
 
 const device_type SPI_KEYBOARD = &device_creator<spi_kbd_device>;
 
@@ -58,6 +53,12 @@ spi_kbd_device::spi_kbd_device(const machine_config &mconfig, const char *tag,
                                device_t *owner, uint32_t clock)
 	: spi_slave_device(mconfig, tag, owner, clock)
 { }
+
+uint8_t spi_kbd_device::spi_slave_exchange_byte(uint8_t recv_byte)
+{
+	printf("SPI recv 0x%02x\n", recv_byte);
+	return 0x0;
+}
 
 // Interesting wrinkles of Buri hardware
 // =====================================
