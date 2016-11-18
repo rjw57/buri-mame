@@ -20,7 +20,6 @@ const char* VIA6522_TAG = "via6522";
 const char* MOS6551_TAG = "mos6551";
 const char* YM3812_TAG = "ym3812";
 const char* TMS9929_TAG = "tms9929";
-const char* KEYBOARD_TAG = "at_keyboard";
 const char* SPI_KEYBOARD_TAG = "spi_keyboard";
 
 const char* UART1_TAG = "uart1";
@@ -67,7 +66,8 @@ const int YM3812_START = 0xDE02;
 // Control codes
 // ~~~~~~~~~~~~~
 //
-// $00 - responds $FF if scancode register is full or $00 if empty
+// $00 - reset the controller
+// $01 - responds $FF if scancode register is full or $00 if empty
 
 #define MCFG_SPI_KBD_ADD( _tag ) \
 	MCFG_DEVICE_ADD( _tag, SPI_KEYBOARD, 0 ) \
@@ -101,6 +101,7 @@ public:
 
 protected:
 	virtual void device_start() override;
+	virtual void device_reset() override;
 	virtual void spi_slave_select() override;
 	virtual void spi_slave_deselect() override;
 	virtual void spi_slave_mosi_byte(uint8_t) override;
@@ -156,6 +157,15 @@ void spi_kbd_device::device_start()
 	m_write_irq.resolve_safe();
 }
 
+void spi_kbd_device::device_reset()
+{
+	spi_slave_device::device_reset();
+	m_state = SPI_KBD_NOT_SELECTED;
+	m_scancode_reg_full = false;
+	m_last_scancode = 0;
+	m_write_irq(0);
+}
+
 void spi_kbd_device::spi_slave_select()
 {
 	m_state = SPI_KBD_NEWLY_SELECTED;
@@ -201,9 +211,11 @@ void spi_kbd_device::spi_slave_mosi_byte(uint8_t recv_byte)
 // control byte.
 uint8_t spi_kbd_device::control(uint8_t ctrl_byte)
 {
-	printf("kbd ctrl byte: 0x%02x\n", ctrl_byte);
 	switch(ctrl_byte) {
 	case 0x00:
+		device_reset();
+		return 0x00;
+	case 0x01:
 		return m_scancode_reg_full ? 0x00 : 0xFF;
 	default:
 		return 0x00;
@@ -241,7 +253,6 @@ public:
 	           m_maincpu(*this, "maincpu"),
 	           m_mos6551(*this, MOS6551_TAG),
 	           m_tms2998a(*this, TMS9929_TAG),
-	           m_keyboard(*this, KEYBOARD_TAG),
 	           m_via6522(*this, VIA6522_TAG),
 	           m_spi_keyboard(*this, SPI_KEYBOARD_TAG)
 	{
@@ -252,14 +263,11 @@ public:
 	DECLARE_WRITE_LINE_MEMBER(mos6551_irq_w);
 	DECLARE_WRITE_LINE_MEMBER(tms9929a_irq_w);
 	DECLARE_WRITE_LINE_MEMBER(via6522_irq_w);
-	DECLARE_WRITE_LINE_MEMBER(spi_kbd_irq_w);
-	DECLARE_WRITE_LINE_MEMBER(keyboard_data_ready);
 	DECLARE_WRITE8_MEMBER(via_pa_w);
 
 	required_device<cpu_device> m_maincpu;
 	required_device<mos6551_device> m_mos6551;
 	required_device<tms9929a_device> m_tms2998a;
-	required_device<at_keyboard_device> m_keyboard;
 	required_device<via6522_device> m_via6522;
 	required_device<spi_kbd_device> m_spi_keyboard;
 
@@ -358,11 +366,9 @@ static MACHINE_CONFIG_START(buri, buri_state)
 	MCFG_VIA6522_WRITEPA_HANDLER(WRITE8(buri_state, via_pa_w))
 	MCFG_VIA6522_IRQ_HANDLER(WRITELINE(buri_state, via6522_irq_w))
 
-	MCFG_AT_KEYB_ADD(KEYBOARD_TAG, 1, WRITELINE(buri_state, keyboard_data_ready))
-
 	MCFG_SPI_KBD_ADD(SPI_KEYBOARD_TAG)
 	MCFG_SPI_MISO_CALLBACK(DEVWRITELINE(VIA6522_TAG, via6522_device, write_pa7))
-	MCFG_SPI_KBD_IRQ_CALLBACK(WRITELINE(buri_state, spi_kbd_irq_w));
+	MCFG_SPI_KBD_IRQ_CALLBACK(DEVWRITELINE(VIA6522_TAG, via6522_device, write_ca1));
 MACHINE_CONFIG_END
 
 ROM_START(buri)
@@ -388,19 +394,6 @@ WRITE_LINE_MEMBER(buri_state::via6522_irq_w)
 	irqs_updated_();
 }
 
-WRITE_LINE_MEMBER(buri_state::keyboard_data_ready)
-{
-	// Called when there is data to be read from the keyboard.
-	if(state) {
-		uint8_t v = m_keyboard->read(machine().dummy_space(), 0);
-		m_via6522->write_pb(machine().dummy_space(), 0, v);
-
-		// Pulse CA1
-		m_via6522->write_cb1(1);
-		m_via6522->write_cb1(0);
-	}
-}
-
 WRITE8_MEMBER(buri_state::via_pa_w)
 {
 	int clk = data & 0x1;
@@ -410,12 +403,6 @@ WRITE8_MEMBER(buri_state::via_pa_w)
 	m_spi_keyboard->write_select(m_selected_spi_device == 0);
 	m_spi_keyboard->write_clock(clk);
 	m_spi_keyboard->write_mosi(mosi);
-}
-
-WRITE_LINE_MEMBER(buri_state::spi_kbd_irq_w)
-{
-	// NOP
-	// printf("SPI keyboard IRQ: %i\n", state);
 }
 
 /*    YEAR  NAME    PARENT  COMPAT   MACHINE    INPUT    CLASS         INIT    COMPANY                FULLNAME               FLAGS */
