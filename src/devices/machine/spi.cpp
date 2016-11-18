@@ -1,6 +1,6 @@
 // license:BSD-3-Clause
 // copyright-holders:Rich Wreham
-#include "spi-slave.h"
+#include "spi.h"
 
 const device_type SPI = &device_creator<spi_slave_device>;
 

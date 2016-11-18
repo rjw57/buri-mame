@@ -12,7 +12,7 @@
 #include "machine/ins8250.h"
 #include "machine/mos6551.h"
 #include "machine/pckeybrd.h"
-#include "machine/spi-slave.h"
+#include "machine/spi.h"
 #include "sound/3812intf.h"
 #include "video/tms9928a.h"
 
@@ -29,6 +29,35 @@ const int VIA6522_START = 0xDEF0;
 const int MOS6551_START = 0xDFFC;
 const int TMS9929_START = 0xDE00;
 const int YM3812_START = 0xDE02;
+
+#define MCFG_SPI_KBD_ADD( _tag ) \
+	MCFG_DEVICE_ADD( _tag, SPI_KEYBOARD, 0 ) \
+	MCFG_SPI_MODE(SPI_MODE0) \
+	MCFG_SPI_DATA_DIRECTION(SPI_MSB_FIRST) \
+	MCFG_SPI_RECV_BYTE_CALLBACK(DEVWRITE8(_tag, spi_kbd_device, recv_byte))
+
+class spi_kbd_device : public spi_slave_device
+{
+public:
+	spi_kbd_device(const machine_config &mconfig, const char *tag,
+	               device_t *owner, uint32_t clock);
+
+	DECLARE_WRITE8_MEMBER(recv_byte);
+};
+
+extern const device_type SPI_KEYBOARD;
+
+WRITE8_MEMBER(spi_kbd_device::recv_byte)
+{
+	printf("gottit: SPI recv 0x%02x\n", data);
+}
+
+const device_type SPI_KEYBOARD = &device_creator<spi_kbd_device>;
+
+spi_kbd_device::spi_kbd_device(const machine_config &mconfig, const char *tag,
+                               device_t *owner, uint32_t clock)
+	: spi_slave_device(mconfig, tag, owner, clock)
+{ }
 
 // Interesting wrinkles of Buri hardware
 // =====================================
@@ -74,14 +103,13 @@ public:
 	DECLARE_WRITE_LINE_MEMBER(via6522_irq_w);
 	DECLARE_WRITE_LINE_MEMBER(keyboard_data_ready);
 	DECLARE_WRITE8_MEMBER(via_pa_w);
-	DECLARE_WRITE8_MEMBER(spi_recv_byte);
 
 	required_device<cpu_device> m_maincpu;
 	required_device<mos6551_device> m_mos6551;
 	required_device<tms9929a_device> m_tms2998a;
 	required_device<at_keyboard_device> m_keyboard;
 	required_device<via6522_device> m_via6522;
-	required_device<spi_slave_device> m_spi_keyboard;
+	required_device<spi_kbd_device> m_spi_keyboard;
 
 	union {
 		uint32_t val;
@@ -180,11 +208,8 @@ static MACHINE_CONFIG_START(buri, buri_state)
 
 	MCFG_AT_KEYB_ADD(KEYBOARD_TAG, 1, WRITELINE(buri_state, keyboard_data_ready))
 
-	MCFG_SPI_ADD(SPI_KEYBOARD_TAG)
-	MCFG_SPI_MODE(SPI_MODE0)
-	MCFG_SPI_DATA_DIRECTION(SPI_MSB_FIRST)
+	MCFG_SPI_KBD_ADD(SPI_KEYBOARD_TAG)
 	MCFG_SPI_MISO_CALLBACK(DEVWRITELINE(VIA6522_TAG, via6522_device, write_pa7))
-	MCFG_SPI_RECV_BYTE_CALLBACK(WRITE8(buri_state, spi_recv_byte))
 MACHINE_CONFIG_END
 
 ROM_START(buri)
@@ -232,10 +257,6 @@ WRITE8_MEMBER(buri_state::via_pa_w)
 	m_spi_keyboard->write_select(m_selected_spi_device == 0);
 	m_spi_keyboard->write_clock(clk);
 	m_spi_keyboard->write_mosi(mosi);
-}
-
-WRITE8_MEMBER(buri_state::spi_recv_byte) {
-	printf("HACK: SPI recv 0x%02x\n", data);
 }
 
 /*    YEAR  NAME    PARENT  COMPAT   MACHINE    INPUT    CLASS         INIT    COMPANY                FULLNAME               FLAGS */
