@@ -33,9 +33,14 @@ enum spi_data_direction_t { SPI_MSB_FIRST, SPI_LSB_FIRST };
 class spi_slave_device_interface
 {
 protected:
+	// device was selected & previously wasn't
 	virtual void spi_slave_selected() = 0;
+
+	// device was deselected & previously was
 	virtual void spi_slave_deselected() = 0;
-	virtual uint8_t spi_slave_exchange_byte(uint8_t) = 0;
+
+	// a byte has been received from the master
+	virtual void spi_slave_receive_byte(uint8_t) = 0;
 };
 
 class spi_slave_device : public device_t, public spi_slave_device_interface
@@ -50,7 +55,7 @@ public:
 	}
 
 	// Set the byte which is exchanged on the next communication. After the
-	// send and receive bytes are exchanged, the next send byte is set to
+	// send and receive bytes are exchanged, the next send byte is reset to
 	// zero.
 	void set_next_send_byte(uint8_t);
 
@@ -74,7 +79,7 @@ protected:
 
 	virtual void spi_slave_selected() override;
 	virtual void spi_slave_deselected() override;
-	virtual uint8_t spi_slave_exchange_byte(uint8_t) override;
+	virtual void spi_slave_receive_byte(uint8_t) override;
 
 private:
 	spi_mode_t m_mode;

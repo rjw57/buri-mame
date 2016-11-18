@@ -101,7 +101,8 @@ void spi_slave_device::clk_edge_(int is_idle_to_active)
 
 	if((m_recv_count == 8) && (m_send_count == 8)) {
 		// sent and received an entire byte
-		set_next_send_byte(spi_slave_exchange_byte(m_recv_byte));
+		set_next_send_byte(0x00); // reset send byte
+		spi_slave_receive_byte(m_recv_byte);
 	}
 }
 
@@ -119,7 +120,4 @@ void spi_slave_device::set_next_send_byte(uint8_t send_byte)
 
 void spi_slave_device::spi_slave_selected() { }
 void spi_slave_device::spi_slave_deselected() { }
-
-uint8_t spi_slave_device::spi_slave_exchange_byte(ATTR_UNUSED uint8_t) {
-	return 0x00;
-}
+void spi_slave_device::spi_slave_receive_byte(ATTR_UNUSED uint8_t) { }
