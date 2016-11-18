@@ -101,9 +101,9 @@ public:
 
 protected:
 	virtual void device_start() override;
-	virtual void spi_slave_selected() override;
-	virtual void spi_slave_deselected() override;
-	virtual void spi_slave_receive_byte(uint8_t) override;
+	virtual void spi_slave_select() override;
+	virtual void spi_slave_deselect() override;
+	virtual void spi_slave_mosi_byte(uint8_t) override;
 
 	uint8_t control(uint8_t ctrl_byte);
 
@@ -156,29 +156,29 @@ void spi_kbd_device::device_start()
 	m_write_irq.resolve_safe();
 }
 
-void spi_kbd_device::spi_slave_selected()
+void spi_kbd_device::spi_slave_select()
 {
 	m_state = SPI_KBD_NEWLY_SELECTED;
 }
 
-void spi_kbd_device::spi_slave_deselected()
+void spi_kbd_device::spi_slave_deselect()
 {
 	m_state = SPI_KBD_NOT_SELECTED;
 }
 
-void spi_kbd_device::spi_slave_receive_byte(uint8_t recv_byte)
+void spi_kbd_device::spi_slave_mosi_byte(uint8_t recv_byte)
 {
 	switch(m_state) {
 	case SPI_KBD_NEWLY_SELECTED:
 		if(recv_byte & 0x80) {
 			// control
 			m_state = SPI_KBD_READY_TO_RESPOND;
-			set_next_send_byte(control(recv_byte & 0x7F));
+			set_miso_byte(control(recv_byte & 0x7F));
 			return;
 		} else {
 			// read
 			m_state = SPI_KBD_READY_TO_READ;
-			set_next_send_byte(m_last_scancode);
+			set_miso_byte(m_last_scancode);
 		}
 	case SPI_KBD_READY_TO_READ:
 		// clear scancode full flag
@@ -186,14 +186,14 @@ void spi_kbd_device::spi_slave_receive_byte(uint8_t recv_byte)
 		m_write_irq(0);
 		m_last_scancode = 0x00;
 		m_state = SPI_KBD_DONE;
-		set_next_send_byte(0x00);
+		set_miso_byte(0x00);
 		return;
 	case SPI_KBD_READY_TO_RESPOND:
 		m_state = SPI_KBD_DONE;
-		set_next_send_byte(0x00);
+		set_miso_byte(0x00);
 		return;
 	default:
-		set_next_send_byte(0x00);
+		set_miso_byte(0x00);
 		return;
 	}
 }

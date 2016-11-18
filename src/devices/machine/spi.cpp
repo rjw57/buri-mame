@@ -41,9 +41,9 @@ WRITE_LINE_MEMBER(spi_slave_device::write_select)
 		if(state) {
 			// newly selected, clear recv/send counts
 			m_recv_count = m_send_count = 0;
-			spi_slave_selected();
+			spi_slave_select();
 		} else {
-			spi_slave_deselected();
+			spi_slave_deselect();
 		}
 	}
 	m_selected = (state != 0);
@@ -101,12 +101,12 @@ void spi_slave_device::clk_edge_(int is_idle_to_active)
 
 	if((m_recv_count == 8) && (m_send_count == 8)) {
 		// sent and received an entire byte
-		set_next_send_byte(0x00); // reset send byte
-		spi_slave_receive_byte(m_recv_byte);
+		set_miso_byte(0x00); // reset send byte
+		spi_slave_mosi_byte(m_recv_byte);
 	}
 }
 
-void spi_slave_device::set_next_send_byte(uint8_t send_byte)
+void spi_slave_device::set_miso_byte(uint8_t send_byte)
 {
 	m_send_byte = send_byte;
 
@@ -118,6 +118,6 @@ void spi_slave_device::set_next_send_byte(uint8_t send_byte)
 	}
 }
 
-void spi_slave_device::spi_slave_selected() { }
-void spi_slave_device::spi_slave_deselected() { }
-void spi_slave_device::spi_slave_receive_byte(ATTR_UNUSED uint8_t) { }
+void spi_slave_device::spi_slave_select() { }
+void spi_slave_device::spi_slave_deselect() { }
+void spi_slave_device::spi_slave_mosi_byte(ATTR_UNUSED uint8_t) { }

@@ -34,13 +34,13 @@ class spi_slave_device_interface
 {
 protected:
 	// device was selected & previously wasn't
-	virtual void spi_slave_selected() = 0;
+	virtual void spi_slave_select() = 0;
 
 	// device was deselected & previously was
-	virtual void spi_slave_deselected() = 0;
+	virtual void spi_slave_deselect() = 0;
 
 	// a byte has been received from the master
-	virtual void spi_slave_receive_byte(uint8_t) = 0;
+	virtual void spi_slave_mosi_byte(uint8_t) = 0;
 };
 
 class spi_slave_device : public device_t, public spi_slave_device_interface
@@ -54,10 +54,10 @@ public:
 		m_write_miso.set_callback(miso);
 	}
 
-	// Set the byte which is exchanged on the next communication. After the
-	// send and receive bytes are exchanged, the next send byte is reset to
-	// zero.
-	void set_next_send_byte(uint8_t);
+	// Set the byte which is sent to the master on the next communication.
+	// After the byte is sent, the next miso byte is reset to zero before
+	// spi_slave_mosi_byte() is called.
+	void set_miso_byte(uint8_t);
 
 	DECLARE_WRITE_LINE_MEMBER(write_select);
 	DECLARE_WRITE_LINE_MEMBER(write_clock);
@@ -77,9 +77,10 @@ protected:
 	virtual void device_start() override;
 	virtual void device_reset() override;
 
-	virtual void spi_slave_selected() override;
-	virtual void spi_slave_deselected() override;
-	virtual void spi_slave_receive_byte(uint8_t) override;
+	// SPI slave overrides
+	virtual void spi_slave_select() override;
+	virtual void spi_slave_deselect() override;
+	virtual void spi_slave_mosi_byte(uint8_t) override;
 
 private:
 	spi_mode_t m_mode;
