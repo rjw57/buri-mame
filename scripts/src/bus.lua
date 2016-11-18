@@ -1279,6 +1279,8 @@ if (BUSES["SPI"]~=null) then
 	files {
 		MAME_DIR .. "src/devices/bus/spi/slave.cpp",
 		MAME_DIR .. "src/devices/bus/spi/slave.h",
+		MAME_DIR .. "src/devices/bus/spi/burikbd.cpp",
+		MAME_DIR .. "src/devices/bus/spi/burikbd.h",
 	}
 end
 
