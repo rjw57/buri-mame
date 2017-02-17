@@ -25,7 +25,7 @@
      US patent 4,335,277 describes the complete 52xx chip
      Special Thanks to Larry Brantingham for answering questions regarding the chip details
 
-   TMS5200/TMS5220/TMS5220C/CD2501E/CD2501ECD:
+   TMS5200/TMS5220/TMS5220C/CD2501E/CD2501ECD/EFO90503:
 
                  +-----------------+
         D7(d0)   |  1           28 |  /RS
@@ -259,6 +259,10 @@ upgraded to add it by hacking on a 'Squawk & Talk' pinball speech board
     Home computer: TI 99/4 PHP1500 Speech module (along with two VSM
 serial chips); Street Electronics Corp.'s Apple II 'Echo 2' Speech
 synthesizer (early cards only)
+
+EFO90503: (1982, EFO Sound-3 board used in a few Playmatic/Cidelsa games)
+    Arcade: Clean Octopus
+    Pinball: Cerberus, Spain '82
 
 CD2501ECD: (1983)
     Home computer: TI 99/8 (prototypes only)
@@ -2200,16 +2204,6 @@ tms5220_device::tms5220_device(const machine_config &mconfig, device_type type, 
 		m_addr_cb(*this),
 		m_data_cb(*this),
 		m_romclk_cb(*this)
-{
-}
-
-//-------------------------------------------------
-//  device_config_complete - perform any
-//  operations now that the configuration is
-//  complete
-//-------------------------------------------------
-
-void tms5220_device::device_config_complete()
 {
 }
 

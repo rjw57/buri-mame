@@ -7,7 +7,6 @@
 #ifndef __HDC92X4_H__
 #define __HDC92X4_H__
 
-#include "emu.h"
 #include "imagedev/floppy.h"
 #include "imagedev/mfmhd.h"
 #include "fdc_pll.h"
@@ -81,7 +80,7 @@ class hdc92x4_device : public device_t
 public:
 	hdc92x4_device(const machine_config &mconfig, device_type type, const char *name, const char *tag, device_t *owner, uint32_t clock, const char *shortname, const char *source);
 
-	// Accesors from the CPU side
+	// Accessors from the CPU side
 	DECLARE_READ8_MEMBER( read );
 	DECLARE_WRITE8_MEMBER( write );
 	DECLARE_WRITE_LINE_MEMBER( reset );

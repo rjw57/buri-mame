@@ -1688,13 +1688,10 @@ static MACHINE_CONFIG_START( coh700, namcos12_state )
 	MCFG_RTC4543_ADD("rtc", XTAL_32_768kHz)
 	MCFG_RTC4543_DATA_CALLBACK(DEVWRITELINE("sub:sci1", h8_sci_device, rx_w))
 
-	MCFG_LINE_DISPATCH_ADD("clk_dispatch", 2)
-	MCFG_LINE_DISPATCH_FWD_CB(0, 2, DEVWRITELINE(":rtc", rtc4543_device, clk_w)) MCFG_DEVCB_INVERT
-	MCFG_LINE_DISPATCH_FWD_CB(1, 2, DEVWRITELINE(":namco_settings", namco_settings_device, clk_w))
-
 	MCFG_DEVICE_MODIFY("sub:sci1")
 	MCFG_H8_SCI_TX_CALLBACK(DEVWRITELINE(":namco_settings", namco_settings_device, data_w))
-	MCFG_H8_SCI_CLK_CALLBACK(DEVWRITELINE(":clk_dispatch", devcb_line_dispatch_device<2>, in_w))
+	MCFG_H8_SCI_CLK_CALLBACK(DEVWRITELINE(":rtc", rtc4543_device, clk_w)) MCFG_DEVCB_INVERT
+	MCFG_DEVCB_CHAIN_OUTPUT(DEVWRITELINE(":namco_settings", namco_settings_device, clk_w))
 
 	MCFG_AT28C16_ADD("at28c16", nullptr)
 
@@ -2695,6 +2692,17 @@ ROM_START( tekken3 )
 	ROM_REGION( 0x1000000, "c352", 0 ) /* samples */
 	ROM_LOAD( "tet1wave0.5",         0x0000000, 0x400000, CRC(77ba7975) SHA1(fe9434dcf0fb232c85efaaae1b4b13d36099620a) )
 	ROM_LOAD( "tet1wave1.4",         0x0400000, 0x400000, CRC(ffeba79f) SHA1(941412bbe9d0305d9a23c224c1bb774c4321f6df) )
+
+	// Namco Cyber Lead cabinet JVS I/O and LED display controller
+	ROM_REGION(0x40000, "cabinet_io", 0)
+	// JVS I/O board (namco ltd.;I/O CYBER LEAD;Ver1.03;JPN,LED-0100)
+	// labels: CL1 I/OB, I/O LED (I/O) PCB
+	// ICs: Namco C77 H8/???? MCU, Atmel AT29C020 256k x8 FlashROM, NEC N341256 32k x8 SRAM, 14.7MHz Xtal, Altera EPM7064 labeled I/OLEDM1
+	ROM_LOAD("cl1-iob.ic5", 0x0000, 0x40000, CRC(abb90360) SHA1(d938b1e1ae596d0ab1007352f61b0b800363c762) )
+	// LED display controller, connected to above I/O
+	// labels: CL1 LEDA, I/O LED (LED) PCB
+	// ICs: same as above plus EPSON SED1351F LCD controller, 12MHz Xtal
+	ROM_LOAD("cl1-leda.ic5", 0x0000, 0x40000, CRC(43602a58) SHA1(64156ded8c43dbbe84b5d6ae13a068c8b18e8aed) )
 ROM_END
 
 ROM_START( tekken3ae )

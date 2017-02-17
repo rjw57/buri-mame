@@ -30,6 +30,7 @@ machine_info::machine_info(running_machine &machine)
 	m_has_dips = false;
 	m_has_bioses = false;
 	m_has_keyboard = false;
+	m_has_test_switch = false;
 
 	// scan the input port array to see what options we need to enable
 	for (auto &port : machine.ioport().ports())
@@ -43,6 +44,8 @@ machine_info::machine_info(running_machine &machine)
 				m_has_analog = true;
 			if (field.type() == IPT_KEYBOARD)
 				m_has_keyboard = true;
+			if (field.type() == IPT_SERVICE)
+				m_has_test_switch = true;
 		}
 
 	for (device_t &device : device_iterator(machine.root_device()))
@@ -353,7 +356,7 @@ menu_game_info::~menu_game_info()
 {
 }
 
-void menu_game_info::populate()
+void menu_game_info::populate(float &customtop, float &custombottom)
 {
 	std::string tempstring = ui().machine_info().game_info_string();
 	item_append(std::move(tempstring), "", FLAG_MULTILINE, nullptr);
@@ -379,7 +382,7 @@ menu_image_info::~menu_image_info()
 {
 }
 
-void menu_image_info::populate()
+void menu_image_info::populate(float &customtop, float &custombottom)
 {
 	item_append(machine().system().description, "", FLAG_DISABLE, nullptr);
 	item_append("", "", FLAG_DISABLE, nullptr);

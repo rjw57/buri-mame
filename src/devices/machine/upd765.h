@@ -3,7 +3,6 @@
 #ifndef __UPD765_F_H__
 #define __UPD765_F_H__
 
-#include "emu.h"
 #include "imagedev/floppy.h"
 #include "fdc_pll.h"
 
@@ -129,6 +128,8 @@ public:
 	bool get_drq() const;
 	void tc_w(bool val) override;
 	void ready_w(bool val);
+
+	DECLARE_WRITE_LINE_MEMBER(tc_line_w) { tc_w(state == ASSERT_LINE); }
 
 	void set_rate(int rate); // rate in bps, to be used when the fdc is externally frequency-controlled
 

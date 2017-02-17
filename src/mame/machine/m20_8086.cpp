@@ -1,5 +1,6 @@
 // license:BSD-3-Clause
 // copyright-holders:Carl
+#include "emu.h"
 #include "m20_8086.h"
 #include "machine/ram.h"
 
@@ -20,8 +21,8 @@ void m20_8086_device::device_start()
 	m_8086->space(AS_PROGRAM).install_readwrite_bank(0x00000,  machine().device<ram_device>("ram")->size() - 0x4001, "mainram");
 	membank("highram")->set_base(ram);
 	membank("mainram")->set_base(&ram[0x4000]);
-	membank("vram")->set_base(memshare(":p_videoram")->ptr());
-	membank("vram2")->set_base(memshare(":p_videoram")->ptr());
+	membank("vram")->set_base(memshare(":videoram")->ptr());
+	membank("vram2")->set_base(memshare(":videoram")->ptr());
 }
 
 void m20_8086_device::device_reset()

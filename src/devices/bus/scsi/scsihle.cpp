@@ -8,6 +8,7 @@ Base class for HLE'd SCSI devices.
 
 */
 
+#include "emu.h"
 #include "scsihle.h"
 
 scsihle_device::scsihle_device(const machine_config &mconfig, device_type type, const char *name, const char *tag, device_t *owner, uint32_t clock, const char *shortname, const char *source) :
@@ -219,7 +220,7 @@ void scsihle_device::device_timer(emu_timer &timer, device_timer_id tid, int par
 
 	case 2:
 		// Some drives, notably the ST225N and ST125N, accept fromat unit commands
-		// with flags set indicating that bad block data should be transfered but
+		// with flags set indicating that bad block data should be transferred but
 		// don't then implemnt a data in phase, this timeout it to catch these !
 		if (IS_COMMAND(SCSI_CMD_FORMAT_UNIT) && (data_idx==0))
 		{

@@ -481,7 +481,7 @@ static MACHINE_CONFIG_START( s7, s7_state )
 	MCFG_CPU_PROGRAM_MAP(s7_audio_map)
 
 	MCFG_SPEAKER_STANDARD_MONO("speaker")
-	MCFG_SOUND_ADD("dac", DAC_8BIT_R2R, 0) MCFG_SOUND_ROUTE(ALL_OUTPUTS, "speaker", 0.5) // unknown DAC
+	MCFG_SOUND_ADD("dac", MC1408, 0) MCFG_SOUND_ROUTE(ALL_OUTPUTS, "speaker", 0.5)
 	MCFG_DEVICE_ADD("vref", VOLTAGE_REGULATOR, 0) MCFG_VOLTAGE_REGULATOR_OUTPUT(5.0)
 	MCFG_SOUND_ROUTE_EX(0, "dac", 1.0, DAC_VREF_POS_INPUT) MCFG_SOUND_ROUTE_EX(0, "dac", -1.0, DAC_VREF_NEG_INPUT)
 
@@ -880,8 +880,8 @@ GAME( 1982, vrkon_l1, 0,        s7, s7, s7_state, s7, ROT0, "Williams", "Varkon 
 GAME( 1982, tmfnt_l5, 0,        s7, s7, s7_state, s7, ROT0, "Williams", "Time Fantasy (L-5)", MACHINE_MECHANICAL | MACHINE_NOT_WORKING )
 GAME( 1982, wrlok_l3, 0,        s7, s7, s7_state, s7, ROT0, "Williams", "Warlok (L-3)", MACHINE_MECHANICAL | MACHINE_NOT_WORKING )
 GAME( 1982, dfndr_l4, 0,        s7, s7, s7_state, s7, ROT0, "Williams", "Defender (L-4)", MACHINE_MECHANICAL | MACHINE_NOT_WORKING )
-GAME( 1983, jst_l2,   0,        s7, s7, s7_state, s7, ROT0, "Williams", "Joust (L-2)", MACHINE_MECHANICAL | MACHINE_NOT_WORKING | MACHINE_NOT_WORKING )
-GAME( 1983, jst_l1,   jst_l2,   s7, s7, s7_state, s7, ROT0, "Williams", "Joust (L-1)", MACHINE_MECHANICAL | MACHINE_NOT_WORKING | MACHINE_NOT_WORKING )
+GAME( 1983, jst_l2,   0,        s7, s7, s7_state, s7, ROT0, "Williams", "Joust (L-2)", MACHINE_MECHANICAL | MACHINE_NOT_WORKING )
+GAME( 1983, jst_l1,   jst_l2,   s7, s7, s7_state, s7, ROT0, "Williams", "Joust (L-1)", MACHINE_MECHANICAL | MACHINE_NOT_WORKING )
 GAME( 1983, lsrcu_l2, 0,        s7, s7, s7_state, s7, ROT0, "Williams", "Laser Cue (L-2)", MACHINE_MECHANICAL | MACHINE_NOT_WORKING )
 GAME( 1983, fpwr2_l2, 0,        s7, s7, s7_state, s7, ROT0, "Williams", "Firepower II (L-2)", MACHINE_MECHANICAL | MACHINE_NOT_WORKING )
 GAME( 1984, strlt_l1, 0,        s7, s7, s7_state, s7, ROT0, "Williams", "Star Light (L-1)", MACHINE_MECHANICAL | MACHINE_NOT_WORKING )

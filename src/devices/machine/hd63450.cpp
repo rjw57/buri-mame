@@ -6,6 +6,7 @@
     Largely based on documentation of the Sharp X68000
 */
 
+#include "emu.h"
 #include "hd63450.h"
 
 const device_type HD63450 = &device_creator<hd63450_device>;
@@ -44,7 +45,10 @@ hd63450_device::hd63450_device(const machine_config &mconfig, const char *tag, d
 void hd63450_device::device_start()
 {
 	// get the CPU device
-	m_cpu = machine().device<cpu_device>(m_cpu_tag);
+	if ((m_cpu = machine().device<cpu_device>(m_cpu_tag)) == nullptr)
+	{
+		m_cpu = owner()->subdevice<cpu_device>(m_cpu_tag);
+	}
 	assert(m_cpu != nullptr);
 
 	// resolve callbacks

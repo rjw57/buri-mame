@@ -57,6 +57,7 @@ DAC and bitbanger values written should be reflected in the read.
 
 ***************************************************************************/
 
+#include "emu.h"
 #include "includes/coco.h"
 #include "cpu/m6809/m6809.h"
 
@@ -84,6 +85,7 @@ coco_state::coco_state(const machine_config &mconfig, device_type type, const ch
 	m_pia_0(*this, PIA0_TAG),
 	m_pia_1(*this, PIA1_TAG),
 	m_dac(*this, "dac"),
+	m_sbs(*this, "sbs"),
 	m_wave(*this, WAVE_TAG),
 	m_cococart(*this, CARTRIDGE_TAG),
 	m_ram(*this, RAM_TAG),
@@ -657,28 +659,20 @@ coco_state::soundmux_status_t coco_state::soundmux_status(void)
 
 void coco_state::update_sound(void)
 {
-	/* PB1 will drive the sound output.  This is a rarely
-	 * used single bit sound mode. It is always connected thus
-	 * cannot be disabled.
-	 *
-	 * Source:  Page 31 of the Tandy Color Computer Serice Manual
-	 */
-	uint8_t single_bit_sound = (m_pia_1->b_output() & 0x02) ? 0x80 : 0x00;
-
 	/* determine the sound mux status */
 	soundmux_status_t status = soundmux_status();
 
 	/* the SC77526 DAC chip internally biases the AC-coupled sound inputs for Cassette and Cartridge at the midpoint of the 3.9v output range */
 	bool bCassSoundEnable = (status == (SOUNDMUX_ENABLE | SOUNDMUX_SEL1));
 	bool bCartSoundEnable = (status == (SOUNDMUX_ENABLE | SOUNDMUX_SEL2));
-	uint8_t cassette_sound = (bCassSoundEnable ? 0x40 : 0);
-	uint8_t cart_sound = (bCartSoundEnable ? 0x40 : 0);
+	uint8_t cassette_sound = (bCassSoundEnable ? 0x20 : 0);
+	uint8_t cart_sound = (bCartSoundEnable ? 0x20 : 0);
 
 	/* determine the value to send to the DAC (this is used by the Joystick read as well as audio out) */
 	m_dac_output = (m_pia_1->a_output() & 0xFC) >> 2;
-	uint8_t dac_sound =  (status == SOUNDMUX_ENABLE ? m_dac_output << 1 : 0);
+	uint8_t dac_sound =  (status == SOUNDMUX_ENABLE ? m_dac_output : 0);
 
-	/* The CoCo uses a single DAC for both audio output and joystick axis position measurement.
+	/* The CoCo uses the main 6-bit DAC for both audio output and joystick axis position measurement.
 	 * To avoid introducing artifacts while reading the axis positions, some software will disable
 	 * the audio output while using the DAC to read the joystick.  On a real CoCo, there is a low-pass
 	 * filter (C57 on the CoCo 3) which will hold the audio level for very short periods of time,
@@ -692,7 +686,7 @@ void coco_state::update_sound(void)
 		m_analog_audio_level = dac_sound + cassette_sound + cart_sound;
 	}
 
-	m_dac->write(single_bit_sound + m_analog_audio_level);
+	m_dac->write(m_analog_audio_level);
 
 	/* determine the cassette sound status */
 	cassette_state cas_sound = bCassSoundEnable ? CASSETTE_SPEAKER_ENABLED : CASSETTE_SPEAKER_MUTED;
@@ -936,7 +930,7 @@ void coco_state::diecom_lightgun_clock(void)
 		else
 			m_dclg_output_v &= ~0x01;
 
-		/* Bit 9 of timer is only avaiable if state == 8*/
+		/* Bit 9 of timer is only available if state == 8*/
 		if (m_dclg_state == 8 && (((m_dclg_timer >> 9) & 0x01) == 1))
 			m_dclg_output_v |= 0x02;
 		else
@@ -999,7 +993,13 @@ void coco_state::pia1_pa_changed(uint8_t data)
 
 void coco_state::pia1_pb_changed(uint8_t data)
 {
-	update_sound();     // singe_bit_sound is connected to PIA1 PB1
+	/* PB1 will drive the sound output.  This is a rarely
+	 * used single bit sound mode. It is always connected thus
+	 * cannot be disabled.
+	 *
+	 * Source:  Page 31 of the Tandy Color Computer Serice Manual
+	 */
+	m_sbs->write(BIT(data, 1));
 }
 
 

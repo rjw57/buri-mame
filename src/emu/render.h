@@ -48,7 +48,6 @@
 
 //#include "osdepend.h"
 
-#include "emu.h"
 //#include "bitmap.h"
 //#include "screen.h"
 
@@ -163,11 +162,11 @@ constexpr u32 PRIMFLAG_PACKABLE = 1 << PRIMFLAG_PACKABLE_SHIFT;
 //**************************************************************************
 
 // forward definitions
+namespace util { namespace xml { class data_node; } }
 class device_t;
 class screen_device;
 class render_container;
 class render_manager;
-class xml_data_node;
 class render_font;
 struct object_transform;
 class layout_element;
@@ -645,7 +644,7 @@ class layout_element
 
 public:
 	// construction/destruction
-	layout_element(running_machine &machine, xml_data_node const &elemnode, const char *dirname);
+	layout_element(running_machine &machine, util::xml::data_node const &elemnode, const char *dirname);
 	virtual ~layout_element();
 
 	// getters
@@ -664,7 +663,7 @@ private:
 		typedef std::unique_ptr<component> ptr;
 
 		// construction/destruction
-		component(running_machine &machine, xml_data_node const &compnode, const char *dirname);
+		component(running_machine &machine, util::xml::data_node const &compnode, const char *dirname);
 		virtual ~component() = default;
 
 		// setup
@@ -704,7 +703,7 @@ private:
 	{
 	public:
 		// construction/destruction
-		image_component(running_machine &machine, xml_data_node const &compnode, const char *dirname);
+		image_component(running_machine &machine, util::xml::data_node const &compnode, const char *dirname);
 
 	protected:
 		// overrides
@@ -728,7 +727,7 @@ private:
 	{
 	public:
 		// construction/destruction
-		rect_component(running_machine &machine, xml_data_node const &compnode, const char *dirname);
+		rect_component(running_machine &machine, util::xml::data_node const &compnode, const char *dirname);
 
 	protected:
 		// overrides
@@ -740,7 +739,7 @@ private:
 	{
 	public:
 		// construction/destruction
-		disk_component(running_machine &machine, xml_data_node const &compnode, const char *dirname);
+		disk_component(running_machine &machine, util::xml::data_node const &compnode, const char *dirname);
 
 	protected:
 		// overrides
@@ -752,7 +751,7 @@ private:
 	{
 	public:
 		// construction/destruction
-		text_component(running_machine &machine, xml_data_node const &compnode, const char *dirname);
+		text_component(running_machine &machine, util::xml::data_node const &compnode, const char *dirname);
 
 	protected:
 		// overrides
@@ -769,7 +768,7 @@ private:
 	{
 	public:
 		// construction/destruction
-		led7seg_component(running_machine &machine, xml_data_node const &compnode, const char *dirname);
+		led7seg_component(running_machine &machine, util::xml::data_node const &compnode, const char *dirname);
 
 	protected:
 		// overrides
@@ -782,7 +781,7 @@ private:
 	{
 	public:
 		// construction/destruction
-		led8seg_gts1_component(running_machine &machine, xml_data_node const &compnode, const char *dirname);
+		led8seg_gts1_component(running_machine &machine, util::xml::data_node const &compnode, const char *dirname);
 
 	protected:
 		// overrides
@@ -795,7 +794,7 @@ private:
 	{
 	public:
 		// construction/destruction
-		led14seg_component(running_machine &machine, xml_data_node const &compnode, const char *dirname);
+		led14seg_component(running_machine &machine, util::xml::data_node const &compnode, const char *dirname);
 
 	protected:
 		// overrides
@@ -808,7 +807,7 @@ private:
 	{
 	public:
 		// construction/destruction
-		led16seg_component(running_machine &machine, xml_data_node const &compnode, const char *dirname);
+		led16seg_component(running_machine &machine, util::xml::data_node const &compnode, const char *dirname);
 
 	protected:
 		// overrides
@@ -821,7 +820,7 @@ private:
 	{
 	public:
 		// construction/destruction
-		led14segsc_component(running_machine &machine, xml_data_node const &compnode, const char *dirname);
+		led14segsc_component(running_machine &machine, util::xml::data_node const &compnode, const char *dirname);
 
 	protected:
 		// overrides
@@ -834,7 +833,7 @@ private:
 	{
 	public:
 		// construction/destruction
-		led16segsc_component(running_machine &machine, xml_data_node const &compnode, const char *dirname);
+		led16segsc_component(running_machine &machine, util::xml::data_node const &compnode, const char *dirname);
 
 	protected:
 		// overrides
@@ -847,7 +846,7 @@ private:
 	{
 	public:
 		// construction/destruction
-		dotmatrix_component(int dots, running_machine &machine, xml_data_node const &compnode, const char *dirname);
+		dotmatrix_component(int dots, running_machine &machine, util::xml::data_node const &compnode, const char *dirname);
 
 	protected:
 		// overrides
@@ -864,7 +863,7 @@ private:
 	{
 	public:
 		// construction/destruction
-		simplecounter_component(running_machine &machine, xml_data_node const &compnode, const char *dirname);
+		simplecounter_component(running_machine &machine, util::xml::data_node const &compnode, const char *dirname);
 
 	protected:
 		// overrides
@@ -885,7 +884,7 @@ private:
 
 	public:
 		// construction/destruction
-		reel_component(running_machine &machine, xml_data_node const &compnode, const char *dirname);
+		reel_component(running_machine &machine, util::xml::data_node const &compnode, const char *dirname);
 
 	protected:
 		// overrides
@@ -932,13 +931,13 @@ private:
 		int                 m_state;        // associated state number
 	};
 
-	typedef component::ptr (*make_component_func)(running_machine &machine, xml_data_node const &compnode, const char *dirname);
+	typedef component::ptr (*make_component_func)(running_machine &machine, util::xml::data_node const &compnode, const char *dirname);
 	typedef std::map<std::string, make_component_func> make_component_map;
 
 	// internal helpers
 	static void element_scale(bitmap_argb32 &dest, bitmap_argb32 &source, const rectangle &sbounds, void *param);
-	template <typename T> static component::ptr make_component(running_machine &machine, xml_data_node const &compnode, const char *dirname);
-	template <int D> static component::ptr make_dotmatrix_component(running_machine &machine, xml_data_node const &compnode, const char *dirname);
+	template <typename T> static component::ptr make_component(running_machine &machine, util::xml::data_node const &compnode, const char *dirname);
+	template <int D> static component::ptr make_dotmatrix_component(running_machine &machine, util::xml::data_node const &compnode, const char *dirname);
 
 	static make_component_map const s_make_component; // maps component XML names to creator functions
 
@@ -969,7 +968,7 @@ public:
 
 	public:
 		// construction/destruction
-		item(running_machine &machine, xml_data_node const &itemnode, simple_list<layout_element> &elemlist);
+		item(running_machine &machine, util::xml::data_node const &itemnode, simple_list<layout_element> &elemlist);
 		virtual ~item();
 
 		// getters
@@ -1005,7 +1004,7 @@ public:
 	};
 
 	// construction/destruction
-	layout_view(running_machine &machine, xml_data_node const &viewnode, simple_list<layout_element> &elemlist);
+	layout_view(running_machine &machine, util::xml::data_node const &viewnode, simple_list<layout_element> &elemlist);
 	virtual ~layout_view();
 
 	// getters
@@ -1058,7 +1057,7 @@ class layout_file
 
 public:
 	// construction/destruction
-	layout_file(running_machine &machine, xml_data_node const &rootnode, const char *dirname);
+	layout_file(running_machine &machine, util::xml::data_node const &rootnode, const char *dirname);
 	virtual ~layout_file();
 
 	// getters
@@ -1171,8 +1170,8 @@ private:
 	bool map_point_internal(s32 target_x, s32 target_y, render_container *container, float &mapped_x, float &mapped_y, ioport_port *&mapped_input_port, ioport_value &mapped_input_mask);
 
 	// config callbacks
-	void config_load(xml_data_node const &targetnode);
-	bool config_save(xml_data_node &targetnode);
+	void config_load(util::xml::data_node const &targetnode);
+	bool config_save(util::xml::data_node &targetnode);
 
 	// view lookups
 	layout_view *view_by_index(int index) const;
@@ -1277,8 +1276,8 @@ private:
 	void container_free(render_container *container);
 
 	// config callbacks
-	void config_load(config_type cfg_type, xml_data_node *parentnode);
-	void config_save(config_type cfg_type, xml_data_node *parentnode);
+	void config_load(config_type cfg_type, util::xml::data_node const *parentnode);
+	void config_save(config_type cfg_type, util::xml::data_node *parentnode);
 
 	// internal state
 	running_machine &               m_machine;          // reference back to the machine

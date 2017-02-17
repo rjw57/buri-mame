@@ -1656,6 +1656,28 @@ static ADDRESS_MAP_START( timefgtr_map, AS_PROGRAM, 8, galaxian_state )
 //  AM_RANGE(0xfff8, 0xffff) AM_WRITENOP // sound related?
 ADDRESS_MAP_END
 
+static ADDRESS_MAP_START( zigzag_map, AS_PROGRAM, 8, galaxian_state )
+	ADDRESS_MAP_UNMAP_HIGH
+	AM_RANGE(0x0000, 0x1fff) AM_ROM
+	AM_RANGE(0x2000, 0x2fff) AM_ROMBANK("bank1")
+	AM_RANGE(0x3000, 0x3fff) AM_ROMBANK("bank2")
+	AM_RANGE(0x4000, 0x43ff) AM_MIRROR(0x0400) AM_RAM
+	AM_RANGE(0x4800, 0x4fff) AM_WRITE(zigzag_ay8910_w)
+	AM_RANGE(0x5000, 0x53ff) AM_MIRROR(0x0400) AM_RAM_WRITE(galaxian_videoram_w) AM_SHARE("videoram")
+	AM_RANGE(0x5800, 0x58ff) AM_MIRROR(0x0700) AM_RAM_WRITE(galaxian_objram_w) AM_SHARE("spriteram")
+	AM_RANGE(0x6000, 0x6000) AM_MIRROR(0x07ff) AM_READ_PORT("IN0")
+	AM_RANGE(0x6000, 0x6001) AM_MIRROR(0x07f8) AM_WRITE(start_lamp_w)
+	AM_RANGE(0x6003, 0x6003) AM_MIRROR(0x07f8) AM_WRITE(coin_count_0_w)
+	AM_RANGE(0x6800, 0x6800) AM_MIRROR(0x07ff) AM_READ_PORT("IN1")
+	AM_RANGE(0x7000, 0x7000) AM_MIRROR(0x07ff) AM_READ_PORT("IN2")
+	AM_RANGE(0x7001, 0x7001) AM_MIRROR(0x07f8) AM_WRITE(irq_enable_w)
+	AM_RANGE(0x7002, 0x7002) AM_MIRROR(0x07f8) AM_WRITE(zigzag_bankswap_w)
+	AM_RANGE(0x7004, 0x7004) AM_MIRROR(0x07f8) AM_WRITE(galaxian_stars_enable_w)
+	AM_RANGE(0x7006, 0x7006) AM_MIRROR(0x07f8) AM_WRITE(galaxian_flip_screen_x_w)
+	AM_RANGE(0x7007, 0x7007) AM_MIRROR(0x07f8) AM_WRITE(galaxian_flip_screen_y_w)
+	AM_RANGE(0x7800, 0x7800) AM_MIRROR(0x07ff) AM_DEVREAD("watchdog", watchdog_timer_device, reset_r)
+ADDRESS_MAP_END
+
 
 /* map derived from schematics */
 #if 0
@@ -2208,6 +2230,17 @@ static INPUT_PORTS_START( galaxian )
 	PORT_BIT( 0xf0, IP_ACTIVE_HIGH, IPT_UNUSED )
 INPUT_PORTS_END
 
+static INPUT_PORTS_START( galaxianmo )
+	PORT_INCLUDE(galaxian)
+
+	PORT_MODIFY("IN2")
+	PORT_DIPNAME( 0x03, 0x00, DEF_STR( Bonus_Life ) )
+	PORT_DIPSETTING(    0x00, DEF_STR(None) )
+	PORT_DIPSETTING(    0x01, "3000" )
+	PORT_DIPSETTING(    0x02, "4000" )
+	PORT_DIPSETTING(    0x03, "5000" )
+INPUT_PORTS_END
+
 static INPUT_PORTS_START( galaxianbl )
 	PORT_INCLUDE(galaxian)
 
@@ -2441,7 +2474,7 @@ static INPUT_PORTS_START( catacomb )
 INPUT_PORTS_END
 
 
-static INPUT_PORTS_START( omega )
+static INPUT_PORTS_START( omegab )
 	PORT_INCLUDE(galaxian)
 
 	PORT_MODIFY("IN0")
@@ -5656,7 +5689,7 @@ static MACHINE_CONFIG_DERIVED( zigzag, galaxian_base )
 
 	/* basic machine hardware */
 	MCFG_CPU_MODIFY("maincpu")
-	MCFG_CPU_PROGRAM_MAP(galaxian_map_base)  /* no discrete sound */
+	MCFG_CPU_PROGRAM_MAP(zigzag_map)
 
 	/* sound hardware */
 	MCFG_SOUND_ADD("8910.0", AY8910, GALAXIAN_PIXEL_CLOCK/3/2) /* matches PCB video - unconfirmed */
@@ -6024,7 +6057,7 @@ static MACHINE_CONFIG_DERIVED( sfx, galaxian_base )
 	MCFG_AY8910_PORT_B_WRITE_CB(WRITE8(galaxian_state, sfx_sample_control_w))
 
 	/* DAC for the sample player */
-	MCFG_SOUND_ADD("dac", DAC_8BIT_R2R, 0) MCFG_SOUND_ROUTE(ALL_OUTPUTS, "speaker", 1.0) // unknown DAC
+	MCFG_SOUND_ADD("dac", DAC_8BIT_R2R, 0) MCFG_SOUND_ROUTE(ALL_OUTPUTS, "speaker", 1.0) // 16-pin IC (not identified by schematics)
 	MCFG_DEVICE_ADD("vref", VOLTAGE_REGULATOR, 0) MCFG_VOLTAGE_REGULATOR_OUTPUT(5.0)
 	MCFG_SOUND_ROUTE_EX(0, "dac", 1.0, DAC_VREF_POS_INPUT) MCFG_SOUND_ROUTE_EX(0, "dac", -1.0, DAC_VREF_NEG_INPUT)
 MACHINE_CONFIG_END
@@ -6414,16 +6447,6 @@ void galaxian_state::common_init(galaxian_draw_bullet_func draw_bullet,galaxian_
 }
 
 
-void galaxian_state::unmap_galaxian_sound(offs_t base)
-{
-	address_space &space = m_maincpu->space(AS_PROGRAM);
-
-	space.unmap_write(base + 0x0004, base + 0x0007, 0x07f8);
-	space.unmap_write(base + 0x0800, base + 0x0fff);
-	space.unmap_write(base + 0x1800, base + 0x1fff);
-}
-
-
 
 /*************************************
  *
@@ -6688,28 +6711,11 @@ DRIVER_INIT_MEMBER(galaxian_state,zigzag)
 	m_numspritegens = 2;
 
 	/* make ROMs 2 & 3 swappable */
-	space.install_read_bank(0x2000, 0x2fff, "bank1");
-	space.install_read_bank(0x3000, 0x3fff, "bank2");
 	membank("bank1")->configure_entries(0, 2, memregion("maincpu")->base() + 0x2000, 0x1000);
 	membank("bank2")->configure_entries(0, 2, memregion("maincpu")->base() + 0x2000, 0x1000);
 
-	/* also re-install the fixed ROM area as a bank in order to inform the memory system that
-	   the fixed area only extends to 0x1fff */
-	space.install_read_bank(0x0000, 0x1fff, "bank3");
-	membank("bank3")->set_base(memregion("maincpu")->base() + 0x0000);
-
 	/* handler for doing the swaps */
-	space.install_write_handler(0x7002, 0x7002, 0, 0x07f8, 0, write8_delegate(FUNC(galaxian_state::zigzag_bankswap_w),this));
 	zigzag_bankswap_w(space, 0, 0);
-
-	/* coin lockout disabled */
-	space.unmap_write(0x6002, 0x6002, 0x7f8);
-
-	/* remove the galaxian sound hardware */
-	unmap_galaxian_sound( 0x6000);
-
-	/* install our AY-8910 handler */
-	space.install_write_handler(0x4800, 0x4fff, write8_delegate(FUNC(galaxian_state::zigzag_ay8910_w),this));
 }
 
 
@@ -7849,7 +7855,7 @@ ROM_START( catacomb )
 	ROM_LOAD( "mmi6331.6l", 0x0000, 0x0020, BAD_DUMP CRC(6a0c7d87) SHA1(140335d85c67c75b65689d4e76d29863c209cf32) )
 ROM_END
 
-ROM_START( omega )
+ROM_START( omegab )
 	ROM_REGION( 0x10000, "maincpu", 0 )
 	ROM_LOAD( "omega1.bin",   0x0000, 0x0800, CRC(fc2a096b) SHA1(071ff30060a1aa0a47ae6e88140b80caed00fc4e) )
 	ROM_LOAD( "omega2.bin",   0x0800, 0x0800, CRC(ad100357) SHA1(7c5e82c25e65b4a390cf5607f15bf4df407f7f11) )
@@ -8140,6 +8146,25 @@ ROM_START( uniwarsa )
 
 	ROM_REGION( 0x0020, "proms", 0 )
 	ROM_LOAD( "kareteco.clr",  0x0000, 0x0020, CRC(6a0c7d87) SHA1(140335d85c67c75b65689d4e76d29863c209cf32) )
+ROM_END
+
+ROM_START( mltiwars )
+	ROM_REGION( 0x4000, "maincpu", 0 )
+	ROM_LOAD( "g1.bin",  0x0000, 0x0800, CRC(d975af10) SHA1(a2e2a36a75db8fd09441308b08b6ae073c68b8cf) )
+	ROM_LOAD( "g2.bin",  0x0800, 0x0800, CRC(b2ed14c3) SHA1(7668df11f64b8e296eedfee53437777dc53a56d5) )
+	ROM_LOAD( "g3.bin",  0x1000, 0x0800, CRC(945f4160) SHA1(5fbe879f51e14c4c7ae551e5b3089f8e148770a4) )
+	ROM_LOAD( "g4.bin",  0x1800, 0x0800, CRC(ef28ec00) SHA1(f57fc2fd38b0ef7ee206f70f161a5f6963de1e94) )
+	ROM_LOAD( "g5.bin",  0x2000, 0x0800, CRC(855ab0dd) SHA1(50aae48726f092d1815f5534e041673bad2b50ac) )
+	ROM_LOAD( "g6.bin",  0x2800, 0x0800, CRC(d915a389) SHA1(0e2ff6eec9453856a1276889946b463cfae58eba) )
+	ROM_LOAD( "g7.bin",  0x3000, 0x0800, CRC(c9245346) SHA1(239bad3fe64eaab2dfc3febd06d1124103a10504) )
+	ROM_LOAD( "g8.bin",  0x3800, 0x0800, CRC(797d45c7) SHA1(76fb8b45fcce3622c59c04af32cfa001ef7bf71d) )
+
+	ROM_REGION( 0x2000, "gfx1", 0 )
+	ROM_LOAD( "g14.bin", 0x0000, 0x1000, CRC(227f9e8e) SHA1(6316ad92053b22df0d9621738507883c55003d3b) )
+	ROM_LOAD( "g15.bin", 0x1000, 0x1000, CRC(3f8b6a24) SHA1(00b8434c0de32af301137f9370f991e5e7192980) )
+
+	ROM_REGION( 0x0020, "proms", 0 )
+	ROM_LOAD( "prom.bin", 0x0000, 0x0020, CRC(6a0c7d87) SHA1(140335d85c67c75b65689d4e76d29863c209cf32) )
 ROM_END
 
 ROM_START( spacempr )
@@ -11558,7 +11583,7 @@ ROM_END
 GAME( 1979, galaxian,    0,        galaxian,   galaxian,   galaxian_state, galaxian,   ROT90,  "Namco", "Galaxian (Namco set 1)", MACHINE_SUPPORTS_SAVE )
 GAME( 1979, galaxiana,   galaxian, galaxian,   superg,     galaxian_state, galaxian,   ROT90,  "Namco", "Galaxian (Namco set 2)", MACHINE_SUPPORTS_SAVE )
 GAME( 1979, galaxianm,   galaxian, galaxian,   galaxian,   galaxian_state, galaxian,   ROT90,  "Namco (Midway license)", "Galaxian (Midway set 1)", MACHINE_SUPPORTS_SAVE )
-GAME( 1979, galaxianmo,  galaxian, galaxian,   galaxian,   galaxian_state, galaxian,   ROT90,  "Namco (Midway license)", "Galaxian (Midway set 2)", MACHINE_SUPPORTS_SAVE )
+GAME( 1979, galaxianmo,  galaxian, galaxian,   galaxianmo, galaxian_state, galaxian,   ROT90,  "Namco (Midway license)", "Galaxian (Midway set 2)", MACHINE_SUPPORTS_SAVE )
 GAME( 1979, galaxiant,   galaxian, galaxian,   superg,     galaxian_state, galaxian,   ROT90,  "Namco (Taito license)", "Galaxian (Taito)", MACHINE_SUPPORTS_SAVE )
 GAME( 1979, galaxiani,   galaxian, galaxian,   superg,     galaxian_state, galaxian,   ROT90,  "bootleg? (Irem)", "Galaxian (Irem)", MACHINE_SUPPORTS_SAVE ) // more likely bootlegged by Irem, not an official license
 
@@ -11599,7 +11624,7 @@ GAME( 1982, orbitron,    0,        galaxian,   orbitron,   galaxian_state, galax
 GAME( 1980, luctoday,    0,        galaxian,   luctoday,   galaxian_state, galaxian,   ROT270, "Sigma", "Lucky Today",MACHINE_WRONG_COLORS | MACHINE_SUPPORTS_SAVE )
 GAME( 19??, chewing,     luctoday, galaxian,   luctoday,   galaxian_state, galaxian,   ROT90,  "<unknown>", "Chewing Gum", MACHINE_SUPPORTS_SAVE )
 GAME( 1982, catacomb,    0,        galaxian,   catacomb,   galaxian_state, galaxian,   ROT90,  "MTM Games", "Catacomb", MACHINE_WRONG_COLORS | MACHINE_SUPPORTS_SAVE )
-GAME( 19??, omega,       theend,   galaxian,   omega,      galaxian_state, galaxian,   ROT270, "bootleg?", "Omega", MACHINE_SUPPORTS_SAVE )
+GAME( 19??, omegab,      theend,   galaxian,   omegab,     galaxian_state, galaxian,   ROT270, "bootleg?", "Omega (bootleg?)", MACHINE_SUPPORTS_SAVE )
 
 /* these games require the coin lockout mechanism to be disabled */
 GAME( 1981, warofbug,    0,        galaxian,   warofbug,   galaxian_state, nolock,     ROT90,  "Armenia / Food and Fun Corp", "War of the Bugs or Monsterous Manouvers in a Mushroom Maze", MACHINE_SUPPORTS_SAVE )
@@ -11621,6 +11646,7 @@ GAME( 19??, piscesb,     pisces,   galaxian,   piscesb,    galaxian_state, pisce
 GAME( 19??, omni,        pisces,   galaxian,   piscesb,    galaxian_state, pisces,     ROT90,  "bootleg", "Omni", MACHINE_SUPPORTS_SAVE )
 GAME( 1980, uniwars,     0,        galaxian,   superg,     galaxian_state, pisces,     ROT90,  "Irem", "UniWar S", MACHINE_SUPPORTS_SAVE )
 GAME( 1980, uniwarsa,    uniwars,  galaxian,   superg,     galaxian_state, pisces,     ROT90,  "bootleg (Karateco)", "UniWar S (bootleg)", MACHINE_SUPPORTS_SAVE )
+GAME( 1980, mltiwars,    uniwars,  galaxian,   superg,     galaxian_state, pisces,     ROT90,  "bootleg (Gayton Games)", "Multi Wars (bootleg of UniWar S)", MACHINE_SUPPORTS_SAVE )
 GAME( 1980, gteikoku,    uniwars,  galaxian,   superg,     galaxian_state, pisces,     ROT90,  "Irem", "Gingateikoku No Gyakushu", MACHINE_SUPPORTS_SAVE )
 GAME( 1980, gteikokb,    uniwars,  galaxian,   gteikokb,   galaxian_state, pisces,     ROT270, "bootleg", "Gingateikoku No Gyakushu (bootleg set 1)", MACHINE_SUPPORTS_SAVE )
 GAME( 1980, gteikob2,    uniwars,  galaxian,   gteikob2,   galaxian_state, pisces,     ROT90,  "bootleg", "Gingateikoku No Gyakushu (bootleg set 2)", MACHINE_SUPPORTS_SAVE )

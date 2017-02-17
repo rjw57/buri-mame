@@ -22,6 +22,7 @@ project "utils"
 		ext_includedir("expat"),
 		ext_includedir("zlib"),
 		ext_includedir("flac"),
+		ext_includedir("utf8proc"),
 	}
 
 	files {
@@ -31,6 +32,7 @@ project "utils"
 		MAME_DIR .. "src/lib/util/avhuff.h",
 		MAME_DIR .. "src/lib/util/aviio.cpp",
 		MAME_DIR .. "src/lib/util/aviio.h",
+		MAME_DIR .. "src/lib/util/base64.hpp",
 		MAME_DIR .. "src/lib/util/bitmap.cpp",
 		MAME_DIR .. "src/lib/util/bitmap.h",
 		MAME_DIR .. "src/lib/util/cdrom.cpp",
@@ -41,6 +43,10 @@ project "utils"
 		MAME_DIR .. "src/lib/util/chdcd.h",
 		MAME_DIR .. "src/lib/util/chdcodec.cpp",
 		MAME_DIR .. "src/lib/util/chdcodec.h",
+		MAME_DIR .. "src/lib/util/client_http.hpp",
+		MAME_DIR .. "src/lib/util/client_https.hpp",
+		MAME_DIR .. "src/lib/util/client_ws.hpp",
+		MAME_DIR .. "src/lib/util/client_wss.hpp",
 		MAME_DIR .. "src/lib/util/corealloc.h",
 		MAME_DIR .. "src/lib/util/corefile.cpp",
 		MAME_DIR .. "src/lib/util/corefile.h",
@@ -48,6 +54,7 @@ project "utils"
 		MAME_DIR .. "src/lib/util/corestr.h",
 		MAME_DIR .. "src/lib/util/coreutil.cpp",
 		MAME_DIR .. "src/lib/util/coreutil.h",
+		MAME_DIR .. "src/lib/util/crypto.hpp",
 		MAME_DIR .. "src/lib/util/delegate.cpp",
 		MAME_DIR .. "src/lib/util/delegate.h",
 		MAME_DIR .. "src/lib/util/flac.cpp",
@@ -71,14 +78,21 @@ project "utils"
 		MAME_DIR .. "src/lib/util/options.h",
 		MAME_DIR .. "src/lib/util/palette.cpp",
 		MAME_DIR .. "src/lib/util/palette.h",
+		MAME_DIR .. "src/lib/util/path_to_regex.cpp",
+		MAME_DIR .. "src/lib/util/path_to_regex.h",
 		MAME_DIR .. "src/lib/util/plaparse.cpp",
 		MAME_DIR .. "src/lib/util/plaparse.h",
 		MAME_DIR .. "src/lib/util/png.cpp",
 		MAME_DIR .. "src/lib/util/png.h",
 		MAME_DIR .. "src/lib/util/pool.cpp",
 		MAME_DIR .. "src/lib/util/pool.h",
+		MAME_DIR .. "src/lib/util/server_http.hpp",
+		MAME_DIR .. "src/lib/util/server_https.hpp",
+		MAME_DIR .. "src/lib/util/server_ws.hpp",
+		MAME_DIR .. "src/lib/util/server_wss.hpp",
 		MAME_DIR .. "src/lib/util/sha1.cpp",
 		MAME_DIR .. "src/lib/util/sha1.h",
+		MAME_DIR .. "src/lib/util/sha1.hpp",
 		MAME_DIR .. "src/lib/util/strformat.cpp",
 		MAME_DIR .. "src/lib/util/strformat.h",
 		MAME_DIR .. "src/lib/util/timeconv.cpp",
@@ -99,36 +113,4 @@ project "utils"
 		MAME_DIR .. "src/lib/util/xmlfile.h",
 		MAME_DIR .. "src/lib/util/zippath.cpp",
 		MAME_DIR .. "src/lib/util/zippath.h",
-	}
-
-	
-project "http"
-	uuid "d7930d44-21d1-4c5d-b6af-582c141cd23a"
-	kind (LIBTYPE)
-
-	addprojectflags()
-
-	includedirs {
-		MAME_DIR .. "3rdparty",
-		MAME_DIR .. "3rdparty/asio/include",
-		MAME_DIR .. "src/osd",
-	}
-	
-	files {
-		MAME_DIR .. "src/lib/http/connection.cpp",
-		MAME_DIR .. "src/lib/http/connection.hpp",
-		MAME_DIR .. "src/lib/http/connection_manager.cpp",
-		MAME_DIR .. "src/lib/http/connection_manager.hpp",
-		MAME_DIR .. "src/lib/http/header.hpp",
-		MAME_DIR .. "src/lib/http/mime_types.cpp",
-		MAME_DIR .. "src/lib/http/mime_types.hpp",
-		MAME_DIR .. "src/lib/http/reply.cpp",
-		MAME_DIR .. "src/lib/http/reply.hpp",
-		MAME_DIR .. "src/lib/http/request.hpp",
-		MAME_DIR .. "src/lib/http/request_handler.cpp",
-		MAME_DIR .. "src/lib/http/request_handler.hpp",
-		MAME_DIR .. "src/lib/http/request_parser.cpp",
-		MAME_DIR .. "src/lib/http/request_parser.hpp",
-		MAME_DIR .. "src/lib/http/server.cpp",
-		MAME_DIR .. "src/lib/http/server.hpp",
 	}

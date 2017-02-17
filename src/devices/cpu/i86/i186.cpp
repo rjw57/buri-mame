@@ -3,6 +3,7 @@
 // Peripheral code from rmnimbus driver by Phill Harvey-Smith which is
 // based on the Leland sound driver by Aaron Giles and Paul Leaman
 
+#include "emu.h"
 #include "i186.h"
 #include "debugger.h"
 #include "i86inline.h"
@@ -549,14 +550,15 @@ void i80186_cpu_device::execute_run()
 void i80186_cpu_device::device_start()
 {
 	i8086_common_cpu_device::device_start();
-	state_add( I8086_ES, "ES", m_sregs[ES] ).callimport().callexport().formatstr("%04X");
-	state_add( I8086_CS, "CS", m_sregs[CS] ).callimport().callexport().formatstr("%04X");
-	state_add( I8086_SS, "SS", m_sregs[SS] ).callimport().callexport().formatstr("%04X");
-	state_add( I8086_DS, "DS", m_sregs[DS] ).callimport().callexport().formatstr("%04X");
-	state_add( I8086_VECTOR, "V", m_int_vector).callimport().callexport().formatstr("%02X");
+	state_add( I8086_ES, "ES", m_sregs[ES] ).formatstr("%04X");
+	state_add( I8086_CS, "CS", m_sregs[CS] ).callimport().formatstr("%04X");
+	state_add( I8086_SS, "SS", m_sregs[SS] ).formatstr("%04X");
+	state_add( I8086_DS, "DS", m_sregs[DS] ).formatstr("%04X");
+	state_add( I8086_VECTOR, "V", m_int_vector).formatstr("%02X");
 
-	state_add(STATE_GENPC, "GENPC", m_pc).formatstr("%05X");
-	state_add(STATE_GENPCBASE, "CURPC", m_pc).formatstr("%05X");
+	state_add( I8086_PC, "PC", m_pc ).callimport().formatstr("%05X");
+	state_add( STATE_GENPCBASE, "CURPC", m_pc ).callimport().formatstr("%05X").noshow();
+	state_add( I8086_HALT, "HALT", m_halt ).mask(1);
 
 	// register for savestates
 	save_item(NAME(m_timer[0].control));
@@ -1023,14 +1025,23 @@ void i80186_cpu_device::device_timer(emu_timer &timer, device_timer_id id, int p
 				}
 			}
 
-			/* if we're continuous, reset */
-			if (t->control & 0x0001)
+			/* if we're continuous or altcounting, reset */
+			if((t->control & 1) || ((t->control & 2) && (which != 2) && !t->active_count))
 			{
 				int count;
 				if((t->control & 2) && (which != 2))
 				{
 					count = t->active_count ? t->maxA : t->maxB;
-					t->active_count = !t->active_count;
+					if(!t->active_count)
+					{
+						t->active_count = 1;
+						t->control |= 0x1000;
+					}
+					else
+					{
+						t->active_count = 0;
+						t->control &= ~0x1000;
+					}
 				}
 				else
 					count = t->maxA;
@@ -1043,7 +1054,7 @@ void i80186_cpu_device::device_timer(emu_timer &timer, device_timer_id id, int p
 			else
 			{
 				t->int_timer->adjust(attotime::never, which);
-				t->control &= ~0x8000;
+				t->control &= ~0x9000;
 			}
 			t->count = 0;
 			break;
@@ -1183,6 +1194,7 @@ void i80186_cpu_device::internal_timer_update(int which, int new_count, int new_
 	if (update_int_timer)
 	{
 		t->active_count = 0;
+		t->control &= ~0x1000;
 		if ((t->control & 0x8000) && !(t->control & 4))
 		{
 			int diff = t->maxA - t->count;
@@ -1528,7 +1540,7 @@ WRITE16_MEMBER(i80186_cpu_device::internal_port_w)
 
 		case 0x17:
 			if (LOG_PORTS) logerror("%05X:80186 interrupt request = %04X\n", pc(), data);
-			m_intr.request = (m_intr.request & ~0x00c0) | (data & 0x00c0);
+			m_intr.request = (m_intr.request & ~0x000c) | (data & 0x000c);
 			update_interrupt_state();
 			break;
 
@@ -1695,7 +1707,7 @@ WRITE16_MEMBER(i80186_cpu_device::internal_port_w)
 			{
 				uint32_t newmap = (data & 0xfff) << 8;
 				uint32_t oldmap = (m_reloc & 0xfff) << 8;
-				if (!(data & 0x1000) || ((data & 0x1000) && (m_reloc & 0x1000)))
+				if (m_reloc & 0x1000)
 					m_program->unmap_readwrite(oldmap, oldmap + 0xff);
 				if (data & 0x1000) // TODO: make work with 80188 if needed
 					m_program->install_readwrite_handler(newmap, newmap + 0xff, read16_delegate(FUNC(i80186_cpu_device::internal_port_r), this), write16_delegate(FUNC(i80186_cpu_device::internal_port_w), this));

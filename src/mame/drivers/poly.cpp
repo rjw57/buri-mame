@@ -41,8 +41,6 @@
 #include "machine/keyboard.h"
 #include "sound/speaker.h"
 
-#define KEYBOARD_TAG "keyboard"
-
 class poly_state : public driver_device
 {
 public:
@@ -183,8 +181,7 @@ static MACHINE_CONFIG_START( poly, poly_state )
 	MCFG_PIA_IRQA_HANDLER(INPUTLINE("maincpu", M6809_IRQ_LINE))
 	MCFG_PIA_IRQB_HANDLER(INPUTLINE("maincpu", M6809_IRQ_LINE))
 
-	MCFG_DEVICE_ADD("ptm", PTM6840, 0)
-	MCFG_PTM6840_INTERNAL_CLOCK(XTAL_12MHz / 3)
+	MCFG_DEVICE_ADD("ptm", PTM6840, XTAL_12MHz / 3)
 	MCFG_PTM6840_EXTERNAL_CLOCKS(0, 0, 0)
 	MCFG_PTM6840_OUT1_CB(WRITELINE(poly_state, ptm_o2_callback))
 	MCFG_PTM6840_OUT2_CB(WRITELINE(poly_state, ptm_o3_callback))
@@ -199,7 +196,7 @@ static MACHINE_CONFIG_START( poly, poly_state )
 
 	MCFG_DEVICE_ADD("adlc", MC6854, 0)
 
-	MCFG_DEVICE_ADD(KEYBOARD_TAG, GENERIC_KEYBOARD, 0)
+	MCFG_DEVICE_ADD("keyboard", GENERIC_KEYBOARD, 0)
 	MCFG_GENERIC_KEYBOARD_CB(WRITE8(poly_state, kbd_put))
 MACHINE_CONFIG_END
 

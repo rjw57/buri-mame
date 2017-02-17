@@ -5,7 +5,6 @@
 #ifndef __YM2413_H__
 #define __YM2413_H__
 
-#include "emu.h"
 
 class ym2413_device : public device_t,
 						public device_sound_interface
@@ -130,7 +129,7 @@ private:
 	uint32_t  eg_cnt;                 /* global envelope generator counter    */
 	uint32_t  eg_timer;               /* global envelope generator counter works at frequency = chipclock/72 */
 	uint32_t  eg_timer_add;           /* step of eg_timer                     */
-	uint32_t  eg_timer_overflow;      /* envelope generator timer overlfows every 1 sample (on real chip) */
+	uint32_t  eg_timer_overflow;      /* envelope generator timer overflows every 1 sample (on real chip) */
 
 	uint8_t   rhythm;                 /* Rhythm mode                  */
 

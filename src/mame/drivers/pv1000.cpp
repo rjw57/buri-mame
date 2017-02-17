@@ -23,7 +23,6 @@ public:
 
 protected:
 	// device-level overrides
-	virtual void device_config_complete() override;
 	virtual void device_start() override;
 
 	// sound stream update overrides
@@ -49,16 +48,6 @@ const device_type PV1000 = &device_creator<pv1000_sound_device>;
 pv1000_sound_device::pv1000_sound_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 				: device_t(mconfig, PV1000, "NEC D65010G031", tag, owner, clock, "pv1000_sound", __FILE__),
 					device_sound_interface(mconfig, *this)
-{
-}
-
-//-------------------------------------------------
-//  device_config_complete - perform any
-//  operations now that the configuration is
-//  complete
-//-------------------------------------------------
-
-void pv1000_sound_device::device_config_complete()
 {
 }
 
@@ -147,7 +136,7 @@ public:
 		m_maincpu(*this, "maincpu"),
 		m_sound(*this, "pv1000_sound"),
 		m_cart(*this, "cartslot"),
-		m_p_videoram(*this, "p_videoram"),
+		m_p_videoram(*this, "videoram"),
 		m_gfxdecode(*this, "gfxdecode"),
 		m_screen(*this, "screen"),
 		m_palette(*this, "palette")
@@ -187,7 +176,7 @@ public:
 
 static ADDRESS_MAP_START( pv1000, AS_PROGRAM, 8, pv1000_state )
 	//AM_RANGE(0x0000, 0x7fff)      // mapped by the cartslot
-	AM_RANGE(0xb800, 0xbbff) AM_RAM AM_SHARE("p_videoram")
+	AM_RANGE(0xb800, 0xbbff) AM_RAM AM_SHARE("videoram")
 	AM_RANGE(0xbc00, 0xbfff) AM_RAM_WRITE(gfxram_w) AM_REGION("gfxram", 0)
 ADDRESS_MAP_END
 

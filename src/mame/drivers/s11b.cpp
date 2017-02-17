@@ -20,6 +20,7 @@
     - Cyclone: Nothing. The game doesn't bother to check if the ball is ready before allowing start. Insert 1 or more credits first, of course.
 */
 
+#include "emu.h"
 #include "includes/s11b.h"
 #include "cpu/m6800/m6800.h"
 #include "cpu/m6809/m6809.h"
@@ -310,7 +311,7 @@ static MACHINE_CONFIG_START( s11b, s11b_state )
 	MCFG_CPU_PROGRAM_MAP(s11b_audio_map)
 
 	MCFG_SPEAKER_STANDARD_MONO("speaker")
-	MCFG_SOUND_ADD("dac", DAC_8BIT_R2R, 0) MCFG_SOUND_ROUTE(ALL_OUTPUTS, "speaker", 0.25) // unknown DAC
+	MCFG_SOUND_ADD("dac", MC1408, 0) MCFG_SOUND_ROUTE(ALL_OUTPUTS, "speaker", 0.25)
 	MCFG_DEVICE_ADD("vref", VOLTAGE_REGULATOR, 0) MCFG_VOLTAGE_REGULATOR_OUTPUT(5.0)
 	MCFG_SOUND_ROUTE_EX(0, "dac", 1.0, DAC_VREF_POS_INPUT) MCFG_SOUND_ROUTE_EX(0, "dac", -1.0, DAC_VREF_NEG_INPUT)
 	MCFG_SOUND_ROUTE_EX(0, "dac1", 1.0, DAC_VREF_POS_INPUT) MCFG_SOUND_ROUTE_EX(0, "dac1", -1.0, DAC_VREF_NEG_INPUT)
@@ -338,7 +339,7 @@ static MACHINE_CONFIG_START( s11b, s11b_state )
 	MCFG_YM2151_IRQ_HANDLER(WRITELINE(s11b_state, ym2151_irq_w))
 	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "bg", 0.25)
 
-	MCFG_SOUND_ADD("dac1", DAC_8BIT_R2R, 0) MCFG_SOUND_ROUTE(ALL_OUTPUTS, "bg", 0.25) // unknown DAC
+	MCFG_SOUND_ADD("dac1", MC1408, 0) MCFG_SOUND_ROUTE(ALL_OUTPUTS, "bg", 0.25)
 
 	MCFG_SOUND_ADD("hc55516_bg", HC55516, 0)
 	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "speech", 0.50)

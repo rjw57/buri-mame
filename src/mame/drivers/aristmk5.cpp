@@ -13,10 +13,10 @@
 
     TODO (MK-5 specific):
     - Fix remaining errors
-    - If all tests passes, this msg is printed on the keyboard serial port:
-    "System Startup Code Entered \n Gos_create could not allocate stack for the new process \n
-    Unrecoverable error occurred. System will now restart"
-    Apparently it looks like some sort of protection device ...
+    - Layouts for various configurations
+    - Bill acceptor
+    - Serial printer
+    - Default NVRAM
 
     code DASMing of POST (adonis):
     - bp 0x3400224:
@@ -175,8 +175,15 @@
 #include "machine/ds1302.h"
 #include "machine/watchdog.h"
 #include "machine/eepromser.h"
+#include "machine/microtch.h"
+#include "machine/input_merger.h"
+#include "machine/nvram.h"
 #include "machine/ins8250.h"
+#include "machine/ticket.h"
 #include "sound/volt_reg.h"
+
+#include "aristmk5.lh"
+#include "aristmk5_us.lh"
 
 class aristmk5_state : public archimedes_state
 {
@@ -185,52 +192,189 @@ public:
 		: archimedes_state(mconfig, type, tag)
 		, m_eeprom(*this, "eeprom%d", 0)
 		, m_rtc(*this, "rtc")
-		, m_sram_bank(*this, "sram_bank")
-		, m_sram_bank_nz(*this, "sram_bank_nz")
+		, m_nvram(*this, "nvram")
+		, m_hopper(*this, "hopper")
+		, m_sram(*this, "sram")
+		, m_p1(*this, "P1")
+		, m_p2(*this, "P2")
 		, m_extra_ports(*this, "EXTRA")
 		 { }
 
 	DECLARE_WRITE32_MEMBER(Ns5w48);
 	DECLARE_READ32_MEMBER(Ns5x58);
-	DECLARE_READ32_MEMBER(mk5_ioc_r);
-	DECLARE_WRITE32_MEMBER(mk5_ioc_w);
 	DECLARE_READ32_MEMBER(Ns5r50);
-	DECLARE_WRITE32_MEMBER(sram_banksel_w);
-	DECLARE_WRITE32_MEMBER(eeprom_w);
-	DECLARE_WRITE32_MEMBER(rtc_w);
-	DECLARE_READ32_MEMBER(eeprom_r);
-	DECLARE_READ32_MEMBER(ldor_r);
-	DECLARE_WRITE32_MEMBER(ldor_clk_w);
+	DECLARE_WRITE8_MEMBER(sram_banksel_w);
+	DECLARE_WRITE8_MEMBER(eeprom_w);
+	DECLARE_WRITE8_MEMBER(eeprom_usa_w);
+	DECLARE_WRITE8_MEMBER(rtc_w);
+	DECLARE_WRITE8_MEMBER(rtc_usa_w);
+	DECLARE_WRITE8_MEMBER(hopper_w);
+	DECLARE_READ8_MEMBER(eeprom_r);
+	DECLARE_READ8_MEMBER(ldor_r);
+	DECLARE_WRITE8_MEMBER(ldor_clk_w);
+	DECLARE_WRITE8_MEMBER(buttons_lamps_w);
+	DECLARE_WRITE8_MEMBER(other_lamps_w);
+	DECLARE_WRITE8_MEMBER(bill_acceptor_lamps_w);
+	DECLARE_READ8_MEMBER(sram_r);
+	DECLARE_WRITE8_MEMBER(sram_w);
+	DECLARE_WRITE8_MEMBER(spi_mux_w);
+	DECLARE_WRITE8_MEMBER(spi_data_w);
+	DECLARE_READ8_MEMBER(spi_int_ack_r);
+	DECLARE_WRITE8_MEMBER(spi_int_ack_w);
+	DECLARE_READ8_MEMBER(spi_data_r);
+	DECLARE_WRITE_LINE_MEMBER(uart_irq_callback);
 
 	DECLARE_DRIVER_INIT(aristmk5);
 	virtual void machine_start() override;
 	virtual void machine_reset() override;
 	TIMER_CALLBACK_MEMBER(mk5_VSYNC_callback);
 	TIMER_CALLBACK_MEMBER(mk5_2KHz_callback);
+	TIMER_CALLBACK_MEMBER(spi_timer);
 
 	INPUT_CHANGED_MEMBER(coin_start);
 	CUSTOM_INPUT_MEMBER(coin_r);
+	CUSTOM_INPUT_MEMBER(coin_usa_r);
+	CUSTOM_INPUT_MEMBER(hopper_r);
 
 private:
 	required_device_array<eeprom_serial_93cxx_device, 2> m_eeprom;
 	required_device<ds1302_device> m_rtc;
-	required_memory_bank m_sram_bank;
-	required_memory_bank m_sram_bank_nz;
+	required_device<nvram_device> m_nvram;
+	required_device<ticket_dispenser_device> m_hopper;
+	required_memory_region m_sram;
+	required_ioport m_p1;
+	required_ioport m_p2;
 	required_ioport m_extra_ports;
 
 	emu_timer *     m_mk5_2KHz_timer;
 	emu_timer *     m_mk5_VSYNC_timer;
-	uint8_t         m_ext_latch;
-	uint8_t         m_flyback;
+	emu_timer *     m_spi_timer;
+	uint8_t         m_sram_bank;
 	uint8_t         m_ldor_shift_reg;
+	uint8_t         m_hopper_test;
 	uint64_t        m_coin_start_cycles;
+	uint8_t         m_coin_div;
+	uint8_t         m_spi_mux;
+	uint8_t         m_spi_latch;
+	uint8_t         m_spi_bits;
+	uint32_t        m_spi_data[8];
 };
 
 
+WRITE8_MEMBER(aristmk5_state::spi_mux_w)
+{
+	uint8_t spi_mux = (data >> 4) & 7;
+
+	if (spi_mux == m_spi_mux)
+		return;
+
+	m_spi_mux = spi_mux;
+
+	switch (m_spi_mux)
+	{
+	case 0: // Test
+	case 3: // not used
+		break;
+
+	case 1: // Top box lamps
+		break;
+
+	case 2: // Mechanical meters
+		for(int i=0; i<4; i++)
+			output().set_lamp_value(32 + i, BIT(m_spi_data[m_spi_mux], 1 + i));     // Tower Lamps
+		break;
+
+	case 4: // Door inputs
+		m_spi_data[m_spi_mux] = m_p1->read();
+		break;
+
+	case 5: // Door outputs
+		for(int i=0; i<32; i++)
+			output().set_lamp_value(i, BIT(m_spi_data[m_spi_mux], i));
+		break;
+
+	case 6: // Main board slow I/O
+		m_spi_data[m_spi_mux] = m_p2->read() & ~((data  & 0x80) ? 0 : 0x100);
+		break;
+
+	case 7: // Main board security registers
+		break;
+	}
+}
+
+WRITE8_MEMBER(aristmk5_state::spi_data_w)
+{
+	m_spi_latch = data;
+	m_spi_bits = 0;
+
+	// start the SPI clock
+	m_spi_timer->adjust(attotime::from_hz((double)MASTER_CLOCK / 9 / 512 / 2), 0, attotime::from_hz((double)MASTER_CLOCK / 9 / 512 / 2));
+}
+
+READ8_MEMBER(aristmk5_state::spi_data_r)
+{
+	return m_spi_latch;
+}
+
+READ8_MEMBER(aristmk5_state::spi_int_ack_r)
+{
+	archimedes_clear_irq_b(0x08);
+	return 0;
+}
+
+WRITE8_MEMBER(aristmk5_state::spi_int_ack_w)
+{
+	archimedes_clear_irq_b(0x08);
+}
+
+TIMER_CALLBACK_MEMBER(aristmk5_state::spi_timer)
+{
+	if (m_spi_mux == 0 || m_spi_mux == 3)
+	{
+		m_spi_latch = (((m_spi_latch & 1) << 7) ^ 0x80) | ((m_spi_latch >> 1) & 0x7f);
+	}
+	else
+	{
+		static int mux_bits[8] = { 0, 16, 16, 0, 24, 32, 24, 8 };
+
+		uint32_t mux_mask = ((uint32_t)1 << (mux_bits[m_spi_mux] - 1)) - 1;
+		uint32_t spi_in_bit = m_spi_data[m_spi_mux] & 1;
+		uint32_t spi_out_bit = m_spi_latch & 1;
+
+		m_spi_data[m_spi_mux] = (spi_out_bit << (mux_bits[m_spi_mux] - 1)) | ((m_spi_data[m_spi_mux] >> 1) & mux_mask);
+		m_spi_latch = (spi_in_bit << 7) | ((m_spi_latch >> 1) & 0x7f);
+	}
+
+	// SPI interrupt
+	if (++m_spi_bits == 8)
+	{
+		m_spi_timer->adjust(attotime::never);
+		archimedes_request_irq_b(0x08);
+	}
+}
+
+WRITE_LINE_MEMBER(aristmk5_state::uart_irq_callback)
+{
+	if (state)
+		archimedes_request_irq_b(0x20);
+	else
+		archimedes_clear_irq_b(0x20);
+}
+
 TIMER_CALLBACK_MEMBER(aristmk5_state::mk5_VSYNC_callback)
 {
-	m_ioc_regs[IRQ_STATUS_A] |= 0x08; //turn vsync bit on
+	archimedes_request_irq_a(0x08); //turn vsync bit on
 	m_mk5_VSYNC_timer->adjust(attotime::never);
+}
+
+READ8_MEMBER(aristmk5_state::sram_r)
+{
+	return m_sram->base()[(m_sram_bank << 14) | (offset & 0x3fff)];
+}
+
+WRITE8_MEMBER(aristmk5_state::sram_w)
+{
+	m_sram->base()[(m_sram_bank << 14) | (offset & 0x3fff)] = data;
 }
 
 WRITE32_MEMBER(aristmk5_state::Ns5w48)
@@ -270,7 +414,7 @@ WRITE32_MEMBER(aristmk5_state::Ns5w48)
 	*/
 
 
-	m_ioc_regs[IRQ_STATUS_A] &= ~0x08;
+	archimedes_clear_irq_a(0x08);
 
 	/*          bit 1              bit 0 */
 	if((data &~(0x02)) && (data & (0x01))) // external video crystal is enabled. 25 mhz
@@ -293,7 +437,7 @@ WRITE32_MEMBER(aristmk5_state::Ns5w48)
 
 TIMER_CALLBACK_MEMBER(aristmk5_state::mk5_2KHz_callback)
 {
-	m_ioc_regs[IRQ_STATUS_A] |= 0x01;
+	archimedes_request_irq_a(0x01);
 	m_mk5_2KHz_timer->adjust(attotime::never);
 
 }
@@ -320,54 +464,9 @@ READ32_MEMBER(aristmk5_state::Ns5x58)
 
 
 	// reset 2KHz timer
-	m_mk5_2KHz_timer->adjust(attotime::from_hz(1953.125));
-	m_ioc_regs[IRQ_STATUS_A] &= ~0x01;
-	m_maincpu->set_input_line(ARM_IRQ_LINE, CLEAR_LINE);
+	m_mk5_2KHz_timer->adjust(attotime::from_hz((double)MASTER_CLOCK / 9 / 4096));
+	archimedes_clear_irq_a(0x01);
 	return 0xffffffff;
-}
-
-/* same as plain AA but with the I2C unconnected */
-READ32_MEMBER(aristmk5_state::mk5_ioc_r)
-{
-	uint32_t ioc_addr;
-
-	ioc_addr = offset*4;
-	ioc_addr >>= 16;
-	ioc_addr &= 0x37;
-
-	if(((ioc_addr == 0x20) || (ioc_addr == 0x30)) && (offset & 0x1f) == 0)
-	{
-		int vert_pos;
-
-		vert_pos = m_screen->vpos();
-		m_flyback = (vert_pos <= m_vidc_regs[VIDC_VDSR] || vert_pos >= m_vidc_regs[VIDC_VDER]) ? 0x80 : 0x00;
-
-		//i2c_data = (i2cmem_sda_read(machine().device("i2cmem")) & 1);
-
-		return (m_flyback) | (m_ioc_regs[CONTROL] & 0x7c) | (1<<1) | 1;
-	}
-
-	return archimedes_ioc_r(space,offset,mem_mask);
-}
-
-WRITE32_MEMBER(aristmk5_state::mk5_ioc_w)
-{
-	uint32_t ioc_addr;
-
-	ioc_addr = offset*4;
-	ioc_addr >>= 16;
-	ioc_addr &= 0x37;
-
-	if(!m_ext_latch)
-	{
-		if(((ioc_addr == 0x20) || (ioc_addr == 0x30)) && (offset & 0x1f) == 0)
-		{
-			m_ioc_regs[CONTROL] = data & 0x7c;
-			return;
-		}
-		else
-			archimedes_ioc_w(space,offset,data,mem_mask);
-	}
 }
 
 READ32_MEMBER(aristmk5_state::Ns5r50)
@@ -375,7 +474,7 @@ READ32_MEMBER(aristmk5_state::Ns5r50)
 	return 0xf5; // checked inside the CPU check, unknown meaning
 }
 
-READ32_MEMBER(aristmk5_state::eeprom_r)
+READ8_MEMBER(aristmk5_state::eeprom_r)
 {
 	uint8_t data = 0x00;
 	if (m_eeprom[0]->do_read() && m_eeprom[1]->do_read())
@@ -387,46 +486,60 @@ READ32_MEMBER(aristmk5_state::eeprom_r)
 	return data;
 }
 
-WRITE32_MEMBER(aristmk5_state::rtc_w)
+WRITE8_MEMBER(aristmk5_state::hopper_w)
 {
-	if (ACCESSING_BITS_0_7)
-	{
-		m_rtc->ce_w(BIT(data, 5));
-
-		if (BIT(data, 6))
-			m_rtc->io_w(BIT(data, 3));
-
-		m_rtc->sclk_w(BIT(data, 4));
-	}
+	m_hopper->write(space, 0, (data & 0x02) ? 0x80 : 0);
+	m_hopper_test = BIT(data, 2);
 }
 
-WRITE32_MEMBER(aristmk5_state::eeprom_w)
+WRITE8_MEMBER(aristmk5_state::rtc_w)
 {
-	if (ACCESSING_BITS_0_7)
-	{
-		m_eeprom[0]->cs_write(BIT(data, 5));
-		m_eeprom[1]->cs_write(BIT(data, 6));
-		m_eeprom[0]->di_write(BIT(data, 3));
-		m_eeprom[1]->di_write(BIT(data, 3));
-		m_eeprom[0]->clk_write(BIT(data, 4));
-		m_eeprom[1]->clk_write(BIT(data, 4));
-	}
+	m_rtc->ce_w(BIT(data, 5));
+
+	if (BIT(data, 6))
+		m_rtc->io_w(BIT(data, 3));
+
+	m_rtc->sclk_w(BIT(data, 4));
 }
 
-READ32_MEMBER(aristmk5_state::ldor_r)
+WRITE8_MEMBER(aristmk5_state::rtc_usa_w)
+{
+	rtc_w(space, offset, data, mem_mask);
+	m_hopper_test = BIT(data, 2);
+}
+
+WRITE8_MEMBER(aristmk5_state::eeprom_w)
+{
+	m_coin_div = data & 1;
+
+	m_eeprom[0]->cs_write(BIT(data, 5));
+	m_eeprom[1]->cs_write(BIT(data, 6));
+	m_eeprom[0]->di_write(BIT(data, 3));
+	m_eeprom[1]->di_write(BIT(data, 3));
+	m_eeprom[0]->clk_write(BIT(data, 4));
+	m_eeprom[1]->clk_write(BIT(data, 4));
+}
+
+WRITE8_MEMBER(aristmk5_state::eeprom_usa_w)
+{
+	eeprom_w(space, offset, data, mem_mask);
+	m_hopper->write(space, 0, (data & 0x04) ? 0x80 : 0);
+}
+
+READ8_MEMBER(aristmk5_state::ldor_r)
 {
 	if (m_extra_ports->read() & 0x01)
 		m_ldor_shift_reg = 0;   // open the Logic door clears the shift register
 
-	return (m_ldor_shift_reg & 0x80);
+	return (m_ldor_shift_reg & 0x80) | 0x60 | ((m_hopper_test && m_hopper->line_r()) ? 0x10 : 0x00);
 }
 
-WRITE32_MEMBER(aristmk5_state::ldor_clk_w)
+WRITE8_MEMBER(aristmk5_state::ldor_clk_w)
 {
 	m_ldor_shift_reg = (m_ldor_shift_reg << 1) | BIT(data, 0);
 }
 
-WRITE32_MEMBER(aristmk5_state::sram_banksel_w)
+WRITE8_MEMBER(aristmk5_state::sram_banksel_w)
 {
 	/*
 
@@ -481,69 +594,115 @@ WRITE32_MEMBER(aristmk5_state::sram_banksel_w)
 
 	     4 pages of 32k for each sram chip.
 	*/
-	m_sram_bank->set_entry((data & 0xc0) >> 6);
-	m_sram_bank_nz->set_entry((data & 0xc0) >> 6);
+
+	m_sram_bank = ((data & 0xc0) >> 3) | (data & 0x07);
+}
+
+WRITE8_MEMBER(aristmk5_state::buttons_lamps_w)
+{
+	for(int i=0; i<8; i++)
+		output().set_lamp_value((offset >> 2) * 8 + i, BIT(data, i));
+}
+
+WRITE8_MEMBER(aristmk5_state::other_lamps_w)
+{
+	for(int i=0; i<8; i++)
+		output().set_lamp_value(16 + i, BIT(data, i));
+}
+
+WRITE8_MEMBER(aristmk5_state::bill_acceptor_lamps_w)
+{
+	for(int i=0; i<8; i++)
+		output().set_lamp_value(24 + i, BIT(data, i));
 }
 
 static ADDRESS_MAP_START( aristmk5_map, AS_PROGRAM, 32, aristmk5_state )
 	AM_RANGE(0x02000000, 0x02ffffff) AM_RAM AM_SHARE("physicalram") /* physical RAM - 16 MB for now, should be 512k for the A310 */
 
 	/* MK-5 overrides */
-	AM_RANGE(0x03010420, 0x03010423) AM_WRITE(sram_banksel_w) // SRAM bank select write
-	AM_RANGE(0x03010440, 0x03010443) AM_WRITE(rtc_w)
-	AM_RANGE(0x03010450, 0x03010453) AM_WRITE(eeprom_w)
-	AM_RANGE(0x03010800, 0x03010803) AM_READ(eeprom_r)
-
-	AM_RANGE(0x03010580, 0x03010583) AM_READ_PORT("P3")
-	AM_RANGE(0x03012000, 0x03012003) AM_READ_PORT("P1")
-	AM_RANGE(0x03012010, 0x03012013) AM_READ_PORT("P2")
-	AM_RANGE(0x03012200, 0x03012203) AM_READ_PORT("DSW1")
-	AM_RANGE(0x03012210, 0x03012213) AM_READ_PORT("DSW2")
-	AM_RANGE(0x03010584, 0x03010587) AM_READ_PORT("P4")
-	AM_RANGE(0x03012184, 0x03012187) AM_READ_PORT("P5")
-
-	AM_RANGE(0x03012020, 0x03012023) AM_READ(ldor_r)
-	AM_RANGE(0x03012070, 0x03012073) AM_WRITE(ldor_clk_w)
+	AM_RANGE(0x03010420, 0x03010423) AM_WRITE8(sram_banksel_w, 0x000000ff) // SRAM bank select write
 
 	AM_RANGE(0x03010480, 0x0301049f) AM_DEVREADWRITE8("uart_0a", ins8250_uart_device, ins8250_r, ins8250_w, 0x000000ff)
 	AM_RANGE(0x03010500, 0x0301051f) AM_DEVREADWRITE8("uart_0b", ins8250_uart_device, ins8250_r, ins8250_w, 0x000000ff)
+	AM_RANGE(0x03010580, 0x03010583) AM_READ_PORT("P3")
 	AM_RANGE(0x03010600, 0x0301061f) AM_DEVREADWRITE8("uart_1a", ins8250_uart_device, ins8250_r, ins8250_w, 0x000000ff)
 	AM_RANGE(0x03010680, 0x0301069f) AM_DEVREADWRITE8("uart_1b", ins8250_uart_device, ins8250_r, ins8250_w, 0x000000ff)
-	AM_RANGE(0x03012100, 0x0301211f) AM_DEVREADWRITE8("uart_2a", ins8250_uart_device, ins8250_r, ins8250_w, 0x000000ff)
-	AM_RANGE(0x03012140, 0x0301215f) AM_DEVREADWRITE8("uart_2b", ins8250_uart_device, ins8250_r, ins8250_w, 0x000000ff)
-	AM_RANGE(0x03012300, 0x0301231f) AM_DEVREADWRITE8("uart_3a", ins8250_uart_device, ins8250_r, ins8250_w, 0x000000ff)
-	AM_RANGE(0x03012340, 0x0301235f) AM_DEVREADWRITE8("uart_3b", ins8250_uart_device, ins8250_r, ins8250_w, 0x000000ff)
 
+	AM_RANGE(0x03010700, 0x03010703) AM_READ_PORT("P6")
+	AM_RANGE(0x03010800, 0x03010803) AM_READ8(eeprom_r, 0x000000ff)
 	AM_RANGE(0x03010810, 0x03010813) AM_DEVREADWRITE("watchdog", watchdog_timer_device, reset32_r, reset32_w) //MK-5 specific, watchdog
-//  System Startup Code Enabled protection appears to be located at 0x3010400 - 0x30104ff
-	AM_RANGE(0x03220000, 0x0323ffff) AM_RAMBANK("sram_bank") //AM_BASE_SIZE_GENERIC(nvram) // nvram 32kbytes x 3
+	AM_RANGE(0x03220000, 0x0323ffff) AM_READWRITE8(sram_r, sram_w, 0x000000ff)
 
 	// bank5 slow
 	AM_RANGE(0x03250048, 0x0325004b) AM_WRITE(Ns5w48) //IOEB control register
 	AM_RANGE(0x03250050, 0x03250053) AM_READ(Ns5r50)  //IOEB ID register
 	AM_RANGE(0x03250058, 0x0325005b) AM_READ(Ns5x58)  //IOEB interrupt Latch
 
-	AM_RANGE(0x03000000, 0x0331ffff) AM_READWRITE(mk5_ioc_r, mk5_ioc_w)
-	AM_RANGE(0x03320000, 0x0333ffff) AM_RAMBANK("sram_bank_nz") // AM_BASE_SIZE_GENERIC(nvram) // nvram 32kbytes x 3 NZ
-	AM_RANGE(0x03400000, 0x035fffff) AM_ROM AM_REGION("maincpu", 0) AM_WRITE(archimedes_vidc_w)
-	AM_RANGE(0x03600000, 0x037fffff) AM_READWRITE(archimedes_memc_r, archimedes_memc_w)
+	AM_RANGE(0x03000000, 0x0331ffff) AM_READWRITE(archimedes_ioc_r, archimedes_ioc_w)
+	AM_RANGE(0x03320000, 0x0333ffff) AM_READWRITE8(sram_r, sram_w, 0x000000ff)
+
+	AM_RANGE(0x03400000, 0x035fffff) AM_WRITE(archimedes_vidc_w)
+	AM_RANGE(0x03600000, 0x037fffff) AM_WRITE(archimedes_memc_w)
 	AM_RANGE(0x03800000, 0x039fffff) AM_WRITE(archimedes_memc_page_w)
+
+	AM_RANGE(0x03400000, 0x03bfffff) AM_ROM AM_REGION("maincpu", 0)
 ADDRESS_MAP_END
 
 /* U.S games have no dram emulator enabled */
 static ADDRESS_MAP_START( aristmk5_usa_map, AS_PROGRAM, 32, aristmk5_state )
 	AM_RANGE(0x00000000, 0x01ffffff) AM_READWRITE(archimedes_memc_logical_r, archimedes_memc_logical_w)
+
+	AM_RANGE(0x03010440, 0x03010443) AM_WRITE8(rtc_usa_w, 0x000000ff)
+	AM_RANGE(0x03010450, 0x03010453) AM_WRITE8(eeprom_usa_w, 0x000000ff)
+
+	AM_RANGE(0x03012000, 0x03012003) AM_READ_PORT("P1")
+	AM_RANGE(0x03012010, 0x03012013) AM_READ_PORT("P2")
+	AM_RANGE(0x03012200, 0x03012203) AM_READ_PORT("DSW1")
+	AM_RANGE(0x03012210, 0x03012213) AM_READ_PORT("DSW2")
+	AM_RANGE(0x03010584, 0x03010587) AM_READ_PORT("P4")
+
+	AM_RANGE(0x03012020, 0x03012023) AM_READ8(ldor_r, 0x000000ff)
+	AM_RANGE(0x03012070, 0x03012073) AM_WRITE8(ldor_clk_w, 0x000000ff)
+	AM_RANGE(0x03012184, 0x03012187) AM_READ_PORT("P5")
+
+	AM_RANGE(0x03012000, 0x0301201f) AM_WRITE8(buttons_lamps_w, 0x000000ff)
+	AM_RANGE(0x03012030, 0x0301203f) AM_WRITE8(other_lamps_w, 0x000000ff)
+	AM_RANGE(0x03012380, 0x0301238f) AM_WRITE8(bill_acceptor_lamps_w, 0x000000ff)
+
+	AM_RANGE(0x03012100, 0x0301211f) AM_DEVREADWRITE8("uart_2a", ins8250_uart_device, ins8250_r, ins8250_w, 0x000000ff)
+	AM_RANGE(0x03012140, 0x0301215f) AM_DEVREADWRITE8("uart_2b", ins8250_uart_device, ins8250_r, ins8250_w, 0x000000ff)
+	AM_RANGE(0x03012300, 0x0301231f) AM_DEVREADWRITE8("uart_3a", ins8250_uart_device, ins8250_r, ins8250_w, 0x000000ff)
+	AM_RANGE(0x03012340, 0x0301235f) AM_DEVREADWRITE8("uart_3b", ins8250_uart_device, ins8250_r, ins8250_w, 0x000000ff)
+
 	AM_IMPORT_FROM(aristmk5_map)
 ADDRESS_MAP_END
 
 /* with dram emulator enabled */
 static ADDRESS_MAP_START( aristmk5_drame_map, AS_PROGRAM, 32, aristmk5_state )
 	AM_RANGE(0x00000000, 0x01ffffff) AM_READWRITE(aristmk5_drame_memc_logical_r, archimedes_memc_logical_w)
+
+	AM_RANGE(0x03010430, 0x03010433) AM_WRITE8(hopper_w, 0x000000ff)
+	AM_RANGE(0x03010440, 0x03010443) AM_WRITE8(rtc_w, 0x000000ff)
+	AM_RANGE(0x03010450, 0x03010453) AM_WRITE8(eeprom_w, 0x000000ff)
+
+	AM_RANGE(0x03010400, 0x03010403) AM_WRITE8(spi_mux_w, 0x000000ff)
+	AM_RANGE(0x03010470, 0x03010473) AM_WRITE8(spi_data_w, 0x000000ff)
+	AM_RANGE(0x03010850, 0x03010853) AM_READWRITE8(spi_int_ack_r, spi_int_ack_w, 0x000000ff)
+	AM_RANGE(0x03010870, 0x03010873) AM_READ8(spi_data_r, 0x000000ff)
+
+	AM_RANGE(0x03014000, 0x0301401f) AM_DEVREADWRITE8("uart_2a", ins8250_uart_device, ins8250_r, ins8250_w, 0x000000ff)
+	AM_RANGE(0x03014020, 0x0301403f) AM_DEVREADWRITE8("uart_2b", ins8250_uart_device, ins8250_r, ins8250_w, 0x000000ff)
+
 	AM_IMPORT_FROM(aristmk5_map)
 ADDRESS_MAP_END
 
 
-CUSTOM_INPUT_MEMBER(aristmk5_state::coin_r)
+CUSTOM_INPUT_MEMBER(aristmk5_state::hopper_r)
+{
+	return (m_hopper_test && m_hopper->line_r()) ? 0 : 1;
+}
+
+CUSTOM_INPUT_MEMBER(aristmk5_state::coin_usa_r)
 {
 	//  ---x  Coin Acceptor
 	//  --x-  Credit Sense
@@ -552,18 +711,45 @@ CUSTOM_INPUT_MEMBER(aristmk5_state::coin_r)
 
 	uint8_t data = 0x07;
 
+	if (!m_coin_div)
+		data |= 0x08;
+
 	if (m_coin_start_cycles)
 	{
 		attotime diff = m_maincpu->cycles_to_attotime(m_maincpu->total_cycles() - m_coin_start_cycles);
 
-		if (diff > attotime::from_msec(40) && diff < attotime::from_msec(80))
+		if (diff > attotime::from_msec(5) && diff < attotime::from_msec(10))
 			data &= ~0x01;
-		if (diff > attotime::from_msec(120) && diff < attotime::from_msec(150))
+		if (diff > attotime::from_msec(15) && diff < attotime::from_msec(20))
 			data &= ~0x02;
-		if (diff <= attotime::from_msec(20))
+		if (diff <= attotime::from_msec(3))
 			data |= 0x08;
 
-		if (diff > attotime::from_msec(300))
+		if (diff > attotime::from_msec(30))
+			m_coin_start_cycles = 0;
+	}
+
+	return data;
+}
+
+CUSTOM_INPUT_MEMBER(aristmk5_state::coin_r)
+{
+	uint8_t data = 0x01;
+
+	if (m_coin_start_cycles)
+	{
+		attotime diff = m_maincpu->cycles_to_attotime(m_maincpu->total_cycles() - m_coin_start_cycles);
+
+		if (diff > attotime::from_msec(10) && diff < attotime::from_msec(15))
+			data &= ~0x01;
+		if (diff > attotime::from_msec(0) && diff < attotime::from_msec(20))
+			data |= 0x10;
+		if (diff > attotime::from_msec(15) && diff < attotime::from_msec(30))
+			data |= 0x08;
+		if (diff > attotime::from_msec(25) && !m_coin_div)
+			data |= 0x02;
+
+		if (diff > attotime::from_msec(30))
 			m_coin_start_cycles = 0;
 	}
 
@@ -576,7 +762,7 @@ INPUT_CHANGED_MEMBER(aristmk5_state::coin_start)
 		m_coin_start_cycles = m_maincpu->total_cycles();
 }
 
-static INPUT_PORTS_START( aristmk5 )
+static INPUT_PORTS_START( aristmk5_usa )
 	/* This simulates the ROM swap */
 	PORT_START("ROM_LOAD")
 	PORT_CONFNAME( 0x03, 0x03, "System Mode" )
@@ -606,55 +792,110 @@ static INPUT_PORTS_START( aristmk5 )
 	PORT_DIPUNKNOWN_DIPLOC(0x80, 0x80, "DSW2:8")
 
 	PORT_START("P1")
-	PORT_BIT(0x00000001, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_Q)
-	PORT_BIT(0x00000002, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_W)
-	PORT_BIT(0x00000004, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_E)
-	PORT_BIT(0x00000008, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_R)
-	PORT_BIT(0x00000010, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_T)
-	PORT_BIT(0x00000020, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_Y)
-	PORT_BIT(0x00000040, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_U)
-	PORT_BIT(0x00000080, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_I)
+	PORT_BIT(0x00000001, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_J) PORT_NAME("Gamble")
+	PORT_BIT(0x00000002, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_K) PORT_NAME("Take Win")
+	PORT_BIT(0x00000004, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_H) PORT_NAME("Bet 10 Credits / Black")
+	PORT_BIT(0x00000008, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_G) PORT_NAME("Bet 5 Credits")
+	PORT_BIT(0x00000010, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_F) PORT_NAME("Bet 3 Credits")
+	PORT_BIT(0x00000020, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_D) PORT_NAME("Bet 2 Credits")
+	PORT_BIT(0x00000040, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_S) PORT_NAME("Bet 1 Credit / Red")
+	PORT_BIT(0x00000080, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_A) PORT_NAME("Service")
 
 	PORT_START("P2")
-	PORT_BIT(0x00000001, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_A)
-	PORT_BIT(0x00000002, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_S)
-	PORT_BIT(0x00000004, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_D)
-	PORT_BIT(0x00000008, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_F)
-	PORT_BIT(0x00000010, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_G)
-	PORT_BIT(0x00000020, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_H)
-	PORT_BIT(0x00000040, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_J)
-	PORT_BIT(0x00000080, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_K)
+	PORT_BIT(0x00000001, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_Q) PORT_NAME("Cashout")
+	PORT_BIT(0x00000002, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_W) PORT_NAME("1 Line")
+	PORT_BIT(0x00000004, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_E) PORT_NAME("3 Lines")
+	PORT_BIT(0x00000008, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_R) PORT_NAME("5 Lines")
+	PORT_BIT(0x00000010, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_T) PORT_NAME("7 Lines")
+	PORT_BIT(0x00000020, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_Y) PORT_NAME("9 Lines")
+	PORT_BIT(0x00000040, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_U) // unused
+	PORT_BIT(0x00000080, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_I) // unused
 
 	PORT_START("P3")
 	PORT_BIT(0x00000001, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_Z)
 	PORT_BIT(0x00000002, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_X)
-	PORT_BIT(0x00000004, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_C)
+	PORT_BIT(0x00000004, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_N)
 	PORT_BIT(0x00000008, IP_ACTIVE_HIGH, IPT_SERVICE)
-	PORT_BIT(0x00000010, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_V)
+	PORT_BIT(0x00000010, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_V) PORT_NAME("Reset Key")
 	PORT_BIT(0x00000020, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_B) PORT_TOGGLE PORT_NAME("Bill acceptor door")
 	PORT_BIT(0x00000040, IP_ACTIVE_LOW , IPT_KEYPAD)  PORT_CODE(KEYCODE_M) PORT_TOGGLE PORT_NAME("Main door")
 	PORT_BIT(0x00000080, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_CODE(KEYCODE_C) PORT_TOGGLE PORT_NAME("Cashbox door")
 
 	PORT_START("P4")
-	PORT_BIT(0x00000078, IP_ACTIVE_HIGH, IPT_SPECIAL) PORT_CUSTOM_MEMBER(DEVICE_SELF, aristmk5_state, coin_r, nullptr)
+	PORT_BIT(0x00000078, IP_ACTIVE_HIGH, IPT_SPECIAL) PORT_CUSTOM_MEMBER(DEVICE_SELF, aristmk5_state, coin_usa_r, nullptr)
 
 	PORT_START("P5")
-	PORT_BIT(0x00000008, IP_ACTIVE_LOW,  IPT_KEYPAD)  // Meters
+	PORT_BIT(0x00000008, IP_ACTIVE_LOW,  IPT_OTHER)   // Meters
+
+	PORT_START("P6")
+	PORT_BIT(0x00000002, IP_ACTIVE_LOW, IPT_OTHER)    // Battery
 
 	PORT_START("EXTRA")
-	PORT_BIT(0x00000001, IP_ACTIVE_HIGH, IPT_KEYPAD)  PORT_TOGGLE PORT_CODE(KEYCODE_L)   PORT_NAME("Logic door")
+	PORT_BIT(0x00000001, IP_ACTIVE_HIGH, IPT_OTHER)   PORT_TOGGLE PORT_CODE(KEYCODE_L)   PORT_NAME("Logic door")
 	PORT_BIT(0x00000002, IP_ACTIVE_HIGH, IPT_COIN1)   PORT_CHANGED_MEMBER(DEVICE_SELF, aristmk5_state, coin_start, nullptr)
+INPUT_PORTS_END
+
+static INPUT_PORTS_START( aristmk5 )
+	/* This simulates the ROM swap */
+	PORT_START("ROM_LOAD")
+	PORT_CONFNAME( 0x03, 0x03, "System Mode" )
+	PORT_CONFSETTING(    0x00, "USA Set Chip v4.04.09 Mode" )
+	PORT_CONFSETTING(    0x01, "USA Set Chip v4.04.00 Mode" )
+	PORT_CONFSETTING(    0x02, "USA Set Chip v4.02.04 Mode" )
+	PORT_CONFSETTING(    0x03, "Game Mode" )
+
+	PORT_START("P1")
+	PORT_BIT(0x00000001, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CODE(KEYCODE_J) PORT_NAME("Gamble")
+	PORT_BIT(0x00000002, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CODE(KEYCODE_K) PORT_NAME("Take Win")
+	PORT_BIT(0x00000004, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CODE(KEYCODE_H) PORT_NAME("Play 20 Lines / Black")
+	PORT_BIT(0x00000008, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CODE(KEYCODE_G) PORT_NAME("Play 15 Lines")
+	PORT_BIT(0x00000010, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CODE(KEYCODE_F) PORT_NAME("Play 10 Lines")
+	PORT_BIT(0x00000020, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CODE(KEYCODE_D) PORT_NAME("Play 5 Lines")
+	PORT_BIT(0x00000040, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CODE(KEYCODE_S) PORT_NAME("Play 1 Line / Red")
+	PORT_BIT(0x00000080, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CODE(KEYCODE_A) PORT_NAME("Reserve")
+	PORT_BIT(0x00000100, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CODE(KEYCODE_Q) PORT_NAME("Collect")
+	PORT_BIT(0x00000200, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CODE(KEYCODE_W) PORT_NAME("Bet 1 Credit / Heart")
+	PORT_BIT(0x00000400, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CODE(KEYCODE_E) PORT_NAME("Bet 2 Credits / Diamond")
+	PORT_BIT(0x00000800, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CODE(KEYCODE_R) PORT_NAME("Bet 3 Credits")
+	PORT_BIT(0x00001000, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CODE(KEYCODE_T) PORT_NAME("Bet 5 Credits / Club")
+	PORT_BIT(0x00002000, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CODE(KEYCODE_Y) PORT_NAME("Bet 10 Credits / Spade")
+	PORT_BIT(0x00004000, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CODE(KEYCODE_U) // unused
+	PORT_BIT(0x00008000, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CODE(KEYCODE_I) // unused
+	PORT_BIT(0x00ff0000, IP_ACTIVE_HIGH, IPT_UNUSED)
+
+	PORT_START("P2")
+	PORT_BIT(0x00000001, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CODE(KEYCODE_V) PORT_NAME("Reset Key")
+	PORT_BIT(0x00000002, IP_ACTIVE_HIGH, IPT_SERVICE)
+	PORT_BIT(0x00000004, IP_ACTIVE_HIGH, IPT_UNUSED)
+	PORT_BIT(0x00000008, IP_ACTIVE_HIGH, IPT_UNUSED)
+	PORT_BIT(0x00000010, IP_ACTIVE_HIGH, IPT_UNUSED)
+	PORT_BIT(0x00000020, IP_ACTIVE_HIGH, IPT_UNUSED)
+	PORT_BIT(0x00000040, IP_ACTIVE_HIGH, IPT_OTHER)     // Hopper full
+	PORT_BIT(0x00000080, IP_ACTIVE_HIGH, IPT_OTHER)     // Hopper empty
+	PORT_BIT(0x00000100, IP_ACTIVE_LOW,  IPT_KEYPAD)    PORT_CODE(KEYCODE_M) PORT_TOGGLE PORT_NAME("Main door optical sensor")
+	PORT_BIT(0x0000fe00, IP_ACTIVE_HIGH, IPT_UNUSED)    // Unused optical security sensors
+	PORT_BIT(0x00010000, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CODE(KEYCODE_L) PORT_TOGGLE PORT_NAME("Logic door")
+	PORT_BIT(0x00020000, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CODE(KEYCODE_Z) PORT_TOGGLE PORT_NAME("Topbox door")
+	PORT_BIT(0x00040000, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CODE(KEYCODE_X) PORT_TOGGLE PORT_NAME("Meter cage")
+	PORT_BIT(0x00080000, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CODE(KEYCODE_C) PORT_TOGGLE PORT_NAME("Cashbox door")
+	PORT_BIT(0x00100000, IP_ACTIVE_LOW,  IPT_KEYPAD)    PORT_CODE(KEYCODE_M) PORT_TOGGLE PORT_NAME("Main door")
+	PORT_BIT(0x00200000, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CODE(KEYCODE_B) PORT_TOGGLE PORT_NAME("Bill acceptor door")
+	PORT_BIT(0x00c00000, IP_ACTIVE_HIGH, IPT_UNUSED)    // Unused mechanical security switch
+
+	PORT_START("P3")
+	PORT_BIT(0x00000002, IP_ACTIVE_HIGH, IPT_KEYPAD)    PORT_CUSTOM_MEMBER(DEVICE_SELF, aristmk5_state, hopper_r, nullptr)
+	PORT_BIT(0x000000f8, IP_ACTIVE_HIGH, IPT_SPECIAL)   PORT_CUSTOM_MEMBER(DEVICE_SELF, aristmk5_state, coin_r, nullptr)
+
+	PORT_START("P6")
+	PORT_BIT(0x00000002, IP_ACTIVE_LOW, IPT_OTHER)          // Battery
+
+	PORT_START("EXTRA")
+	PORT_BIT(0x00000001, IP_ACTIVE_HIGH, IPT_COIN1)         PORT_CHANGED_MEMBER(DEVICE_SELF, aristmk5_state, coin_start, nullptr)
 INPUT_PORTS_END
 
 DRIVER_INIT_MEMBER(aristmk5_state,aristmk5)
 {
-	uint8_t *SRAM    = memregion("sram")->base();
-	uint8_t *SRAM_NZ = memregion("sram")->base();
-
 	archimedes_driver_init();
-
-	m_sram_bank->configure_entries(0, 4,    &SRAM[0],    0x20000);
-	m_sram_bank_nz->configure_entries(0, 4, &SRAM_NZ[0], 0x20000);
 
 	int do_debug = 0;
 
@@ -717,11 +958,11 @@ DRIVER_INIT_MEMBER(aristmk5_state,aristmk5)
 						{
 							calculatedchecksum += ROM[i];
 
-							//	printf("Using address %08x, value %08x, Calculated Checksum %08x\n", i*4,  ROM[i], calculatedchecksum);
+							//  printf("Using address %08x, value %08x, Calculated Checksum %08x\n", i*4,  ROM[i], calculatedchecksum);
 						}
 						else
 						{
-							//	printf("SKIPPING address %08x, value %08x, Calculated Checksum %08x\n", i*4,  ROM[i], calculatedchecksum);
+							//  printf("SKIPPING address %08x, value %08x, Calculated Checksum %08x\n", i*4,  ROM[i], calculatedchecksum);
 						}
 					}
 
@@ -786,16 +1027,19 @@ DRIVER_INIT_MEMBER(aristmk5_state,aristmk5)
 
 void aristmk5_state::machine_start()
 {
+	m_nvram->set_base(m_sram->base(), m_sram->bytes());
+
 	archimedes_init();
 
 	m_mk5_2KHz_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(aristmk5_state::mk5_2KHz_callback),this));
 	m_mk5_VSYNC_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(aristmk5_state::mk5_VSYNC_callback),this));
+	m_spi_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(aristmk5_state::spi_timer), this));
 }
 
 void aristmk5_state::machine_reset()
 {
 	archimedes_reset();
-	m_mk5_2KHz_timer->adjust(attotime::from_hz(1953.125)); // 8MHz / 4096
+	m_mk5_2KHz_timer->adjust(attotime::from_hz((double)MASTER_CLOCK / 9 / 4096)); // 8MHz / 4096
 	m_mk5_VSYNC_timer->adjust(attotime::from_hz(50000)); // default bit 1 & bit 2 == 0
 
 	m_ioc_regs[IRQ_STATUS_B] |= 0x40; //hack, set keyboard irq empty to be ON
@@ -820,13 +1064,14 @@ void aristmk5_state::machine_reset()
 
 	m_ldor_shift_reg = 0x55;
 	m_coin_start_cycles = 0;
+	m_sram_bank = 0;
+	m_hopper_test = 1;
+	m_coin_div = 0;
+	m_spi_mux = 0;
+	m_spi_latch = 0;
+	m_spi_bits = 0;
+	memset(m_spi_data, 0, sizeof(m_spi_data));
 }
-
-
-#if 0
-#define NVRAM_SIZE 256
-#define NVRAM_PAGE_SIZE 0   /* max size of one write request */
-#endif
 
 
 static MACHINE_CONFIG_START( aristmk5, aristmk5_state )
@@ -836,9 +1081,6 @@ static MACHINE_CONFIG_START( aristmk5, aristmk5_state )
 	MCFG_WATCHDOG_ADD("watchdog")
 	MCFG_WATCHDOG_TIME_INIT(attotime::from_seconds(2))  /* 1.6 - 2 seconds */
 
-//  MCFG_I2CMEM_ADD("i2cmem")
-//  MCFG_I2CMEM_PAGE_SIZE(NVRAM_PAGE_SIZE)
-//  MCFG_I2CMEM_DATA_SIZE(NVRAM_SIZE)
 	/* TODO: this isn't supposed to access a keyboard ... */
 	MCFG_DEVICE_ADD("kart", AAKART, 12000000/128) // TODO: frequency
 
@@ -854,31 +1096,38 @@ static MACHINE_CONFIG_START( aristmk5, aristmk5_state )
 	MCFG_EEPROM_SERIAL_93C56_ADD("eeprom0")
 	MCFG_EEPROM_SERIAL_93C56_ADD("eeprom1")
 
+	MCFG_NVRAM_ADD_NO_FILL("nvram")
+
 	// TL16C452FN U71
 	MCFG_DEVICE_ADD("uart_0a", NS16450, MASTER_CLOCK / 9)
-//	MCFG_INS8250_OUT_INT_CB(WRITELINE(aristmk5_state, uart_irq_callback))
+	MCFG_INS8250_OUT_INT_CB(DEVWRITELINE("uart_irq", input_merger_device, in0_w))
 	MCFG_DEVICE_ADD("uart_0b", NS16450, MASTER_CLOCK / 9)
-//	MCFG_INS8250_OUT_INT_CB(WRITELINE(aristmk5_state, uart_irq_callback))
+	MCFG_INS8250_OUT_INT_CB(DEVWRITELINE("uart_irq", input_merger_device, in1_w))
 
 	// TL16C452FN U72
 	MCFG_DEVICE_ADD("uart_1a", NS16450, MASTER_CLOCK / 9)
-//	MCFG_INS8250_OUT_INT_CB(WRITELINE(aristmk5_state, uart_irq_callback))
+	MCFG_INS8250_OUT_INT_CB(DEVWRITELINE("uart_irq", input_merger_device, in2_w))
 	MCFG_DEVICE_ADD("uart_1b", NS16450, MASTER_CLOCK / 9)
-//	MCFG_INS8250_OUT_INT_CB(WRITELINE(aristmk5_state, uart_irq_callback))
+	MCFG_INS8250_OUT_INT_CB(DEVWRITELINE("uart_irq", input_merger_device, in3_w))
 
 	// COMM port 4 - 5
 	MCFG_DEVICE_ADD("uart_2a", NS16450, MASTER_CLOCK / 9)
-//	MCFG_INS8250_OUT_INT_CB(WRITELINE(aristmk5_state, uart_irq_callback))
+//  MCFG_INS8250_OUT_INT_CB(WRITELINE(aristmk5_state, uart_irq_callback))
 	MCFG_DEVICE_ADD("uart_2b", NS16450, MASTER_CLOCK / 9)
-//	MCFG_INS8250_OUT_INT_CB(WRITELINE(aristmk5_state, uart_irq_callback))
+//  MCFG_INS8250_OUT_INT_CB(WRITELINE(aristmk5_state, uart_irq_callback))
 
 	// COMM port 6 - 7
 	MCFG_DEVICE_ADD("uart_3a", NS16450, MASTER_CLOCK / 9)
-//	MCFG_INS8250_OUT_INT_CB(WRITELINE(aristmk5_state, uart_irq_callback))
+//  MCFG_INS8250_OUT_INT_CB(WRITELINE(aristmk5_state, uart_irq_callback))
 	MCFG_DEVICE_ADD("uart_3b", NS16450, MASTER_CLOCK / 9)
-//	MCFG_INS8250_OUT_INT_CB(WRITELINE(aristmk5_state, uart_irq_callback))
+//  MCFG_INS8250_OUT_INT_CB(WRITELINE(aristmk5_state, uart_irq_callback))
+
+	MCFG_INPUT_MERGER_ACTIVE_HIGH("uart_irq")
+	MCFG_INPUT_MERGER_OUTPUT_HANDLER(WRITELINE(aristmk5_state, uart_irq_callback))
 
 	MCFG_DS1302_ADD("rtc", XTAL_32_768kHz)
+
+	MCFG_TICKET_DISPENSER_ADD("hopper", attotime::from_msec(100), TICKET_MOTOR_ACTIVE_HIGH, TICKET_STATUS_ACTIVE_LOW)
 
 	MCFG_SPEAKER_STANDARD_MONO("speaker")
 	MCFG_SOUND_ADD("dac0", DAC_16BIT_R2R_TWOS_COMPLEMENT, 0) MCFG_SOUND_ROUTE(0, "speaker", 0.1) // unknown DAC
@@ -900,9 +1149,24 @@ static MACHINE_CONFIG_START( aristmk5, aristmk5_state )
 	MCFG_SOUND_ROUTE_EX(0, "dac7", 1.0, DAC_VREF_POS_INPUT) MCFG_SOUND_ROUTE_EX(0, "dac7", -1.0, DAC_VREF_NEG_INPUT)
 MACHINE_CONFIG_END
 
+
+static MACHINE_CONFIG_DERIVED( aristmk5_touch, aristmk5 )
+	MCFG_DEVICE_MODIFY("uart_0a")
+	MCFG_INS8250_OUT_TX_CB(DEVWRITELINE("microtouch", microtouch_device, rx))
+
+	MCFG_MICROTOUCH_ADD("microtouch", 2400, DEVWRITELINE("uart_0a", ins8250_uart_device, rx_w))
+MACHINE_CONFIG_END
+
 static MACHINE_CONFIG_DERIVED( aristmk5_usa, aristmk5 )
 	MCFG_CPU_MODIFY("maincpu")
 	MCFG_CPU_PROGRAM_MAP(aristmk5_usa_map)
+MACHINE_CONFIG_END
+
+static MACHINE_CONFIG_DERIVED( aristmk5_usa_touch, aristmk5_usa )
+	MCFG_DEVICE_MODIFY("uart_0a")
+	MCFG_INS8250_OUT_TX_CB(DEVWRITELINE("microtouch", microtouch_device, rx))
+
+	MCFG_MICROTOUCH_ADD("microtouch", 2400, DEVWRITELINE("uart_0a", ins8250_uart_device, rx_w))
 MACHINE_CONFIG_END
 
 #define ARISTOCRAT_MK5_BIOS \
@@ -922,6 +1186,22 @@ MACHINE_CONFIG_END
 	ROM_LOAD( "a562840.u22",  0x000400, 0x000157, CRC(941d4cdb) SHA1(1ca091fba69e92f262dbb3d40f515703c8981793) ) \
 	ROM_REGION16_BE( 0x100, "eeprom0", ROMREGION_ERASEFF ) \
 	ROM_REGION16_BE( 0x100, "eeprom1", ROMREGION_ERASEFF ) \
+
+#define ARISTOCRAT_MK5_BIOS_HAVE_EEPROMS \
+	ROM_REGION( 0x400000, "set_4.04.09", ROMREGION_ERASEFF ) /* setchip v4.04.08 4meg */ \
+	ROM_LOAD32_WORD( "setchip v4.04.09.u7",  0x000000, 0x80000, CRC(e8e8dc75) SHA1(201fe95256459ce34fdb6f7498135ab5016d07f3) ) \
+	ROM_LOAD32_WORD( "setchip v4.04.09.u11", 0x000002, 0x80000, CRC(ff7a9035) SHA1(4352c4336e61947c555fdc80c61f944076f64b64) ) \
+	ROM_REGION( 0x400000, "set_4.04.00", ROMREGION_ERASEFF ) /* setchip v4.04.00 4meg 42pin */ \
+	ROM_LOAD32_WORD( "setchip v4.04.00.u7",  0x000000, 0x80000, CRC(2453137e) SHA1(b59998e75ae3924da16faf47b9cfe9afd60d810c) ) \
+	ROM_LOAD32_WORD( "setchip v4.04.00.u11", 0x000002, 0x80000, CRC(82dfa12a) SHA1(86fd0f0ad8d5d1bc503392a40bbcdadb055b2765) ) \
+	ROM_REGION( 0x400000, "set_4.02.04", ROMREGION_ERASEFF ) /* setchip v4.02.04 */ \
+	ROM_LOAD32_WORD( "setchip v4.02.04.u7",  0x000000, 0x80000, CRC(5a254b22) SHA1(8444f237b392df2a3cb42ea349e7af32f47dd544) ) \
+	ROM_LOAD32_WORD( "setchip v4.02.04.u11", 0x000002, 0x80000, CRC(def36617) SHA1(c7ba5b08e884a8fb36c9fb51c08e243e32c81f89) ) \
+	/* GALs */ \
+	ROM_REGION( 0x600, "gals", 0 ) \
+	ROM_LOAD( "a562837.u36",  0x000000, 0x000157, CRC(1f269234) SHA1(29940dd50fb55c632935f62ff44ca724379c7a43) ) \
+	ROM_LOAD( "a562838.u65",  0x000200, 0x000157, CRC(f2f3c40a) SHA1(b795dfa5cc4e8127c3f3a0906664910d1325ec92) ) \
+	ROM_LOAD( "a562840.u22",  0x000400, 0x000157, CRC(941d4cdb) SHA1(1ca091fba69e92f262dbb3d40f515703c8981793) ) \
 
 
 ROM_START( aristmk5 )
@@ -943,12 +1223,12 @@ ROM_END
 ROM_START( adonis )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000bf8
-		0x000000-0x05eb1b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xfc98a056
-			Calculated Checksum 0xfc98a056  (OK)
-		0x05eb1c-0x10fa8b is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x05eb1c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000bf8
+	    0x000000-0x05eb1b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xfc98a056
+	        Calculated Checksum 0xfc98a056  (OK)
+	    0x05eb1c-0x10fa8b is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x05eb1c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "0200751v.u7",  0x000000, 0x80000, CRC(ab386ab0) SHA1(56c5baea4272866a9fe18bdc371a49f155251f86) )
@@ -978,12 +1258,12 @@ ROM_END
 ROM_START( adonisa )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000bf8
-		0x000000-0x05cdc3 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x91f374c7
-			Calculated Checksum 0x91f374c7  (OK)
-		0x05cdc4-0x11000b is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x05cdc4-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included			
+	    Checksum code found at 0x000bf8
+	    0x000000-0x05cdc3 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x91f374c7
+	        Calculated Checksum 0x91f374c7  (OK)
+	    0x05cdc4-0x11000b is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x05cdc4-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "0100751v.u7",  0x000000, 0x80000, CRC(ca3e97db) SHA1(bd0a4402e57891899d92ea85a87fb8925a44f706) )
@@ -1014,12 +1294,12 @@ ROM_END
 ROM_START( adonisu )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000d18
-		0x000000-0x0e8a7b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xe6715f98
-			Calculated Checksum 0xc80cd95e  (BAD)
-		0x0e8a7c-0x1c5f47 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x0e8a7c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000d18
+	    0x000000-0x0e8a7b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xe6715f98
+	        Calculated Checksum 0xc80cd95e  (BAD)
+	    0x0e8a7c-0x1c5f47 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x0e8a7c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	// the checksum only covers part of the first 2 roms, marked all as BAD_DUMP because it can't be trusted without a full redump.
@@ -1038,11 +1318,11 @@ ROM_START( adonisce )
 	ARISTOCRAT_MK5_BIOS
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	/*
-		Checksum code found at 0x000c44
-		0x000000-0x06ddab is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x07c97aad
-			Calculated Checksum 0x07c97aad  (OK)
-		0x06ddac-0x2a41cb is the non-Checksummed range
+	    Checksum code found at 0x000c44
+	    0x000000-0x06ddab is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x07c97aad
+	        Calculated Checksum 0x07c97aad  (OK)
+	    0x06ddac-0x2a41cb is the non-Checksummed range
 	*/
 	ROM_LOAD32_WORD("0201005v.u7",  0x0000000, 0x0080000, CRC(32149323) SHA1(abfc6a8518a39528db3700c2cb558e925ceeda6d) )
 	ROM_LOAD32_WORD("0201005v.u11", 0x0000002, 0x0080000, CRC(309b0b55) SHA1(669568031d305b29395345a26a5d004d83881433) )
@@ -1060,12 +1340,12 @@ ROM_END
 ROM_START( baddog )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000ae4
-		0x000000-0x056f3f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x15ac4012
-			Calculated Checksum 0x15ac4012  (OK)
-		0x056f40-0x2fb607 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x056f40-0x2fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000ae4
+	    0x000000-0x056f3f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x15ac4012
+	        Calculated Checksum 0x15ac4012  (OK)
+	    0x056f40-0x2fb607 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x056f40-0x2fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
@@ -1085,12 +1365,12 @@ ROM_END
 ROM_START( blackpnt )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000bb0
-		0x000000-0x056d8b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xeebac434
-			Calculated Checksum 0xeebac434  (OK)
-		0x056d8c-0x138557 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x056d8c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included		
+	    Checksum code found at 0x000bb0
+	    0x000000-0x056d8b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xeebac434
+	        Calculated Checksum 0xeebac434  (OK)
+	    0x056d8c-0x138557 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x056d8c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0200818v.u7",  0x0000000, 0x0080000, CRC(eed76145) SHA1(6a40a6ba2ce320a37b086dc4916c92c8e38c065e) )
@@ -1107,11 +1387,11 @@ ROM_END
 ROM_START( bootsctn )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		0x000000-0x06c177 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xb0980753
-			Calculated Checksum 0xb0980753  (OK)
-		0x06c178-0x384a9b is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x06c178-0x3fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    0x000000-0x06c177 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xb0980753
+	        Calculated Checksum 0xb0980753  (OK)
+	    0x06c178-0x384a9b is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x06c178-0x3fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0100812v.u7",  0x0000000, 0x0080000, CRC(f8e12462) SHA1(82a25757b2146204b86e557b8f1c45280e0668a8) )
@@ -1136,11 +1416,11 @@ ROM_END
 ROM_START( bootsctnu )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000d08
-		0x000000-0x0941ab is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xdf68cecf
-			Calculated Checksum 0xed145d01  (BAD)
-		0x0941ac-0x328187 is the non-Checksummed range (suspicious endpoint)
+	    Checksum code found at 0x000d08
+	    0x000000-0x0941ab is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xdf68cecf
+	        Calculated Checksum 0xed145d01  (BAD)
+	    0x0941ac-0x328187 is the non-Checksummed range (suspicious endpoint)
 	*/
 
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
@@ -1163,11 +1443,11 @@ ROM_END
 ROM_START( bumblbug )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b68
-		0x000000-0x05b94b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xf5d418fe
-			Calculated Checksum 0xf5d418fe  (OK)
-		0x05b94c-0x0fc69f is the non-Checksummed range (unusual endpoint)
+	    Checksum code found at 0x000b68
+	    0x000000-0x05b94b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xf5d418fe
+	        Calculated Checksum 0xf5d418fe  (OK)
+	    0x05b94c-0x0fc69f is the non-Checksummed range (unusual endpoint)
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0200510v.u7",  0x0000000, 0x0080000, CRC(d4cfce73) SHA1(735c385779afe55e521dbfe9ebfdc55fe3346349) )
@@ -1183,12 +1463,12 @@ ROM_END
 ROM_START( bumblbugql )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000ac8
-		0x000000-0x05554b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x66b20ae6
-			Calculated Checksum 0x66b20ae6  (OK)
-		0x05554c-0x1c4e2b is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x05554c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000ac8
+	    0x000000-0x05554b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x66b20ae6
+	        Calculated Checksum 0x66b20ae6  (OK)
+	    0x05554c-0x1c4e2b is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x05554c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "0200456v.u7",  0x000000, 0x80000, CRC(f04dd78b) SHA1(443057fc3e02406d46cf68f95e85e5a0fd8e7b1e) )
@@ -1209,12 +1489,12 @@ ROM_END
 ROM_START( bumblbugu )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000d08
-		0x000000-0x0b1f47 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x9f3936f9
-			Calculated Checksum 0x16f5c058  (BAD)
-		0x0b1f48-0x183c1f is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x0b1f48-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included		
+	    Checksum code found at 0x000d08
+	    0x000000-0x0b1f47 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x9f3936f9
+	        Calculated Checksum 0x16f5c058  (BAD)
+	    0x0b1f48-0x183c1f is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x0b1f48-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	// the checksum only covers part of the first 2 roms, marked all as BAD_DUMP because it can't be trusted without a full redump.
@@ -1232,12 +1512,12 @@ ROM_END
 ROM_START( buttdeli )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000adc
-		0x000000-0x04477f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x19143954
-			Calculated Checksum 0x19143954  (OK)
-		0x044780-0x1c713b is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x044780-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000adc
+	    0x000000-0x04477f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x19143954
+	        Calculated Checksum 0x19143954  (OK)
+	    0x044780-0x1c713b is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x044780-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0200143v.u7",  0x0000000, 0x0080000, CRC(7f69cdfc) SHA1(1241741d21334df10d60080555824a87eae93db3) )
@@ -1255,12 +1535,12 @@ ROM_START( cashcat )
 	ARISTOCRAT_MK5_BIOS
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	/*
-		Checksum code found at 0x000adc
-		0x000000-0x04477f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x19143954
-			Calculated Checksum 0x19143954  (OK)
-		0x044780-0x1c713b is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x044780-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000adc
+	    0x000000-0x04477f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x19143954
+	        Calculated Checksum 0x19143954  (OK)
+	    0x044780-0x1c713b is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x044780-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_LOAD32_WORD("0300863v.u7",  0x0000000, 0x0080000, CRC(de0f0202) SHA1(994f6c47b1e2e0e133853dc69b189752104486e4) )
 	ROM_LOAD32_WORD("0300863v.u11", 0x0000002, 0x0080000, CRC(e60e8bd1) SHA1(ffaa7be8968047b9ee54a117d273a14cbca41028) )
@@ -1276,12 +1556,12 @@ ROM_END
 ROM_START( cashcham )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000ae0
-		0x000000-0x055f83 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x159a2aa3
-			Calculated Checksum 0x159a2aa3  (OK)
-		0x055f84-0x1dbdd7 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x055f84-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000ae0
+	    0x000000-0x055f83 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x159a2aa3
+	        Calculated Checksum 0x159a2aa3  (OK)
+	    0x055f84-0x1dbdd7 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x055f84-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0100438v.u7",  0x0000000, 0x0080000, CRC(c942ef22) SHA1(4f56674f749602ae928832f98a641e680af8989b) )
@@ -1297,12 +1577,12 @@ ROM_END
 ROM_START( cashchama )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b00
-		0x000000-0x05ca1b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xa32ccd1b
-			Calculated Checksum 0xa32ccd1b  (OK)
-		0x05ca1c-0x1dbdd7 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x05ca1c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included	
+	    Checksum code found at 0x000b00
+	    0x000000-0x05ca1b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xa32ccd1b
+	        Calculated Checksum 0xa32ccd1b  (OK)
+	    0x05ca1c-0x1dbdd7 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x05ca1c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0200437v.u7",  0x0000000, 0x0080000, CRC(a287fd5a) SHA1(7d06f679e5ff38e0989819410856361962c93e42) )
@@ -1335,12 +1615,12 @@ ROM_END
 ROM_START( cashchamu )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000d08
-		0x000000-0x09b413 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x741cd9a0
-			Calculated Checksum 0x740e5ad7  (BAD)
-		0x09b414-0x1b550b is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x09b414-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000d08
+	    0x000000-0x09b413 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x741cd9a0
+	        Calculated Checksum 0x740e5ad7  (BAD)
+	    0x09b414-0x1b550b is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x09b414-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	// the checksum only covers part of the first 2 roms, marked all as BAD_DUMP because it can't be trusted without a full redump.
@@ -1358,12 +1638,12 @@ ROM_END
 ROM_START( cashcra5 )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b80
-		0x000000-0x06076b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x2c872d3e
-			Calculated Checksum 0x2c872d3e  (OK)
-		0x06076c-0x1a2ecf is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x06076c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included		
+	    Checksum code found at 0x000b80
+	    0x000000-0x06076b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x2c872d3e
+	        Calculated Checksum 0x2c872d3e  (OK)
+	    0x06076c-0x1a2ecf is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x06076c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0300467v.u7",  0x0000000, 0x0080000, CRC(b0ff2aae) SHA1(b05667ffe952cae7a6581398552db6e47921090e) )
@@ -1378,17 +1658,17 @@ ROM_END
 
 
 // 630 - 10 Credit Multiplier / 9 Line Multiline.
-// The Chariot Challenge - NSW/ACT - A - 10/08/98.
+// The Chariot Challenge - Venezuela - A - 10/08/98.
 // 04J00714
 ROM_START( chariotc )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000ba8
-		0x000000-0x07dbb7 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x203ac6e8
-			Calculated Checksum 0x203ac6e8  (OK)
-		0x07dbb8-0x1b3787 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x07dbb8-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000ba8
+	    0x000000-0x07dbb7 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x203ac6e8
+	        Calculated Checksum 0x203ac6e8  (OK)
+	    0x07dbb8-0x1b3787 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x07dbb8-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "04j00714.u7",  0x000000, 0x80000, CRC(2f3a1af7) SHA1(e1448116a81687cb79dd380dfbc8decf1f83e649) )
@@ -1405,12 +1685,12 @@ ROM_END
 ROM_START( chariotca )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000ba8
-		0x000000-0x0603fb is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xbe63efe6
-			Calculated Checksum 0xbe63efe6  (OK)
-		0x0603fc-0x17a75b is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x0603fc-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000ba8
+	    0x000000-0x0603fb is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xbe63efe6
+	        Calculated Checksum 0xbe63efe6  (OK)
+	    0x0603fc-0x17a75b is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x0603fc-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0100787v.u7",  0x0000000, 0x0080000, CRC(845f9913) SHA1(df6121290b30ff4a9c2d0e690cf8e7797e9a8612) )
@@ -1427,12 +1707,12 @@ ROM_END
 ROM_START( checkma5 )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000c38
-		0x000000-0x071847 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x0de9b6ca
-			Calculated Checksum 0x0de9b6ca  (OK)
-		0x071848-0x25ff4b is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x071848-0x2fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000c38
+	    0x000000-0x071847 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x0de9b6ca
+	        Calculated Checksum 0x0de9b6ca  (OK)
+	    0x071848-0x25ff4b is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x071848-0x2fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("01j00681.u7",  0x0000000, 0x0080000, CRC(059b940e) SHA1(f637508dafbd37169429c495a893addbc6d28834) )
@@ -1451,11 +1731,11 @@ ROM_END
 ROM_START( chickna5 )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b80
-		0x000000-0x053fb7 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x8afbaabc
-			Calculated Checksum 0x8afbaabc  (OK)
-		0x053fb8-0x2fda37 is the non-Checksummed range (unusual endpoint)
+	    Checksum code found at 0x000b80
+	    0x000000-0x053fb7 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x8afbaabc
+	        Calculated Checksum 0x8afbaabc  (OK)
+	    0x053fb8-0x2fda37 is the non-Checksummed range (unusual endpoint)
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0100351v.u7",  0x0000000, 0x0080000, CRC(be69c21c) SHA1(8b546727b5972f33d077db0a64aa41a7fde6d417) )
@@ -1477,23 +1757,16 @@ ROM_END
 // All devices are 27c4002 instead of 27c4096.
 ROM_START( chickna5u )
 	ARISTOCRAT_MK5_BIOS
-	/*
-		Checksum code found at 0x000d08
-		0x000000-0x0a6917 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x0d44c6b0
-			Calculated Checksum 0xc47bc6b0  (BAD)
-		0x0a6918-0x35040b is the non-Checksummed range (unusual endpoint)
-	*/
+
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
-	// the checksum only covers part of the first 2 roms, marked all as BAD_DUMP because it can't be trusted without a full redump.
-	ROM_LOAD32_WORD( "rhg073003.u7",  0x000000, 0x80000, BAD_DUMP CRC(ca196b37) SHA1(6b204204c1574439ccea1b6145d867a73bad304f) )  // 92.588%
-	ROM_LOAD32_WORD( "rhg073003.u11", 0x000002, 0x80000, BAD_DUMP CRC(b0d7be28) SHA1(6998dce808bf7970500b9e1ce6efed3940ee2d63) )  // 92.588%
-	ROM_LOAD32_WORD( "rhg073003.u8",  0x100000, 0x80000, BAD_DUMP CRC(80e3e34c) SHA1(3ad73c5fc21c4d9647ea514bf367073bbeb981a9) )  // base
-	ROM_LOAD32_WORD( "rhg073003.u12", 0x100002, 0x80000, BAD_DUMP CRC(63d5ec8e) SHA1(dca76342ecee6843e6fc656aafc8ee2e4d19fd65) )  // base
-	ROM_LOAD32_WORD( "rhg073003.u9",  0x200000, 0x80000, BAD_DUMP CRC(662ff210) SHA1(bbd2410fa2cd67e327981c3b2e16342fb9393401) )  // base
-	ROM_LOAD32_WORD( "rhg073003.u13", 0x200002, 0x80000, BAD_DUMP CRC(c3cef8ae) SHA1(4e65787d61387b511972e514047528495e1de11c) )  // base
-	ROM_LOAD32_WORD( "rhg073003.u10", 0x300000, 0x80000, BAD_DUMP CRC(8b3f7d6b) SHA1(7f1a04556c448976145652b05b690142376764d4) )  // base
-	ROM_LOAD32_WORD( "rhg073003.u14", 0x300002, 0x80000, BAD_DUMP CRC(240f7759) SHA1(1fa5ba0185b027101dae207ec5d28b07d3d73fc2) )  // base
+	ROM_LOAD32_WORD( "rhg073003.u7",  0x000000, 0x080000, CRC(06558129) SHA1(be726c0d35776faf1ecd20eb0a193e68a1fb1a84) )
+	ROM_LOAD32_WORD( "rhg073003.u11", 0x000002, 0x080000, CRC(0eadf5d4) SHA1(b783f6e1911fc098d1b4d1d8c75862e031078e5b) )
+	ROM_LOAD32_WORD( "rhg073003.u8",  0x100000, 0x080000, CRC(683e96bc) SHA1(bca8e87bea9f7044fa29dc4518e2ac5b429e3313) )
+	ROM_LOAD32_WORD( "rhg073003.u12", 0x100002, 0x080000, CRC(8313b03b) SHA1(d2a91bae8063d89ec9a1edab6df3e6711719d2c2) )
+	ROM_LOAD32_WORD( "rhg073003.u9",  0x200000, 0x080000, CRC(9c08aefa) SHA1(fe3ffa8eb308ab216cc08dd2ce51113b4ef74c4a) )
+	ROM_LOAD32_WORD( "rhg073003.u13", 0x200002, 0x080000, CRC(69fd4f89) SHA1(4e0469caecf9293197a4a5de960eb9dcfee39ca3) )
+	ROM_LOAD32_WORD( "rhg073003.u10", 0x300000, 0x080000, CRC(9aae49d7) SHA1(5cf87b747ea7561766fe0ffc15967fea657b252b) )
+	ROM_LOAD32_WORD( "rhg073003.u14", 0x300002, 0x080000, CRC(240f7759) SHA1(1fa5ba0185b027101dae207ec5d28b07d3d73fc2) )
 
 	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
 	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
@@ -1504,12 +1777,12 @@ ROM_END
 ROM_START( chickna5qld )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000ac8
-		0x000000-0x05f193 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xeff4424a
-			Calculated Checksum 0xeff4424a  (OK)
-		0x05f194-0x3a9a7f is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x05f194-0x3fffff is the non-Checksummed range if the additional vectors? at the end are included	
+	    Checksum code found at 0x000ac8
+	    0x000000-0x05f193 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xeff4424a
+	        Calculated Checksum 0xeff4424a  (OK)
+	    0x05f194-0x3a9a7f is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x05f194-0x3fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "0200530v.u7",  0x000000, 0x80000, CRC(2d53de96) SHA1(6f2ed8f68d0474021a302d7e06ba869c0f1f7262) )
@@ -1529,12 +1802,12 @@ ROM_END
 ROM_START( coralrc2 )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000be8
-		0x000000-0x05ba63 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x12fce303
-			Calculated Checksum 0x12fce303  (OK)
-		0x05ba64-0x12b3e3 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x05ba64-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000be8
+	    0x000000-0x05ba63 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x12fce303
+	        Calculated Checksum 0x12fce303  (OK)
+	    0x05ba64-0x12b3e3 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x05ba64-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0100919v.u7",  0x0000000, 0x0080000, CRC(02c430c3) SHA1(f4bae1aa5437af1df2a04f700da044bc4fb652b7) )
@@ -1551,12 +1824,12 @@ ROM_END
 ROM_START( cuckoo )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b10
-		0x000000-0x05f63f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x6aa5ad46
-			Calculated Checksum 0x6aa5ad46  (OK)
-		0x05f640-0x1b1deb is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x05f640-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000b10
+	    0x000000-0x05f63f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x6aa5ad46
+	        Calculated Checksum 0x6aa5ad46  (OK)
+	    0x05f640-0x1b1deb is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x05f640-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0200753v.u7",  0x0000000, 0x0080000, CRC(5c7ef84a) SHA1(59563a076ecf391ac1779e0dcd530a1ea158a4e3) )
@@ -1574,14 +1847,14 @@ ROM_END
 // CUCKOO - Export C - 02/02/00.
 // All devices are 27c4002 instead of 27c4096.
 ROM_START( cuckoou )
-	ARISTOCRAT_MK5_BIOS
+	ARISTOCRAT_MK5_BIOS_HAVE_EEPROMS
 	/*
-		Checksum code found at 0x000d18
-		0x000000-0x0a588b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x9e544942
-			Calculated Checksum 0x9e544942  (OK)
-		0x0a588c-0x184b17 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x0a588c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000d18
+	    0x000000-0x0a588b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x9e544942
+	        Calculated Checksum 0x9e544942  (OK)
+	    0x0a588c-0x184b17 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x0a588c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "chg1195.u7",  0x000000, 0x80000, CRC(0bd17338) SHA1(b8f467bdf8d76533a2b7d44fe93be414f25a3c31) )
@@ -1592,18 +1865,31 @@ ROM_START( cuckoou )
 	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
 	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
 	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+
+	ROM_REGION16_BE( 0x100, "eeprom0", 0 )
+	ROM_LOAD16_WORD_SWAP( "eeprom0",      0x000000, 0x000100, CRC(fea8a821) SHA1(c744cac6af7621524fc3a2b0a9a135a32b33c81b) )
+
+	ROM_REGION16_BE( 0x100, "eeprom1", 0 )
+	ROM_LOAD16_WORD_SWAP( "eeprom1",      0x000000, 0x000100, CRC(415b9c77) SHA1(86a3b3aabd81f5fcf767dd53f7034f7d58f2020e) )
+
+	ROM_REGION( 0x80000, "nvram", 0 )
+	ROM_LOAD( "nvram",        0x000000, 0x080000, CRC(64c895fe) SHA1(12c75338dd1b2260d0581744cef1b705c718727f) )
+
+	ROM_REGION( 0x20, "rtc", 0 )
+	ROM_LOAD( "rtc",          0x000000, 0x00001f, CRC(6909acb0) SHA1(6a4589599cd1c477e916474e7b029e9a4e92019b) )
+
 ROM_END
 
 
 ROM_START( dstbloom )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000adc
-		0x000000-0x0431d3 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x3a2c9103
-			Calculated Checksum 0x3a2c9103  (OK)
-		0x0431d4-0x1cb32b is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x0431d4-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000adc
+	    0x000000-0x0431d3 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x3a2c9103
+	        Calculated Checksum 0x3a2c9103  (OK)
+	    0x0431d4-0x1cb32b is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x0431d4-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0200111v.u7",  0x0000000, 0x0080000, CRC(fbfaa3fe) SHA1(3f915261503fc97eb556422e9ccdac81372c04cc) )
@@ -1620,11 +1906,11 @@ ROM_START( dmdfever )
 	ARISTOCRAT_MK5_BIOS
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	/*
-		Checksum code found at 0x000ad8
-		0x000000-0x054f3f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x87d3b331
-			Calculated Checksum 0x87d3b331  (OK)
-		0x054f40-0x0ef137 is the non-Checksummed range (unusual endpoint)	
+	    Checksum code found at 0x000ad8
+	    0x000000-0x054f3f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x87d3b331
+	        Calculated Checksum 0x87d3b331  (OK)
+	    0x054f40-0x0ef137 is the non-Checksummed range (unusual endpoint)
 	*/
 	ROM_LOAD32_WORD( "0200302v.u7",  0x000000, 0x80000, CRC(d90032f9) SHA1(9c34e626168bdfa3ff2722d9ff1970d826135cf7) )
 	ROM_LOAD32_WORD( "0200302v.u11", 0x000002, 0x80000, CRC(29620f05) SHA1(172b6226c443931f0c4ddc44a63c8fc0e6be3824) )
@@ -1637,12 +1923,12 @@ ROM_END
 ROM_START( diamdove )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b78
-		0x000000-0x063a9f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x2dfce931
-			Calculated Checksum 0x2dfce931  (OK)
-		0x063aa0-0x273ea3 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x063aa0-0x2fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000b78
+	    0x000000-0x063a9f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x2dfce931
+	        Calculated Checksum 0x2dfce931  (OK)
+	    0x063aa0-0x273ea3 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x063aa0-0x2fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0101018v.u7",  0x0000000, 0x0080000, CRC(2ebb3704) SHA1(42567d873d6ab9221d09e5449fa57b557677d2ab) )
@@ -1676,11 +1962,11 @@ ROM_END
 ROM_START( dolphntr )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b08
-		0x000000-0x05c367 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x14ccd8a1
-			Calculated Checksum 0x14ccd8a1  (OK)
-		0x05c368-0x0fe787 is the non-Checksummed range (unusual endpoint)	
+	    Checksum code found at 0x000b08
+	    0x000000-0x05c367 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x14ccd8a1
+	        Calculated Checksum 0x14ccd8a1  (OK)
+	    0x05c368-0x0fe787 is the non-Checksummed range (unusual endpoint)
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "0200424v.u7",  0x000000, 0x80000, CRC(5dd88306) SHA1(ee8ec7d123d057e8df9be0e8dadecea7dab7aafd) )
@@ -1695,12 +1981,12 @@ ROM_END
 ROM_START( dolphntra )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b08
-		0x000000-0x053897 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x81967fa4
-			Calculated Checksum 0x81967fa4  (OK)
-		0x053898-0x1cac2f is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x053898-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000b08
+	    0x000000-0x053897 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x81967fa4
+	        Calculated Checksum 0x81967fa4  (OK)
+	    0x053898-0x1cac2f is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x053898-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "0100424v.u7",  0x000000, 0x80000, CRC(657faef7) SHA1(09e1f9d461e855c10cf8b825ef83dd3e7db65b43) )
@@ -1717,12 +2003,12 @@ ROM_END
 ROM_START( dolphntrb )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b20
-		0x000000-0x0536c3 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xeee6e6fc
-			Calculated Checksum 0xeee6e6fc  (OK)
-		0x0536c4-0x1ce293 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x0536c4-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included		
+	    Checksum code found at 0x000b20
+	    0x000000-0x0536c3 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xeee6e6fc
+	        Calculated Checksum 0xeee6e6fc  (OK)
+	    0x0536c4-0x1ce293 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x0536c4-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0100388v.u7",  0x0000000, 0x0080000, CRC(7463b5f6) SHA1(89e5cf8143d0b4ed54aa2c9bd8840f0aba19322e) )
@@ -1735,19 +2021,37 @@ ROM_START( dolphntrb )
 	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
 ROM_END
 
+ROM_START( dolphntrce )
+	ARISTOCRAT_MK5_BIOS
+
+	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
+	ROM_LOAD32_WORD("ahg1606.u7",  0x0000000, 0x0080000, CRC(d468edf7) SHA1(100672d09184e06130ce253749bd9e20ee0a06d4) )
+	ROM_LOAD32_WORD("ahg1606.u11", 0x0000002, 0x0080000, CRC(0fe64635) SHA1(b504216e59984951b46701019f87cad759ab60f2) )
+	ROM_LOAD32_WORD("ahg1606.u8",  0x0100000, 0x0080000, CRC(a53a2de4) SHA1(1741af795f88e867021f3c08d8990611d893a8e8) )
+	ROM_LOAD32_WORD("ahg1606.u12", 0x0100002, 0x0080000, CRC(c2e268a2) SHA1(6aeb27ae844dbf495c64be210bcac97f4c7a6969) )
+	ROM_LOAD32_WORD("ahg1606.u9",  0x0200000, 0x0080000, CRC(fe9146f7) SHA1(95bef8910d213d588d45ec2639828a31aab6603c) )
+	ROM_LOAD32_WORD("ahg1606.u13", 0x0200002, 0x0080000, CRC(d6aa89fe) SHA1(eccb49d49f533aeed9fefb14018bcc06d3fdaf23) )
+	ROM_LOAD32_WORD("ahg1606.u10", 0x0300000, 0x0080000, CRC(0be76189) SHA1(a458f620f48b9f4a73f59d31ba98864c5a64e1d7) )
+	ROM_LOAD32_WORD("ahg1606.u14", 0x0300002, 0x0080000, CRC(c6c59ed6) SHA1(0ce8e5824c5937ffe2eeb34320db9dc568bca7cb) )
+
+	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
+	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
+	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+ROM_END
+
 
 // 602/1 - 10 Credit Multiplier / 9 Line Multiline.
 // Dolphin Treasure - Export B - 06/12/96.
 // All devices are 27c4002 instead of 27c4096.
 ROM_START( dolphntru )
-	ARISTOCRAT_MK5_BIOS
+	ARISTOCRAT_MK5_BIOS_HAVE_EEPROMS
 	/*
-		Checksum code found at 0x000d08
-		0x000000-0x08ec8b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x9caf255e
-			Calculated Checksum 0x9caf255e  (OK)
-		0x08ec8c-0x13d99f is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x08ec8c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included		
+	    Checksum code found at 0x000d08
+	    0x000000-0x08ec8b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x9caf255e
+	        Calculated Checksum 0x9caf255e  (OK)
+	    0x08ec8c-0x13d99f is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x08ec8c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "fhg407702.u7",  0x000000, 0x80000, CRC(97e3e4d0) SHA1(211b9b9e0f25dfaf9d1dfe1d3d88592522aa6f07) )
@@ -1758,18 +2062,41 @@ ROM_START( dolphntru )
 	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
 	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
 	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+
+	ROM_REGION16_BE( 0x100, "eeprom0", 0 )
+	ROM_LOAD16_WORD_SWAP( "eeprom0",      0x000000, 0x000100, CRC(fea8a821) SHA1(c744cac6af7621524fc3a2b0a9a135a32b33c81b) )
+
+	ROM_REGION16_BE( 0x100, "eeprom1", 0 )
+	ROM_LOAD16_WORD_SWAP( "eeprom1",      0x000000, 0x000100, CRC(1fc27753) SHA1(7e5008faaf115dc506481430272285117c989d8e) )
+
+	ROM_REGION( 0x80000, "nvram", 0 )
+	ROM_LOAD( "nvram",        0x000000, 0x080000, CRC(0063e5ca) SHA1(a3d7b636bc9d792e93d11cb2babf24fbdd6d7776) )
+
+	ROM_REGION( 0x20, "rtc", 0 )
+	ROM_LOAD( "rtc",          0x000000, 0x00001f, CRC(6909acb0) SHA1(6a4589599cd1c477e916474e7b029e9a4e92019b) )
 ROM_END
 
+ROM_START( drgneye )
+	ARISTOCRAT_MK5_BIOS
+
+	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
+	ROM_LOAD32_WORD("0100521v.u7",  0x0000000, 0x0080000, CRC(db9c952d) SHA1(4cbe3ffe6cf0bb112cb9a2d7a4ff0b28154d32c1) )
+	ROM_LOAD32_WORD("0100521v.u11", 0x0000002, 0x0080000, CRC(2bb47749) SHA1(796f610e5202b5eb26a6e901d43ee5d9e3f95332) )
+
+	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
+	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
+	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+ROM_END
 
 ROM_START( dynajack )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b78
-		0x000000-0x07031b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xd8815d1c
-			Calculated Checksum 0xd8815d1c  (OK)
-		0x07031c-0x227a4b is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x07031c-0x2fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000b78
+	    0x000000-0x07031b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xd8815d1c
+	        Calculated Checksum 0xd8815d1c  (OK)
+	    0x07031c-0x227a4b is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x07031c-0x2fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("01j00081.u7",  0x0000000, 0x0080000, CRC(73783ecf) SHA1(280b4da540b405959f31c2eebbf87ab635d21c06) )
@@ -1788,11 +2115,11 @@ ROM_END
 ROM_START( eldorda5 )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b88
-		0x000000-0x06328b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xed424efa
-			Calculated Checksum 0xed424efa  (OK)
-		0x06328c-0x0d4b57 is the non-Checksummed range (unusual endpoint)		
+	    Checksum code found at 0x000b88
+	    0x000000-0x06328b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xed424efa
+	        Calculated Checksum 0xed424efa  (OK)
+	    0x06328c-0x0d4b57 is the non-Checksummed range (unusual endpoint)
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0100652v.u7",  0x0000000, 0x0080000, CRC(d9afe87c) SHA1(577ea5da9c4e93a393711a0c7361365301f4241e) )
@@ -1807,11 +2134,11 @@ ROM_END
 ROM_START( eforsta5 )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000ae4
-		0x000000-0x045da3 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x2c99855f
-			Calculated Checksum 0x2c99855f  (OK)
-		0x045da4-0x0ebd43 is the non-Checksummed range (unusual endpoint)
+	    Checksum code found at 0x000ae4
+	    0x000000-0x045da3 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x2c99855f
+	        Calculated Checksum 0x2c99855f  (OK)
+	    0x045da4-0x0ebd43 is the non-Checksummed range (unusual endpoint)
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "0400122v.u7",  0x000000, 0x80000, CRC(b5829b27) SHA1(f6f84c8dc524dcee95e37b93ead9090903bdca4f) )
@@ -1830,12 +2157,12 @@ ROM_END
 ROM_START( eforsta5u )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000d08
-		0x000000-0x0a5233 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x5de71535
-			Calculated Checksum 0x5de71535  (OK)
-		0x0a5234-0x15dbdf is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x0a5234-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000d08
+	    0x000000-0x0a5233 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x5de71535
+	        Calculated Checksum 0x5de71535  (OK)
+	    0x0a5234-0x15dbdf is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x0a5234-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 
 	// if you enable the additional debug output you get 'Error in graphics EPROMs' so these ROMs are also bad even if the above passes
@@ -1854,12 +2181,12 @@ ROM_END
 ROM_START( fortellr )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b78
-		0x000000-0x07038b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x49e7e64e
-			Calculated Checksum 0x49e7e64e  (OK)
-		0x07038c-0x3616a7 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x07038c-0x3fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000b78
+	    0x000000-0x07038b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x49e7e64e
+	        Calculated Checksum 0x49e7e64e  (OK)
+	    0x07038c-0x3616a7 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x07038c-0x3fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("01j00131.u7",  0x0000000, 0x0080000, CRC(78394106) SHA1(aedfb98d7aa515eebabf378edb9c43e01bcba010) )
@@ -1884,12 +2211,12 @@ ROM_END
 ROM_START( gambler )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000d08
-		0x000000-0x08f46b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x9eb3c0ef
-			Calculated Checksum 0x9eb3c0ef  (OK)
-		0x08f46c-0x1354cb is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x08f46c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000d08
+	    0x000000-0x08f46b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x9eb3c0ef
+	        Calculated Checksum 0x9eb3c0ef  (OK)
+	    0x08f46c-0x1354cb is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x08f46c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	// if you enable the additional debug output you get 'Error2 in graphics EPROMs' so these ROMs are also bad even if the above passes
@@ -1943,12 +2270,12 @@ ROM_END
 ROM_START( gnomeatw )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b68
-		0x000000-0x05ebcb is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xd396114d
-			Calculated Checksum 0xd396114d  (OK)
-		0x05ebcc-0x1bf9db is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x05ebcc-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000b68
+	    0x000000-0x05ebcb is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xd396114d
+	        Calculated Checksum 0xd396114d  (OK)
+	    0x05ebcc-0x1bf9db is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x05ebcc-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0100767v.u7",  0x0000000, 0x0080000, CRC(a5d3825e) SHA1(4ce7466eff770a2c6c3c5de620a14e05bb9fb406) )
@@ -1965,12 +2292,12 @@ ROM_END
 ROM_START( goldpyr )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000d08
-		0x000000-0x08ec83 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x7c8c2fbf
-			Calculated Checksum 0x7c8c2fbf  (OK)
-		0x08ec84-0x1aca63 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x08ec84-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000d08
+	    0x000000-0x08ec83 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x7c8c2fbf
+	        Calculated Checksum 0x7c8c2fbf  (OK)
+	    0x08ec84-0x1aca63 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x08ec84-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "ahg120503.u7",  0x000000, 0x80000, CRC(2fbed80c) SHA1(fb0d97cb2be96da37c487fc3aef06c6120efdb46) )
@@ -1992,12 +2319,12 @@ ROM_END
 ROM_START( goldpyra )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000d08
-		0x000000-0x08ef13 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xd3126f08
-			Calculated Checksum 0x26ee6f08  (BAD)
-		0x08ef14-0x1aca3b is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x08ef14-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000d08
+	    0x000000-0x08ef13 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xd3126f08
+	        Calculated Checksum 0x26ee6f08  (BAD)
+	    0x08ef14-0x1aca3b is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x08ef14-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	// the checksum only covers part of the first 2 roms, marked all as BAD_DUMP because it can't be trusted without a full redump.
@@ -2011,16 +2338,34 @@ ROM_START( goldpyra )
 	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
 ROM_END
 
+ROM_START( goldpyrb )
+	ARISTOCRAT_MK5_BIOS
+
+	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
+	// these are the 'bios' for Casino games (could be moved to a different base set)
+	ROM_LOAD32_WORD( "0700474v.u7",  0x000000, 0x80000, CRC(04b7dcbf) SHA1(eded1223336181bb08f9593247f1f79d96278b75) )
+	ROM_LOAD32_WORD( "0700474v.u11", 0x000002, 0x80000, CRC(a89ce1b5) SHA1(411b474a111f23ebd834bea5af0bf0cf3926d590) )
+
+	ROM_LOAD32_WORD( "0100878v.u8",  0x100000, 0x80000, CRC(c3184f1c) SHA1(3f808b465175108d48ca5b2560e4546b30a7fd72) )
+	ROM_LOAD32_WORD( "0100878v.u12", 0x100002, 0x80000, CRC(acb3de77) SHA1(e0e337d6efbd6ee8e0c0ec2653c3dc0bd5741ff4) )
+	ROM_LOAD32_WORD( "0100878v.u9",  0x200000, 0x80000, CRC(0a2f6903) SHA1(11fd913f8c3a677ae07c7ec50548a82c1eaf63ee) )
+	ROM_LOAD32_WORD( "0100878v.u13", 0x200002, 0x80000, CRC(0df660be) SHA1(73d370d90655dada34f2b5b2209652632c34a22e) )
+
+	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
+	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
+	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+ROM_END
+
 
 ROM_START( goldenra )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b98
-		0x000000-0x068297 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x1cc81433
-			Calculated Checksum 0x1cc81433  (OK)
-		0x068298-0x285abf is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x068298-0x2fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000b98
+	    0x000000-0x068297 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x1cc81433
+	        Calculated Checksum 0x1cc81433  (OK)
+	    0x068298-0x285abf is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x068298-0x2fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0101164v.u7",  0x0000000, 0x0080000, CRC(2f75d5f7) SHA1(d7f6ecff7cf759d80733b6d3f224caa5128be0b7) )
@@ -2039,11 +2384,11 @@ ROM_END
 ROM_START( incasun )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000bf8
-		0x000000-0x05f56b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x86b74381
-			Calculated Checksum 0x86b74381  (OK)
-		0x05f56c-0x23586f is the non-Checksummed range (unusual endpoint)
+	    Checksum code found at 0x000bf8
+	    0x000000-0x05f56b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x86b74381
+	        Calculated Checksum 0x86b74381  (OK)
+	    0x05f56c-0x23586f is the non-Checksummed range (unusual endpoint)
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0100872v.u7",  0x0000000, 0x0080000, CRC(180e098b) SHA1(48782c46a344dba0aaad407d0d4a432da091b0f5) )
@@ -2059,7 +2404,7 @@ ROM_START( incasun )
 ROM_END
 
 ROM_START( incasunu )
-	ARISTOCRAT_MK5_BIOS
+	ARISTOCRAT_MK5_BIOS_HAVE_EEPROMS
 
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("chg1458.u7",  0x0000000, 0x0080000, CRC(20c78b79) SHA1(d7402ff89160f25c9f4f67bbf688621d4ce22205) )
@@ -2072,17 +2417,29 @@ ROM_START( incasunu )
 	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
 	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
 	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+
+	ROM_REGION16_BE( 0x100, "eeprom0", 0 )
+	ROM_LOAD16_WORD_SWAP( "eeprom0",      0x000000, 0x000100, CRC(fea8a821) SHA1(c744cac6af7621524fc3a2b0a9a135a32b33c81b) )
+
+	ROM_REGION16_BE( 0x100, "eeprom1", 0 )
+	ROM_LOAD16_WORD_SWAP( "eeprom1",      0x000000, 0x000100, CRC(b3efdb60) SHA1(f219175019b7237f1e2d132f36803097f2a1d174) )
+
+	ROM_REGION( 0x80000, "nvram", 0 )
+	ROM_LOAD( "nvram",        0x000000, 0x080000, CRC(a68e890e) SHA1(8ab087a09cfee8d3e2d84b1003b6798c7223be03) )
+
+	ROM_REGION( 0x20, "rtc", 0 )
+	ROM_LOAD( "rtc",          0x000000, 0x00001f, CRC(6909acb0) SHA1(6a4589599cd1c477e916474e7b029e9a4e92019b) )
 ROM_END
 
 ROM_START( incasunsp )
 	ARISTOCRAT_MK5_BIOS
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	/*
-		Checksum code found at 0x000bf8
-		0x000000-0x05f70f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x1de6e2c7
-			Calculated Checksum 0x1de6e2c7  (OK)
-		0x05f710-0x235a13 is the non-Checksummed range (unusual endpoint)
+	    Checksum code found at 0x000bf8
+	    0x000000-0x05f70f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x1de6e2c7
+	        Calculated Checksum 0x1de6e2c7  (OK)
+	    0x05f710-0x235a13 is the non-Checksummed range (unusual endpoint)
 	*/
 	ROM_LOAD32_WORD("sp__0100872v.u7",  0x0000000, 0x0080000, CRC(62919753) SHA1(0f0d186260a64b8b45671f68abf497586264793e) )
 	ROM_LOAD32_WORD("sp__0100872v.u11", 0x0000002, 0x0080000, CRC(f221ac71) SHA1(c2c1f8703e9a41e5c4d5ebfeac57e220a64e9657) )
@@ -2117,12 +2474,12 @@ ROM_END
 ROM_START( indrema5 )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000ba8
-		0x000000-0x06323f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x965e92e4
-			Calculated Checksum 0x965e92e4  (OK)
-		0x063240-0x1cd2d3 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x063240-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included	
+	    Checksum code found at 0x000ba8
+	    0x000000-0x06323f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x965e92e4
+	        Calculated Checksum 0x965e92e4  (OK)
+	    0x063240-0x1cd2d3 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x063240-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "0100845v.u7",  0x000000, 0x80000, CRC(0c924a3e) SHA1(499b4ae601e53173e3ba5f400a40e5ae7bbaa043) )
@@ -2139,20 +2496,20 @@ ROM_END
 ROM_START( jungjuic )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		note, this actually contains a 2nd checksum for the game, this is likely the base/bios check only.
+	    note, this actually contains a 2nd checksum for the game, this is likely the base/bios check only.
 
-		Checksum code found at 0x001b74
-		0x000000-0x089a2f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x5ad8a58b
-			Calculated Checksum 0x5ad8a58b  (OK)
-		0x089a30-0x1b4043 is the non-Checksummed range (unusual endpoint)	
-	
+	    Checksum code found at 0x001b74
+	    0x000000-0x089a2f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x5ad8a58b
+	        Calculated Checksum 0x5ad8a58b  (OK)
+	    0x089a30-0x1b4043 is the non-Checksummed range (unusual endpoint)
+
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	// these are the 'bios' for Casino games (could be moved to a different base set)
 	ROM_LOAD32_WORD( "0700474v.u7",  0x000000, 0x80000, CRC(04b7dcbf) SHA1(eded1223336181bb08f9593247f1f79d96278b75) )
 	ROM_LOAD32_WORD( "0700474v.u11", 0x000002, 0x80000, CRC(a89ce1b5) SHA1(411b474a111f23ebd834bea5af0bf0cf3926d590) )
-	
+
 	ROM_LOAD32_WORD( "0200240v.u8",  0x100000, 0x80000, CRC(10c61ff7) SHA1(86d17cf2492612c3a6284a1c8e41a67a5199c0eb) )
 	ROM_LOAD32_WORD( "0200240v.u12", 0x100002, 0x80000, CRC(ffa3d0ba) SHA1(e60e01d4d425aea483387fa2f9ae5bb69b80f829) )
 
@@ -2165,12 +2522,12 @@ ROM_END
 ROM_START( kgalah )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b28
-		0x000000-0x05af27 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xa4ff4d2a
-			Calculated Checksum 0xa4ff4d2a  (OK)
-		0x05af28-0x1b3e9f is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x05af28-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000b28
+	    0x000000-0x05af27 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xa4ff4d2a
+	        Calculated Checksum 0xa4ff4d2a  (OK)
+	    0x05af28-0x1b3e9f is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x05af28-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0200536v.u7",  0x0000000, 0x0080000, CRC(9333543a) SHA1(dbbd59de046c35e70e71836b342eb5ecf4799575) )
@@ -2190,11 +2547,11 @@ ROM_END
 ROM_START( koalamnt )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000d18
-		0x000000-0x0ec32b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x5e570341
-			Calculated Checksum 0x17df3e7d  (BAD)
-		0x0ec32c-0x34ebdf is the non-Checksummed range (unusual endpoint)	
+	    Checksum code found at 0x000d18
+	    0x000000-0x0ec32b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x5e570341
+	        Calculated Checksum 0x17df3e7d  (BAD)
+	    0x0ec32c-0x34ebdf is the non-Checksummed range (unusual endpoint)
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	// the checksum only covers part of the first 2 roms, marked all as BAD_DUMP because it can't be trusted without a full redump.
@@ -2216,12 +2573,12 @@ ROM_END
 ROM_START( kookabuk )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b68
-		0x000000-0x061857 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xf03ce7cb
-			Calculated Checksum 0xf03ce7cb  (OK)
-		0x061858-0x1a2757 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x061858-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000b68
+	    0x000000-0x061857 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xf03ce7cb
+	        Calculated Checksum 0xf03ce7cb  (OK)
+	    0x061858-0x1a2757 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x061858-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0100677v.u7",  0x0000000, 0x0080000, CRC(b2fdf0e8) SHA1(0dd002cfad2fa4f217a0c67066d098f4cd3ba319) )
@@ -2238,11 +2595,11 @@ ROM_END
 ROM_START( locoloot )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b20
-		0x000000-0x055e93 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xafd2e94d
-			Calculated Checksum 0xafd2e94d  (OK)
-		0x055e94-0x0bbf23 is the non-Checksummed range (unusual endpoint)
+	    Checksum code found at 0x000b20
+	    0x000000-0x055e93 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xafd2e94d
+	        Calculated Checksum 0xafd2e94d  (OK)
+	    0x055e94-0x0bbf23 is the non-Checksummed range (unusual endpoint)
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0100472v.u7",  0x0000000, 0x0080000, CRC(4f02763c) SHA1(302cea5fb157f65fc907f123ef42a0a38cc707ac) )
@@ -2272,11 +2629,11 @@ ROM_END
 ROM_START( lonewolf )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b48
-		0x000000-0x0580f3 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x424e42b6
-			Calculated Checksum 0x424e42b6  (OK)
-		0x0580f4-0x0df6b7 is the non-Checksummed range (unusual endpoint)
+	    Checksum code found at 0x000b48
+	    0x000000-0x0580f3 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x424e42b6
+	        Calculated Checksum 0x424e42b6  (OK)
+	    0x0580f4-0x0df6b7 is the non-Checksummed range (unusual endpoint)
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0100587v.u7",  0x0000000, 0x0080000, CRC(15024eae) SHA1(7101125aa8531c75f9d80fe357013d09dbb0fec9) )
@@ -2294,12 +2651,12 @@ ROM_END
 ROM_START( mgarden )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000d08
-		0x000000-0x0a522b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x8b0f5dae
-			Calculated Checksum 0x8afcb91f  (BAD)
-		0x0a522c-0x15dbd7 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x0a522c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000d08
+	    0x000000-0x0a522b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x8b0f5dae
+	        Calculated Checksum 0x8afcb91f  (BAD)
+	    0x0a522c-0x15dbd7 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x0a522c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	// the checksum only covers part of the first 2 roms, marked all as BAD_DUMP because it can't be trusted without a full redump.
@@ -2317,14 +2674,14 @@ ROM_END
 // MV4115 - 5,10,20 Credit Multiplier / 9 Line Multiline.
 // Magic Mask [Reel Game] - Export A - 09/05/2000.
 ROM_START( magimask )
-	ARISTOCRAT_MK5_BIOS
+	ARISTOCRAT_MK5_BIOS_HAVE_EEPROMS
 	/*
-		Checksum code found at 0x000d18
-		0x000000-0x0e8527 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x1d86deee
-			Calculated Checksum 0x1d86deee  (OK)
-		0x0e8528-0x1e4887 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x0e8528-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000d18
+	    0x000000-0x0e8527 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x1d86deee
+	        Calculated Checksum 0x1d86deee  (OK)
+	    0x0e8528-0x1e4887 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x0e8528-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "dhg1309.u7",  0x000000, 0x80000, CRC(17317eb9) SHA1(3ddb8d61f23461c3194af534928164550208bbee) )
@@ -2335,6 +2692,18 @@ ROM_START( magimask )
 	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
 	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
 	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+
+	ROM_REGION16_BE( 0x100, "eeprom0", 0 )
+	ROM_LOAD16_WORD_SWAP( "eeprom0",      0x000000, 0x000100, CRC(fea8a821) SHA1(c744cac6af7621524fc3a2b0a9a135a32b33c81b) )
+
+	ROM_REGION16_BE( 0x100, "eeprom1", 0 )
+	ROM_LOAD16_WORD_SWAP( "eeprom1",      0x000000, 0x000100, CRC(6e485bbc) SHA1(3d6c8d120c69ed2804f267c50681974f73e1ee51) )
+
+	ROM_REGION( 0x80000, "nvram", 0 )
+	ROM_LOAD( "nvram",        0x000000, 0x080000, CRC(538c7523) SHA1(1e6516b77daf855e397c1ec590e73637ce3b8406) )
+
+	ROM_REGION( 0x20, "rtc", 0 )
+	ROM_LOAD( "rtc",          0x000000, 0x00001f, CRC(6909acb0) SHA1(6a4589599cd1c477e916474e7b029e9a4e92019b) )
 ROM_END
 
 
@@ -2350,14 +2719,14 @@ ROM_END
 // dhg1309.u11    ahg1548.u11    17.786026%
 // dhg1309.u7     ahg1548.u7     16.893578%
 ROM_START( magimaska )
-	ARISTOCRAT_MK5_BIOS
+	ARISTOCRAT_MK5_BIOS_HAVE_EEPROMS
 	/*
-		Checksum code found at 0x000d18
-		0x000000-0x0e9597 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x6610851f
-			Calculated Checksum 0x6610851f  (OK)
-		0x0e9598-0x1e591f is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x0e9598-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000d18
+	    0x000000-0x0e9597 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x6610851f
+	        Calculated Checksum 0x6610851f  (OK)
+	    0x0e9598-0x1e591f is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x0e9598-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "ahg1548.u7",  0x000000, 0x80000, CRC(452a19c9) SHA1(aab1f4ccfc6cdb382f7a0e85491614cc58811a08) )
@@ -2368,6 +2737,18 @@ ROM_START( magimaska )
 	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
 	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
 	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+
+	ROM_REGION16_BE( 0x100, "eeprom0", 0 )
+	ROM_LOAD16_WORD_SWAP( "eeprom0",      0x000000, 0x000100, CRC(fea8a821) SHA1(c744cac6af7621524fc3a2b0a9a135a32b33c81b) )
+
+	ROM_REGION16_BE( 0x100, "eeprom1", 0 )
+	ROM_LOAD16_WORD_SWAP( "eeprom1",      0x000000, 0x000100, CRC(a10501f9) SHA1(34fdcd16bd7dc474baadc0836e2083abaf589549) )
+
+	ROM_REGION( 0x80000, "nvram", 0 )
+	ROM_LOAD( "nvram",       0x000000, 0x080000, CRC(5365446b) SHA1(9ae7a72d0ed3e7f7523a2e0a8f0dc014c6490438) )
+
+	ROM_REGION( 0x20, "rtc", 0 )
+	ROM_LOAD( "rtc",          0x000000, 0x00001f, CRC(6909acb0) SHA1(6a4589599cd1c477e916474e7b029e9a4e92019b) )
 ROM_END
 
 
@@ -2391,12 +2772,12 @@ ROM_END
 ROM_START( marmagic )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b78
-		0x000000-0x06d93b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x59531d0a
-			Calculated Checksum 0x59531d0a  (OK)
-		0x06d93c-0x2deae3 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x06d93c-0x2fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000b78
+	    0x000000-0x06d93b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x59531d0a
+	        Calculated Checksum 0x59531d0a  (OK)
+	    0x06d93c-0x2deae3 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x06d93c-0x2fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "01j00101.u7",  0x000000, 0x80000, CRC(eee7ebaf) SHA1(bad0c08578877f84325c07d51c6ed76c40b70720) )
@@ -2411,6 +2792,25 @@ ROM_START( marmagic )
 	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
 ROM_END
 
+ROM_START( marmagicua )
+	ARISTOCRAT_MK5_BIOS
+
+	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
+	ROM_LOAD32_WORD( "ehg1558.u7",  0x000000, 0x80000, CRC(7c2602ae) SHA1(f5a13154448041575e4bea1399ed0a5a0888d493) )
+	ROM_LOAD32_WORD( "ehg1558.u11", 0x000002, 0x80000, CRC(4fe3b18a) SHA1(cc36eddd264de1a088c16e1b741168130d895bd7) )
+	ROM_LOAD32_WORD( "ehg1558.u8",  0x100000, 0x80000, CRC(c9ff4bd8) SHA1(5766d7c39e753fb2a2412a41338dcfd4e31b642b) )
+	ROM_LOAD32_WORD( "ehg1558.u12", 0x100002, 0x80000, CRC(d00cd217) SHA1(2be7c1ef6c0a39d1c7ed391feeaf0f42a6471bae) )
+	ROM_LOAD32_WORD( "ehg1558.u9",  0x200000, 0x80000, CRC(879e4b14) SHA1(52d9540dd3ed51d42a31d1a7effe75e995e95330) )
+	ROM_LOAD32_WORD( "ehg1558.u13", 0x200002, 0x80000, CRC(770872a1) SHA1(cd430385a3dfc080decfa2402d7dbad0db912e15) )
+	ROM_LOAD32_WORD( "ehg1558.u10", 0x300000, 0x80000, CRC(4301eb40) SHA1(1a32c61df2ab04c365135378d97d18bbb0b50179) )
+	ROM_LOAD32_WORD( "ehg1558.u14", 0x300002, 0x80000, CRC(a2096cb3) SHA1(c2bba35396f9c83b17d692a384b6406f3441c8f5) )
+
+	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
+	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
+	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+ROM_END
+
+
 
 // US003 - Multi credit / Multi line.
 // Margarita Magic [Reel Game] - NSW/ACT - A - 07/07/2000.
@@ -2420,12 +2820,12 @@ ROM_END
 ROM_START( marmagicu )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000d18
-		0x000000-0x0eda53 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xac229593
-			Calculated Checksum 0x67abc369  (BAD)
-		0x0eda54-0x2fffef is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x0eda54-0x2fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000d18
+	    0x000000-0x0eda53 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xac229593
+	        Calculated Checksum 0x67abc369  (BAD)
+	    0x0eda54-0x2fffef is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x0eda54-0x2fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	// the checksum only covers part of the first 2 roms, marked all as BAD_DUMP because it can't be trusted without a full redump.
@@ -2446,14 +2846,14 @@ ROM_END
 // Mine, Mine, Mine - Export E - 14/02/96.
 // All devices are 27c4002 instead of 27c4096.
 ROM_START( minemine )
-	ARISTOCRAT_MK5_BIOS
+	ARISTOCRAT_MK5_BIOS_HAVE_EEPROMS
 	/*
-		Checksum code found at 0x000d10
-		0x000000-0x0a7203 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x75c908a7
-			Calculated Checksum 0x75c908a7  (OK)
-		0x0a7204-0x1a0edf is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x0a7204-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000d10
+	    0x000000-0x0a7203 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x75c908a7
+	        Calculated Checksum 0x75c908a7  (OK)
+	    0x0a7204-0x1a0edf is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x0a7204-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "vhg0416-99.u7",  0x000000, 0x80000, CRC(41bc3714) SHA1(5a8f7d24a6a697524af7997dcedd214fcaf48768) )
@@ -2464,18 +2864,30 @@ ROM_START( minemine )
 	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
 	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
 	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+
+	ROM_REGION16_BE( 0x100, "eeprom0", 0 )
+	ROM_LOAD16_WORD_SWAP( "eeprom0",      0x000000, 0x000100, CRC(fea8a821) SHA1(c744cac6af7621524fc3a2b0a9a135a32b33c81b) )
+
+	ROM_REGION16_BE( 0x100, "eeprom1", 0 )
+	ROM_LOAD16_WORD_SWAP( "eeprom1",      0x000000, 0x000100, CRC(8421e7c2) SHA1(fc1b07d5b7aadafc4a0f2e4dfa698e7c72340717) )
+
+	ROM_REGION( 0x80000, "nvram", 0 )
+	ROM_LOAD( "nvram",        0x000000, 0x080000, CRC(883f5023) SHA1(e526e337b5b0fc77091b4946b503b56307c390e9) )
+
+	ROM_REGION( 0x20, "rtc", 0 )
+	ROM_LOAD( "rtc",          0x000000, 0x00001f, CRC(6909acb0) SHA1(6a4589599cd1c477e916474e7b029e9a4e92019b) )
 ROM_END
 
 
 ROM_START( monmouse )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b80
-		0x000000-0x066077 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x569023a4
-			Calculated Checksum 0x569023a4  (OK)
-		0x066078-0x1faf7b is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x066078-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000b80
+	    0x000000-0x066077 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x569023a4
+	        Calculated Checksum 0x569023a4  (OK)
+	    0x066078-0x1faf7b is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x066078-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0400469v.u7",  0x0000000, 0x0080000, CRC(7f7972b6) SHA1(25991f476f55cd1eddc8e63af9c472c1d7e83481) )
@@ -2509,11 +2921,11 @@ ROM_END
 ROM_START( mountmon )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000ae4
-		0x000000-0x04ee9b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x4bb1139e
-			Calculated Checksum 0x4bb1139e  (OK)
-		0x04ee9c-0x0e3a1f is the non-Checksummed range (unusual endpoint)
+	    Checksum code found at 0x000ae4
+	    0x000000-0x04ee9b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x4bb1139e
+	        Calculated Checksum 0x4bb1139e  (OK)
+	    0x04ee9c-0x0e3a1f is the non-Checksummed range (unusual endpoint)
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0100294v.u7",  0x0000000, 0x0080000, CRC(b84342af) SHA1(e27e65730ddc897b01e8875a4da3ea2d6db2b858) )
@@ -2528,12 +2940,12 @@ ROM_END
 ROM_START( multidrw )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b98
-		0x000000-0x07477f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xe2d3d401
-			Calculated Checksum 0xe2d3d401  (OK)
-		0x074780-0x2c5abb is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x074780-0x2fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000b98
+	    0x000000-0x07477f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xe2d3d401
+	        Calculated Checksum 0xe2d3d401  (OK)
+	    0x074780-0x2c5abb is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x074780-0x2fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
@@ -2553,11 +2965,11 @@ ROM_END
 ROM_START( mystgard )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000ae4
-		0x000000-0x04eea7 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x37310f71
-			Calculated Checksum 0x37310f71  (OK)
-		0x04eea8-0x0dce17 is the non-Checksummed range (unusual endpoint)	
+	    Checksum code found at 0x000ae4
+	    0x000000-0x04eea7 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x37310f71
+	        Calculated Checksum 0x37310f71  (OK)
+	    0x04eea8-0x0dce17 is the non-Checksummed range (unusual endpoint)
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("Mystic Garden.u7",  0x0000000, 0x0080000, CRC(28d15442) SHA1(ee33017f3efcf688a43ea1d7f2b74b4b9a6d2cae) )
@@ -2572,12 +2984,12 @@ ROM_END
 ROM_START( orchidms )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b20
-		0x000000-0x0677c7 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x522d283f
-			Calculated Checksum 0x522d283f  (OK)
-		0x0677c8-0x13adcb is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x0677c8-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included	
+	    Checksum code found at 0x000b20
+	    0x000000-0x0677c7 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x522d283f
+	        Calculated Checksum 0x522d283f  (OK)
+	    0x0677c8-0x13adcb is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x0677c8-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0100275v.u7",  0x0000000, 0x0080000, CRC(5d18ae22) SHA1(c10f7a83f51cfe75653ace8066b7dedf07e91b28) )
@@ -2594,11 +3006,11 @@ ROM_END
 ROM_START( oscara5 )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b80
-		0x000000-0x05d187 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xd11b30fc
-			Calculated Checksum 0xd11b30fc  (OK)
-		0x05d188-0x0e1d73 is the non-Checksummed range (unusual endpoint)	
+	    Checksum code found at 0x000b80
+	    0x000000-0x05d187 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xd11b30fc
+	        Calculated Checksum 0xd11b30fc  (OK)
+	    0x05d188-0x0e1d73 is the non-Checksummed range (unusual endpoint)
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0200348v.u7",  0x0000000, 0x0080000, CRC(930bdc00) SHA1(36b1a289abebc7cce64e767e201d8f8f7fe80cf2) )
@@ -2613,12 +3025,12 @@ ROM_END
 ROM_START( pantmag )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000d18
-		0x000000-0x06d1ff is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x50122492
-			Calculated Checksum 0x50122492  (OK)
-		0x06d200-0x195d7b is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x06d200-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000d18
+	    0x000000-0x06d1ff is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x50122492
+	        Calculated Checksum 0x50122492  (OK)
+	    0x06d200-0x195d7b is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x06d200-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0101046v.u7",  0x0000000, 0x0080000, CRC(6383899d) SHA1(df96af7cb580565715da6e78b83e7ba6832028e7) )
@@ -2631,19 +3043,34 @@ ROM_START( pantmag )
 	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
 ROM_END
 
+ROM_START( pantmaga )
+	ARISTOCRAT_MK5_BIOS
+
+	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
+	ROM_LOAD32_WORD("0100716v.u7",  0x0000000, 0x0080000, CRC(8646a4a6) SHA1(1449ba497e4ccebf5de9630bfaf31ad3c583fc44) )
+	ROM_LOAD32_WORD("0100716v.u11", 0x0000002, 0x0080000, CRC(61ae2a5a) SHA1(3b11c0f1c6e1464211e6dea958f08d7212ee5756) )
+	ROM_LOAD32_WORD("0100716v.u8",  0x0100000, 0x0080000, CRC(91997f98) SHA1(2353abdc0b160cf087230f0c290f37f045a4d07b) )
+	ROM_LOAD32_WORD("0100716v.u12", 0x0100002, 0x0080000, CRC(6adfd0ab) SHA1(3b6479bcd95812f5678a27adc7decbc881cd6caa) )
+
+	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
+	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
+	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+ROM_END
+
+
 
 // MV4115/6 - 9/20 Line Multiline Multiplier.
 // Party Gras [Reel Game] - Export A - 10/11/2001.
 // All devices are 27c4002 instead of 27c4096.
 ROM_START( partygrs )
-	ARISTOCRAT_MK5_BIOS
+	ARISTOCRAT_MK5_BIOS_HAVE_EEPROMS
 	/*
-		Checksum code found at 0x000d18
-		0x000000-0x0e9b47 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x673ffb0f
-			Calculated Checksum 0x673ffb0f  (OK)
-		0x0e9b48-0x1fd2ab is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x0e9b48-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000d18
+	    0x000000-0x0e9b47 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x673ffb0f
+	        Calculated Checksum 0x673ffb0f  (OK)
+	    0x0e9b48-0x1fd2ab is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x0e9b48-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "ahg1567.u7",  0x000000, 0x80000, CRC(53047385) SHA1(efe50e8785047986513f2de63d2425ba80417481) )
@@ -2654,6 +3081,18 @@ ROM_START( partygrs )
 	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
 	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
 	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+
+	ROM_REGION16_BE( 0x100, "eeprom0", 0 )
+	ROM_LOAD16_WORD_SWAP( "eeprom0",      0x000000, 0x000100, CRC(fea8a821) SHA1(c744cac6af7621524fc3a2b0a9a135a32b33c81b) )
+
+	ROM_REGION16_BE( 0x100, "eeprom1", 0 )
+	ROM_LOAD16_WORD_SWAP( "eeprom1",      0x000000, 0x000100, CRC(a10501f9) SHA1(34fdcd16bd7dc474baadc0836e2083abaf589549) )
+
+	ROM_REGION( 0x80000, "nvram", 0 )
+	ROM_LOAD( "nvram",        0x000000, 0x080000, CRC(fec1b1df) SHA1(5981e2961692d4c8633afea4ecb4828eabba65bd) )
+
+	ROM_REGION( 0x20, "rtc", 0 )
+	ROM_LOAD( "rtc",          0x000000, 0x00001f, CRC(6909acb0) SHA1(6a4589599cd1c477e916474e7b029e9a4e92019b) )
 ROM_END
 
 
@@ -2663,12 +3102,12 @@ ROM_END
 ROM_START( partygrsa )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000d18
-		0x000000-0x0a69d3 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xf4a004d3
-			Calculated Checksum 0x221d04d3  (BAD)
-		0x0a69d4-0x1b953f is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x0a69d4-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000d18
+	    0x000000-0x0a69d3 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xf4a004d3
+	        Calculated Checksum 0x221d04d3  (BAD)
+	    0x0a69d4-0x1b953f is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x0a69d4-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	// the checksum only covers part of the first 2 roms, marked all as BAD_DUMP because it can't be trusted without a full redump.
@@ -2686,12 +3125,12 @@ ROM_END
 ROM_START( peaflut )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b98
-		0x000000-0x0638d3 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x2ce2619f
-			Calculated Checksum 0x2ce2619f  (OK)
-		0x0638d4-0x1dbf8b is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x0638d4-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000b98
+	    0x000000-0x0638d3 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x2ce2619f
+	        Calculated Checksum 0x2ce2619f  (OK)
+	    0x0638d4-0x1dbf8b is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x0638d4-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("02j00011.u7",  0x0000000, 0x0080000, CRC(e4497f35) SHA1(7030aba6c17fc391564385f5669e07edc94dca61) )
@@ -2708,12 +3147,12 @@ ROM_END
 ROM_START( pengpay )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b68
-		0x000000-0x05c71f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x68980cb3
-			Calculated Checksum 0x68980cb3  (OK)
-		0x05c720-0x1aefcf is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x05c720-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000b68
+	    0x000000-0x05c71f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x68980cb3
+	        Calculated Checksum 0x68980cb3  (OK)
+	    0x05c720-0x1aefcf is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x05c720-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0200460v.u7",  0x0000000, 0x0080000, CRC(47145744) SHA1(74a186a15537d8b05ce23f37c53f351e8058b0b2) )
@@ -2730,12 +3169,12 @@ ROM_END
 ROM_START( pengpaya )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b60
-		0x000000-0x05644f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x5bc8a3d6
-			Calculated Checksum 0x5bc8a3d6  (OK)
-		0x056450-0x1c19f3 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x056450-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000b60
+	    0x000000-0x05644f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x5bc8a3d6
+	        Calculated Checksum 0x5bc8a3d6  (OK)
+	    0x056450-0x1c19f3 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x056450-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0200357v.u7",  0x0000000, 0x0080000, CRC(cb21de26) SHA1(5a730f08db4d91b18f0b5a1f489f1d982b08edcc) )
@@ -2752,12 +3191,12 @@ ROM_END
 ROM_START( pengpayb )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b68
-		0x000000-0x05d7b7 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xd4f9ba59
-			Calculated Checksum 0xd4f9ba59  (OK)
-		0x05d7b8-0x1c9acf is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x05d7b8-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000b68
+	    0x000000-0x05d7b7 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xd4f9ba59
+	        Calculated Checksum 0xd4f9ba59  (OK)
+	    0x05d7b8-0x1c9acf is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x05d7b8-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0200359v.u7",  0x0000000, 0x0080000, CRC(f51c4e02) SHA1(fca30b3ce0d063966df1e878338596d050664695) )
@@ -2775,14 +3214,14 @@ ROM_END
 // Penguin Pays - Export B - 14/07/97.
 // All devices are 27c4002 instead of 27c4096.
 ROM_START( pengpayu )
-	ARISTOCRAT_MK5_BIOS
+	ARISTOCRAT_MK5_BIOS_HAVE_EEPROMS
 	/*
-		Checksum code found at 0x000d08
-		0x000000-0x0cd21b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x7dc52ffa
-			Calculated Checksum 0x7dc52ffa  (OK)
-		0x0cd21c-0x192ed7 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x0cd21c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000d08
+	    0x000000-0x0cd21b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x7dc52ffa
+	        Calculated Checksum 0x7dc52ffa  (OK)
+	    0x0cd21c-0x192ed7 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x0cd21c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "bhi041703.u7",  0x000000, 0x80000, CRC(19d75260) SHA1(798472b1b5d8f5ca99d8bfe57e99a76686f0aa3f) )
@@ -2793,10 +3232,22 @@ ROM_START( pengpayu )
 	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
 	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
 	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+
+	ROM_REGION16_BE( 0x100, "eeprom0", 0 )
+	ROM_LOAD16_WORD_SWAP( "eeprom0",      0x000000, 0x000100, CRC(fea8a821) SHA1(c744cac6af7621524fc3a2b0a9a135a32b33c81b) )
+
+	ROM_REGION16_BE( 0x100, "eeprom1", 0 )
+	ROM_LOAD16_WORD_SWAP( "eeprom1",      0x000000, 0x000100, CRC(8421e7c2) SHA1(fc1b07d5b7aadafc4a0f2e4dfa698e7c72340717) )
+
+	ROM_REGION( 0x80000, "nvram", 0 )
+	ROM_LOAD( "nvram",        0x000000, 0x080000, CRC(4e5b9702) SHA1(b2b645db80c4ece24fae8ce6fb660e77ac8e5810) )
+
+	ROM_REGION( 0x20, "rtc", 0 )
+	ROM_LOAD( "rtc",          0x000000, 0x00001f, CRC(6909acb0) SHA1(6a4589599cd1c477e916474e7b029e9a4e92019b) )
 ROM_END
 
 
-ROM_START( petshop )
+ROM_START( petshopa )
 	ARISTOCRAT_MK5_BIOS
 	// checksum code not found (due to bad rom)
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
@@ -2810,16 +3261,61 @@ ROM_START( petshop )
 	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
 ROM_END
 
+ROM_START( petshop )
+	ARISTOCRAT_MK5_BIOS
+
+	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
+	ROM_LOAD32_WORD("0100731v.u7",  0x0000000, 0x0080000, CRC(01cffccc) SHA1(a39d943e700fff34d82bcff8c61f2586ee65e673) )
+	ROM_LOAD32_WORD("0100731v.u11", 0x0000002, 0x0080000, CRC(a8e906c5) SHA1(f6dd7bcf5fa90933c9741699f0c1e07b685ccb40) )
+	ROM_LOAD32_WORD("0100731v.u8",  0x0100000, 0x0080000, CRC(757e1296) SHA1(e14508bbaa3439a93c8b716267a2198ed3c54728) )
+	ROM_LOAD32_WORD("0100731v.u12", 0x0100002, 0x0080000, CRC(6e74cd57) SHA1(9092e656cbd8627b208b81ca0d737483a779bce1) )
+
+	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
+	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
+	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+ROM_END
+
+ROM_START( phantpay )
+	ARISTOCRAT_MK5_BIOS
+
+	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
+	ROM_LOAD32_WORD("0500005v.u7",  0x0000000, 0x0080000, CRC(2cfc44a7) SHA1(a2a93047311d7a1f45e2915478ba2a11d5179194) )
+	ROM_LOAD32_WORD("0500005v.u11", 0x0000002, 0x0080000, CRC(3e91ed2a) SHA1(92d49bd78d329ad53cb2063af2d324eada3f53d1) )
+	ROM_LOAD32_WORD("0500005v.u8",  0x0100000, 0x0080000, CRC(ab1e77e9) SHA1(5a8da1210214ccc89dfde2e28f5142036a743172) )
+	ROM_LOAD32_WORD("0500005v.u12", 0x0100002, 0x0080000, CRC(d43a092a) SHA1(5f851bd179b14ef3983b460ed932810f3713d3e5) )
+
+	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
+	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
+	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+ROM_END
+
+ROM_START( penpir2 )
+	ARISTOCRAT_MK5_BIOS
+
+	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
+	// these are the 'bios' for Casino games (could be moved to a different base set)
+	ROM_LOAD32_WORD( "0700474v.u7",  0x000000, 0x80000, CRC(04b7dcbf) SHA1(eded1223336181bb08f9593247f1f79d96278b75) )
+	ROM_LOAD32_WORD( "0700474v.u11", 0x000002, 0x80000, CRC(a89ce1b5) SHA1(411b474a111f23ebd834bea5af0bf0cf3926d590) )
+
+	ROM_LOAD32_WORD( "0100869v.u8",  0x100000, 0x80000, CRC(5a87f637) SHA1(0fee8140637e9f923727e8c358c9f59b8319855d) )
+	ROM_LOAD32_WORD( "0100869v.u12", 0x100002, 0x80000, CRC(2aef04c1) SHA1(7415f436960c7b4a43634161ca317b2ae34ee745) )
+	ROM_LOAD32_WORD( "0100869v.u9",  0x200000, 0x80000, CRC(05de2653) SHA1(7d3f9d50013d8137cef285940b04209cfdae4a1d) )
+	ROM_LOAD32_WORD( "0100869v.u13", 0x200002, 0x80000, CRC(e1dbfd58) SHA1(687b7254279734e1835e1713d032b5aa2cf70812) )
+
+	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
+	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
+	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+ROM_END
 
 ROM_START( przfight )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b48
-		0x000000-0x053def is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x97c4e600
-			Calculated Checksum 0x97c4e600  (OK)
-		0x053df0-0x2a9f7f is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x053df0-0x2fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000b48
+	    0x000000-0x053def is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x97c4e600
+	        Calculated Checksum 0x97c4e600  (OK)
+	    0x053df0-0x2a9f7f is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x053df0-0x2fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0100299v.u7",  0x0000000, 0x0080000, CRC(2b1a9678) SHA1(c75de4c76cd934df746040d0515694d92e2fc145) )
@@ -2838,12 +3334,12 @@ ROM_END
 ROM_START( qcash )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000af4
-		0x000000-0x05d55b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x10b06e83
-			Calculated Checksum 0x10b06e83  (OK)
-		0x05d55c-0x1a669f is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x05d55c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000af4
+	    0x000000-0x05d55b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x10b06e83
+	        Calculated Checksum 0x10b06e83  (OK)
+	    0x05d55c-0x1a669f is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x05d55c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0100706v.u7",  0x0000000, 0x0080000, CRC(591c96eb) SHA1(acd6f02206086d710a92401c618f715b3646d78a) )
@@ -2860,12 +3356,12 @@ ROM_END
 ROM_START( qnile )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b80
-		0x000000-0x055c83 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x53fa5304
-			Calculated Checksum 0x53fa5304  (OK)
-		0x055c84-0x16745b is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x055c84-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included	
+	    Checksum code found at 0x000b80
+	    0x000000-0x055c83 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x53fa5304
+	        Calculated Checksum 0x53fa5304  (OK)
+	    0x055c84-0x16745b is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x055c84-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
@@ -2883,12 +3379,12 @@ ROM_END
 ROM_START( qnilea )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b80
-		0x000000-0x064c4b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xa60cbcfa
-			Calculated Checksum 0xa60cbcfa  (OK)
-		0x064c4c-0x172a17 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x064c4c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000b80
+	    0x000000-0x064c4b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xa60cbcfa
+	        Calculated Checksum 0xa60cbcfa  (OK)
+	    0x064c4c-0x172a17 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x064c4c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0300440v.u7",  0x0000000, 0x0080000, CRC(0076da68) SHA1(ed301c102e88d5b637144ed32042da46780e5b34) )
@@ -2905,12 +3401,12 @@ ROM_END
 ROM_START( qnileb )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b80
-		0x000000-0x059dff is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xa63a9b3e
-			Calculated Checksum 0xa63a9b3e  (OK)
-		0x059e00-0x16b5d7 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x059e00-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included	
+	    Checksum code found at 0x000b80
+	    0x000000-0x059dff is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xa63a9b3e
+	        Calculated Checksum 0xa63a9b3e  (OK)
+	    0x059e00-0x16b5d7 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x059e00-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "0200439v.u7",  0x000000, 0x80000, CRC(d476a893) SHA1(186d6fb1830c33976f2d3c96e4f045ece885dc63) )
@@ -2927,12 +3423,12 @@ ROM_END
 ROM_START( qnilec )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b80
-		0x000000-0x062913 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x2d52d80f
-			Calculated Checksum 0x2d52d80f  (OK)
-		0x062914-0x1740eb is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x062914-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000b80
+	    0x000000-0x062913 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x2d52d80f
+	        Calculated Checksum 0x2d52d80f  (OK)
+	    0x062914-0x1740eb is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x062914-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "0300439v.u7",  0x000000, 0x80000, CRC(63f9129e) SHA1(a513fd47d3ca4fe007730a06e5f6ffc2891dc74f) )
@@ -2952,14 +3448,14 @@ ROM_END
 // All devices are 27c4002 instead of 27c4096.
 // Even when it's a NSW/ACT, the program seems to be for US-Export platforms...
 ROM_START( qnileu )
-	ARISTOCRAT_MK5_BIOS
+	ARISTOCRAT_MK5_BIOS_HAVE_EEPROMS
 	/*
-		Checksum code found at 0x000d08
-		0x000000-0x08ec87 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xb2ac33b8
-			Calculated Checksum 0xb2ac33b8  (OK)
-		0x08ec88-0x1aca67 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x08ec88-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included	
+	    Checksum code found at 0x000d08
+	    0x000000-0x08ec87 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xb2ac33b8
+	        Calculated Checksum 0xb2ac33b8  (OK)
+	    0x08ec88-0x1aca67 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x08ec88-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "ghg409102.u7",  0x000000, 0x80000, CRC(a00ab2cf) SHA1(eb3120fe4b1d0554c224c7646e727e86fd35975e) )
@@ -2970,17 +3466,29 @@ ROM_START( qnileu )
 	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
 	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
 	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+
+	ROM_REGION16_BE( 0x100, "eeprom0", 0 )
+	ROM_LOAD16_WORD_SWAP( "eeprom0",      0x000000, 0x000100, CRC(fea8a821) SHA1(c744cac6af7621524fc3a2b0a9a135a32b33c81b) )
+
+	ROM_REGION16_BE( 0x100, "eeprom1", 0 )
+	ROM_LOAD16_WORD_SWAP( "eeprom1",      0x000000, 0x000100, CRC(1fc27753) SHA1(7e5008faaf115dc506481430272285117c989d8e) )
+
+	ROM_REGION( 0x80000, "nvram", 0 )
+	ROM_LOAD( "nvram",        0x000000, 0x080000, CRC(5a7bb53a) SHA1(cdac900925d0ee8f98209a377b9f8760de0c2883) )
+
+	ROM_REGION( 0x20, "rtc", 0 )
+	ROM_LOAD( "rtc",          0x000000, 0x00001f, CRC(6909acb0) SHA1(6a4589599cd1c477e916474e7b029e9a4e92019b) )
 ROM_END
 
 
 ROM_START( qnilemax )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000bb8
-		0x000000-0x06fd6f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xcd901653
-			Calculated Checksum 0xcd901653  (OK)
-		0x06fd70-0x3864c7 is the non-Checksummed range (unusual endpoint)	
+	    Checksum code found at 0x000bb8
+	    0x000000-0x06fd6f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xcd901653
+	        Calculated Checksum 0xcd901653  (OK)
+	    0x06fd70-0x3864c7 is the non-Checksummed range (unusual endpoint)
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0401072v.u7",  0x0000000, 0x0080000, CRC(4ac2a82e) SHA1(3fc50e97ad48c57e21a37fbb6142152c72055ad4) )
@@ -2997,16 +3505,44 @@ ROM_START( qnilemax )
 	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
 ROM_END
 
+ROM_START( qtbird )
+	ARISTOCRAT_MK5_BIOS
+
+	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
+	ROM_LOAD32_WORD("0500009v.u7",  0x0000000, 0x0080000, CRC(f294fc0a) SHA1(f3d60ca6008445f535fce027f5ec3fe82ae552c3) )
+	ROM_LOAD32_WORD("0500009v.u11", 0x0000002, 0x0080000, CRC(328b7e04) SHA1(5c49f60b7c88d6e94e7ab464fad4eee6806f327a) )
+	ROM_LOAD32_WORD("0500009v.u8",  0x0100000, 0x0080000, CRC(764b5568) SHA1(a097992499044b7ca017a8c85387dc1ea94ff27a) )
+	ROM_LOAD32_WORD("0500009v.u12", 0x0100002, 0x0080000, CRC(bb8344a9) SHA1(8b0e904b937c7f34470ad946076240b0c54bf434) )
+
+	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
+	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
+	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+ROM_END
+
+ROM_START( kgbirdmk5 )
+	ARISTOCRAT_MK5_BIOS
+
+	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
+	ROM_LOAD32_WORD( "0200024v.u7",  0x000000, 0x080000, CRC(90aefddc) SHA1(610b850c1d3e882c4df9e0a09a056b0c97341a19) ) 
+	ROM_LOAD32_WORD( "0200024v.u11", 0x000002, 0x080000, CRC(52791ad8) SHA1(6e4cf553b355f03ef69ef3c4e2816bbd0cbe6599) ) 
+	ROM_LOAD32_WORD( "0200024v.u8",  0x100000, 0x080000, CRC(c0477ae3) SHA1(5005944b8b28553dd959192d614be7f1b6228a30) ) 
+	ROM_LOAD32_WORD( "0200024v.u12", 0x100002, 0x080000, CRC(df176c5a) SHA1(dcaecdefb7c880b9425a6445dbed969968fe3d1c) ) 
+	
+	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
+	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
+	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+ROM_END
+
 
 ROM_START( rainwrce )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000bf8
-		0x000000-0x06bb13 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x6c1aaee7
-			Calculated Checksum 0x6c1aaee7  (OK)
-		0x06bb14-0x367863 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x06bb14-0x3fffff is the non-Checksummed range if the additional vectors? at the end are included	
+	    Checksum code found at 0x000bf8
+	    0x000000-0x06bb13 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x6c1aaee7
+	        Calculated Checksum 0x6c1aaee7  (OK)
+	    0x06bb14-0x367863 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x06bb14-0x3fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
@@ -3024,16 +3560,33 @@ ROM_START( rainwrce )
 	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
 ROM_END
 
+ROM_START( toutango )
+	ARISTOCRAT_MK5_BIOS
+	
+	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
+	ROM_LOAD32_WORD( "0100782v.u7",  0x000000, 0x080000, CRC(4c70120f) SHA1(e43b39c31c14d16ebf962d8dd201a882df74f595) ) 
+	ROM_LOAD32_WORD( "0100782v.u11", 0x000002, 0x080000, CRC(18519789) SHA1(95385207be6e44746b5e78aa5622afb5258419b2) ) 
+	ROM_LOAD32_WORD( "0100782v.u8",  0x100000, 0x080000, CRC(bf358a6f) SHA1(3ae3bcd486f9c6f5f2a799ed3e4f7b177a59465b) ) 
+	ROM_LOAD32_WORD( "0100782v.u12", 0x100002, 0x080000, CRC(fd366efa) SHA1(22a372f5efe43b9320199b7534e9b3a39b582e4a) ) 
+	ROM_LOAD32_WORD( "0100782v.u9",  0x200000, 0x080000, CRC(bc35aed0) SHA1(7ab25c3207c2be43cfefabe4d4bb0a98bc8e5aea) ) 
+	ROM_LOAD32_WORD( "0100782v.u13", 0x200002, 0x080000, CRC(f8a67a69) SHA1(b1a28047cb4572ae15359c30f71cafa4bd70658c) ) 
+	ROM_LOAD32_WORD( "0100782v.u10", 0x300000, 0x080000, CRC(e6528de7) SHA1(b3aa1937f0b673ba2cfa68acc7cb540ebefc66d4) ) 
+	ROM_LOAD32_WORD( "0100782v.u14", 0x300002, 0x080000, CRC(69f2acde) SHA1(cda52548e675a06677a2d9fee89b33f9abb96f64) ) 
+	
+	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
+	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
+	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+ROM_END
 
 ROM_START( reelrock )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000ba8
-		0x000000-0x062f6f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x67b49a57
-			Calculated Checksum 0x67b49a57  (OK)
-		0x062f70-0x1a752b is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x062f70-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included	
+	    Checksum code found at 0x000ba8
+	    0x000000-0x062f6f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x67b49a57
+	        Calculated Checksum 0x67b49a57  (OK)
+	    0x062f70-0x1a752b is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x062f70-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "0100779v.u7",  0x000000, 0x80000, CRC(b60af34f) SHA1(1143380b765db234b3871c0fe04736472fde7de4) )
@@ -3050,12 +3603,12 @@ ROM_END
 ROM_START( retrsam )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b88
-		0x000000-0x06445b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xb6820a81
-			Calculated Checksum 0xb6820a81  (OK)
-		0x06445c-0x10203b is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x06445c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000b88
+	    0x000000-0x06445b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xb6820a81
+	        Calculated Checksum 0xb6820a81  (OK)
+	    0x06445c-0x10203b is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x06445c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("v0400549v.u7", 0x0000000, 0x0080000, CRC(129be82c) SHA1(487639b7d42d6d35a9c48b44d26667c269b5b633) )
@@ -3072,11 +3625,11 @@ ROM_END
 ROM_START( retrsama )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b88
-		0x000000-0x0590b7 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xa4b725ab
-			Calculated Checksum 0xa4b725ab  (OK)
-		0x0590b8-0x0ef623 is the non-Checksummed range (unusual endpoint)
+	    Checksum code found at 0x000b88
+	    0x000000-0x0590b7 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xa4b725ab
+	        Calculated Checksum 0xa4b725ab  (OK)
+	    0x0590b8-0x0ef623 is the non-Checksummed range (unusual endpoint)
 	*/
 
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
@@ -3092,11 +3645,11 @@ ROM_END
 ROM_START( retrsamb )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b88
-		0x000000-0x05889b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xd80cf106
-			Calculated Checksum 0xd80cf106  (OK)
-		0x05889c-0x0f313b is the non-Checksummed range (unusual endpoint)
+	    Checksum code found at 0x000b88
+	    0x000000-0x05889b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xd80cf106
+	        Calculated Checksum 0xd80cf106  (OK)
+	    0x05889c-0x0f313b is the non-Checksummed range (unusual endpoint)
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0200506v.u7",  0x0000000, 0x0080000, CRC(acb913c1) SHA1(eb008b2b3d06f769f1ea1c75b52334e468c5f13c) )
@@ -3109,14 +3662,14 @@ ROM_END
 
 
 ROM_START( sumospin )
-	ARISTOCRAT_MK5_BIOS	
+	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b88
-		0x000000-0x05d92b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x94d3401c
-			Calculated Checksum 0x94d3401c  (OK)
-		0x05d92c-0x18f637 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x05d92c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000b88
+	    0x000000-0x05d92b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x94d3401c
+	        Calculated Checksum 0x94d3401c  (OK)
+	    0x05d92c-0x18f637 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x05d92c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0200606v.u7",  0x0000000, 0x0080000, CRC(c3ec9f97) SHA1(62c886cc794de4b915533729c5ea5a71a4b59108) )
@@ -3133,17 +3686,17 @@ ROM_END
 ROM_START( sbuk2 )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b98
-		0x000000-0x06ab7f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x874caad2
-			Calculated Checksum 0x874caad2  (OK)
-		0x06ab80-0x1fffef is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x06ab80-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included	
+	    Checksum code found at 0x000b98
+	    0x000000-0x06ab7f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x874caad2
+	        Calculated Checksum 0x874caad2  (OK)
+	    0x06ab80-0x1fffef is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x06ab80-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0400501v.u7",  0x0000000, 0x0080000, CRC(f025775d) SHA1(71a94f6f17fa7cdcd997b0117b8f4afe21606a69) )
 	ROM_LOAD32_WORD("0400501v.u11", 0x0000002, 0x0080000, CRC(f1b51a61) SHA1(8e9fcb071f704122e13333094828a41974646792) )
-	ROM_LOAD32_WORD("0400501v.u8",  0x0100000, 0x0080000, CRC(03912f4e) SHA1(48bdcd2160e05261b7d834c53e1d483acaad098f) )
+	ROM_LOAD32_WORD("0400501v.u8",  0x0100000, 0x0080000, BAD_DUMP CRC(03912f4e) SHA1(48bdcd2160e05261b7d834c53e1d483acaad098f) ) // bit 0x20 is stuck on for most of the ROM
 	ROM_LOAD32_WORD("0400501v.u12", 0x0100002, 0x0080000, CRC(f9b65d2b) SHA1(f519fc284aaa08d3619e4d88e92e690320cf5432) )
 
 	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
@@ -3155,12 +3708,12 @@ ROM_END
 ROM_START( sbuk3 )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000ba8
-		0x000000-0x05ead3 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x23d4cb22
-			Calculated Checksum 0x23d4cb22  (OK)
-		0x05ead4-0x114e33 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x05ead4-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000ba8
+	    0x000000-0x05ead3 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x23d4cb22
+	        Calculated Checksum 0x23d4cb22  (OK)
+	    0x05ead4-0x114e33 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x05ead4-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0200711v.u7",  0x0000000, 0x0080000, CRC(e056c7db) SHA1(7a555583f750d8275b2ffd25a0efbe370a5ac43c) )
@@ -3177,11 +3730,11 @@ ROM_END
 ROM_START( swhr2 )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000ae0
-		0x000000-0x041803 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x4449ca76
-			Calculated Checksum 0x4449ca76  (OK)
-		0x041804-0x0ecbb3 is the non-Checksummed range (unusual endpoint)	
+	    Checksum code found at 0x000ae0
+	    0x000000-0x041803 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x4449ca76
+	        Calculated Checksum 0x4449ca76  (OK)
+	    0x041804-0x0ecbb3 is the non-Checksummed range (unusual endpoint)
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0200004v.u7",  0x0000000, 0x0080000, CRC(de4d6d77) SHA1(959ffb7d06359870e07cb9d761f0bc0480c45e0c) )
@@ -3200,12 +3753,12 @@ ROM_END
 ROM_START( swhr2u )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000d08
-		0x000000-0x0b31cb is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x0720df2c
-			Calculated Checksum 0x3dad9905  (BAD)
-		0x0b31cc-0x155097 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x0b31cc-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000d08
+	    0x000000-0x0b31cb is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x0720df2c
+	        Calculated Checksum 0x3dad9905  (BAD)
+	    0x0b31cc-0x155097 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x0b31cc-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	// the checksum only covers part of the first 2 roms, marked all as BAD_DUMP because it can't be trusted without a full redump.
@@ -3223,11 +3776,11 @@ ROM_END
 ROM_START( swhr2v )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b68
-		0x000000-0x07a763 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x014df7a2
-			Calculated Checksum 0x014df7a2  (OK)
-		0x07a764-0x0e360b is the non-Checksummed range (unusual endpoint)	
+	    Checksum code found at 0x000b68
+	    0x000000-0x07a763 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x014df7a2
+	        Calculated Checksum 0x014df7a2  (OK)
+	    0x07a764-0x0e360b is the non-Checksummed range (unusual endpoint)
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "01j01986.u7",  0x000000, 0x80000, CRC(f51b2faa) SHA1(dbcfdbee92af5f89a8a2611bbc687ee0cc907642) )
@@ -3241,10 +3794,9 @@ ROM_END
 
 ROM_START( topbana )
 	ARISTOCRAT_MK5_BIOS
-	// checksum code not found (due to bad rom)
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
-	ROM_LOAD32_WORD("0100550v.u7",  0x0000000, 0x0080000, CRC(1f60241c) SHA1(3a6207d9c919319fc10b6de63bc030f8d335588e) )
-	ROM_LOAD32_WORD("0100550v.u11", 0x0000002, 0x007fffa, BAD_DUMP CRC(140a73bc) SHA1(3fd88797b6310f5849e901d032fbeb8a2d8604fb) )   // This is a bad .u8 from Indian Dream, not proper Top Banana .u11!!
+	ROM_LOAD32_WORD( "0100550v.u11", 0x000002, 0x080000, CRC(1c64b3b6) SHA1(80bbc6e3f47ab932e9c07e0c6063197a2d8e81f7) )
+	ROM_LOAD32_WORD( "0100550v.u7",  0x000000, 0x080000, CRC(9c5e2d66) SHA1(658143706c0e1f3b43b3ec301da1052363fe5244) )
 
 	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
 	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
@@ -3255,12 +3807,12 @@ ROM_END
 ROM_START( trstrove )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b98
-		0x000000-0x0638d7 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x7fa3a1a8
-			Calculated Checksum 0x7fa3a1a8  (OK)
-		0x0638d8-0x158933 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x0638d8-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included	
+	    Checksum code found at 0x000b98
+	    0x000000-0x0638d7 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x7fa3a1a8
+	        Calculated Checksum 0x7fa3a1a8  (OK)
+	    0x0638d8-0x158933 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x0638d8-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("01j00161.u7",  0x0000000, 0x0080000, CRC(07a8b338) SHA1(7508d7d0e3494d355cb773165b240ba876a60eec) )
@@ -3277,12 +3829,12 @@ ROM_END
 ROM_START( tritreat )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000d18
-		0x000000-0x07089b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x56d2b752
-			Calculated Checksum 0x56d2b752  (OK)
-		0x07089c-0x2903cf is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x07089c-0x2fffff is the non-Checksummed range if the additional vectors? at the end are included	
+	    Checksum code found at 0x000d18
+	    0x000000-0x07089b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x56d2b752
+	        Calculated Checksum 0x56d2b752  (OK)
+	    0x07089c-0x2903cf is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x07089c-0x2fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
@@ -3302,12 +3854,12 @@ ROM_END
 ROM_START( trojhors )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000bb8
-		0x000000-0x06e9f7 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x071faa81
-			Calculated Checksum 0x071faa81  (OK)
-		0x06e9f8-0x2df4f7 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x06e9f8-0x2fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000bb8
+	    0x000000-0x06e9f7 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x071faa81
+	        Calculated Checksum 0x071faa81  (OK)
+	    0x06e9f8-0x2df4f7 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x06e9f8-0x2fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("01j00851.u7",  0x0000000, 0x0080000, CRC(7be0caf5) SHA1(b83fba7eb4624b3dc56f763b48b7c45fe31f3396) )
@@ -3330,12 +3882,12 @@ ROM_END
 ROM_START( trpdlght )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000d08
-		0x000000-0x0b2d1f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x910fae87
-			Calculated Checksum 0x2485ae87  (BAD)
-		0x0b2d20-0x15384f is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x0b2d20-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000d08
+	    0x000000-0x0b2d1f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x910fae87
+	        Calculated Checksum 0x2485ae87  (BAD)
+	    0x0b2d20-0x15384f is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x0b2d20-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	// the checksum only covers part of the first 2 roms, marked all as BAD_DUMP because it can't be trusted without a full redump.
@@ -3353,12 +3905,12 @@ ROM_END
 ROM_START( unicornd )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000bf8
-		0x000000-0x05f36f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x2f8bff86
-			Calculated Checksum 0x2f8bff86  (OK)
-		0x05f370-0x1d0a3f is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x05f370-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000bf8
+	    0x000000-0x05f36f is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x2f8bff86
+	        Calculated Checksum 0x2f8bff86  (OK)
+	    0x05f370-0x1d0a3f is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x05f370-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0100791v.u7",  0x0000000, 0x0080000, CRC(d785d1b3) SHA1(4aa7c61036dd5fe1cdbc6c39a89881f88f3dd148) )
@@ -3385,21 +3937,21 @@ ROM_START( unicorndnz )
 	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
 ROM_END
 
-ROM_START( wamazon )
+ROM_START( wamazona )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b68
-		0x000000-0x052b8b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xc07f695c
-			Calculated Checksum 0xc07f695c  (OK)
-		0x052b8c-0x1fffef is the non-Checksummed range still containing data but NOT covered by Checksum  (unusual)
-		0x052b8c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included		
+	    Checksum code found at 0x000b68
+	    0x000000-0x052b8b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xc07f695c
+	        Calculated Checksum 0xc07f695c  (OK)
+	    0x052b8c-0x1fffef is the non-Checksummed range still containing data but NOT covered by Checksum  (unusual)
+	    0x052b8c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0200285v.u7",  0x0000000, 0x0080000, CRC(bfa21358) SHA1(6b76656401b3dbbace8d4335951468b9885fc7f0) )
 	ROM_LOAD32_WORD("0200285v.u11", 0x0000002, 0x0080000, CRC(54b2a375) SHA1(635fde5c678b908fa58c0e04ba9b7a84fac1f7fe) )
 	ROM_LOAD32_WORD("0200285v.u8",  0x0100000, 0x0080000, CRC(4e39f128) SHA1(91d3c6a9e5c30275c3f8967dde55214df097f2ba) )
-	ROM_LOAD32_WORD("0200285v.u12", 0x0100002, 0x0080000, CRC(2cd12986) SHA1(b6b0bd6dd8c964498edc3763cb5c450795042a8d) )
+	ROM_LOAD32_WORD("0200285v.u12", 0x0100002, 0x0080000, BAD_DUMP CRC(2cd12986) SHA1(b6b0bd6dd8c964498edc3763cb5c450795042a8d) ) // actually a bad dump of u7 from oscara5!
 
 	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
 	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
@@ -3407,14 +3959,14 @@ ROM_START( wamazon )
 ROM_END
 
 
-ROM_START( wamazona )
+ROM_START( wamazon )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b68
-		0x000000-0x05c043 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x2c7f1cbb
-			Calculated Checksum 0x2c7f1cbb  (OK)
-		0x05c044-0x0f60cb is the non-Checksummed range (unusual endpoint)
+	    Checksum code found at 0x000b68
+	    0x000000-0x05c043 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x2c7f1cbb
+	        Calculated Checksum 0x2c7f1cbb  (OK)
+	    0x05c044-0x0f60cb is the non-Checksummed range (unusual endpoint)
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0200507v.u7",  0x0000000, 0x0080000, CRC(44576def) SHA1(3396460444ceb394c9c88e5fc37ccedcfc4b179c) )
@@ -3428,12 +3980,12 @@ ROM_END
 ROM_START( wamazonv )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b68
-		0x000000-0x07b2f3 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x7b4d5882
-			Calculated Checksum 0x7b4d5882  (OK)
-		0x07b2f4-0x11537b is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x07b2f4-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
+	    Checksum code found at 0x000b68
+	    0x000000-0x07b2f3 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x7b4d5882
+	        Calculated Checksum 0x7b4d5882  (OK)
+	    0x07b2f4-0x11537b is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x07b2f4-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
@@ -3451,11 +4003,11 @@ ROM_END
 ROM_START( wildbill )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000ad8
-		0x000000-0x054e6b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xd6b20386
-			Calculated Checksum 0xd6b20386  (OK)
-		0x054e6c-0x0ec99f is the non-Checksummed range (unusual endpoint)
+	    Checksum code found at 0x000ad8
+	    0x000000-0x054e6b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xd6b20386
+	        Calculated Checksum 0xd6b20386  (OK)
+	    0x054e6c-0x0ec99f is the non-Checksummed range (unusual endpoint)
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0100297v.u7",  0x0000000, 0x0080000, CRC(e3117ab7) SHA1(c13912f524f1c1d373adb6382ceddd1bc18f7f02) )
@@ -3470,12 +4022,12 @@ ROM_END
 ROM_START( wcougar )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000adc
-		0x000000-0x043573 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x0a061a1a
-			Calculated Checksum 0x0a061a1a  (OK)
-		0x043574-0x1061fb is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x043574-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included	
+	    Checksum code found at 0x000adc
+	    0x000000-0x043573 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x0a061a1a
+	        Calculated Checksum 0x0a061a1a  (OK)
+	    0x043574-0x1061fb is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x043574-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0100167v.u7",  0x0000000, 0x0080000, CRC(47154679) SHA1(21749fbaa60f9bf1db43bdd272e6628ae73bf759) )
@@ -3493,14 +4045,14 @@ ROM_END
 // Wild Cougar - Export D - 19/05/97.
 // All devices are 27c4002 instead of 27c4096.
 ROM_START( wcougaru )
-	ARISTOCRAT_MK5_BIOS
+	ARISTOCRAT_MK5_BIOS_HAVE_EEPROMS
 	/*
-		Checksum code found at 0x000d08
-		0x000000-0x0b0d5b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0xdfe9eb92
-			Calculated Checksum 0xdfe9eb92  (OK)
-		0x0b0d5c-0x153803 is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x0b0d5c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included	
+	    Checksum code found at 0x000d08
+	    0x000000-0x0b0d5b is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0xdfe9eb92
+	        Calculated Checksum 0xdfe9eb92  (OK)
+	    0x0b0d5c-0x153803 is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x0b0d5c-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "nhg029604.u7",  0x000000, 0x80000, CRC(7ada053f) SHA1(5102b0b9db505454624750a3fd6db455682538f3) )
@@ -3511,20 +4063,59 @@ ROM_START( wcougaru )
 	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
 	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
 	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+
+	ROM_REGION16_BE( 0x100, "eeprom0", 0 )
+	ROM_LOAD16_WORD_SWAP( "eeprom0",      0x000000, 0x000100, CRC(fea8a821) SHA1(c744cac6af7621524fc3a2b0a9a135a32b33c81b) )
+
+	ROM_REGION16_BE( 0x100, "eeprom1", 0 )
+	ROM_LOAD16_WORD_SWAP( "eeprom1",      0x000000, 0x000100, CRC(8421e7c2) SHA1(fc1b07d5b7aadafc4a0f2e4dfa698e7c72340717) )
+
+	ROM_REGION( 0x80000, "nvram", 0 )
+	ROM_LOAD( "nvram",        0x000000, 0x080000, CRC(dfe52286) SHA1(db31fb64e2fff8aa5ba0cc6d3d73860e8019406c) )
+
+	ROM_REGION( 0x20, "rtc", 0 )
+	ROM_LOAD( "rtc",          0x000000, 0x00001f, CRC(6909acb0) SHA1(6a4589599cd1c477e916474e7b029e9a4e92019b) )
 ROM_END
 
+ROM_START( wizways )
+	ARISTOCRAT_MK5_BIOS
+
+	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
+	ROM_LOAD32_WORD("0200396v.u7",  0x0000000, 0x0080000, CRC(85fca945) SHA1(ca48a907b4f6c1b665ae053e2992681f02166cb1) )
+	ROM_LOAD32_WORD("0200396v.u11", 0x0000002, 0x0080000, CRC(677c855f) SHA1(a4ec8e6151271af292379ead28214ef9163bfdc3) )
+	ROM_LOAD32_WORD("0200396v.u8",  0x0100000, 0x0080000, CRC(4b1192ae) SHA1(2537249ccfc8c507762ac2c46d05ef13fa3d0bf9) )
+	ROM_LOAD32_WORD("0200396v.u12", 0x0100002, 0x0080000, CRC(934d7286) SHA1(205f72b62d83667e9068141346bda3bcb9742a83) )
+
+	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
+	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
+	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+ROM_END
+
+ROM_START( wnpost )
+	ARISTOCRAT_MK5_BIOS
+
+	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
+	ROM_LOAD32_WORD("rhg041804.u7",  0x0000000, 0x0080000, CRC(73274802) SHA1(9838a63d5f4e1bf31675ac15c34a17e709f2f647) )
+	ROM_LOAD32_WORD("rhg041804.u11", 0x0000002, 0x0080000, CRC(4f076a94) SHA1(2962429c930ffc17e2f37a006215ee6f1c649953) )
+	ROM_LOAD32_WORD("rhg041804.u8",  0x0100000, 0x0080000, CRC(b1830ffa) SHA1(c23a97bfdfe9e408f0ec8053646d6c8c8e06a263) )
+	ROM_LOAD32_WORD("rhg041804.u12", 0x0100002, 0x0080000, CRC(ff70b305) SHA1(3c832ed20b1d00318fd3d2428bb469735f68965b) )
+
+	ROM_REGION( 0x800000, "maincpu", ROMREGION_ERASE00 ) /* ARM Code */
+	ROM_REGION( 0x200000, "vram", ROMREGION_ERASE00 )
+	ROM_REGION( 0x20000*4, "sram", ROMREGION_ERASE00 )
+ROM_END
 
 ROM_START( wthing )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000b74
-		0x000000-0x0673cb is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x89dd307a
-			Calculated Checksum 0x89dd307a  (OK)
-		0x0673cc-0x1b367b is the non-Checksummed range still containing data but NOT covered by Checksum
-		0x0673cc-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included	
+	    Checksum code found at 0x000b74
+	    0x000000-0x0673cb is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x89dd307a
+	        Calculated Checksum 0x89dd307a  (OK)
+	    0x0673cc-0x1b367b is the non-Checksummed range still containing data but NOT covered by Checksum
+	    0x0673cc-0x1fffff is the non-Checksummed range if the additional vectors? at the end are included
 	*/
-		
+
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD("0101158v.u7",  0x0000000, 0x0080000, CRC(eb402ffb) SHA1(49ef6ca2503a6e785f62cb29e505e5c2ba019e37) )
 	ROM_LOAD32_WORD("0101158v.u11", 0x0000002, 0x0080000, CRC(61d22f2e) SHA1(b836e5afbd5bb14ae68e100a6042f1953ed57a21) )
@@ -3540,11 +4131,11 @@ ROM_END
 ROM_START( wtiger )
 	ARISTOCRAT_MK5_BIOS
 	/*
-		Checksum code found at 0x000d30
-		0x000000-0x060227 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
-			Expected Checksum   0x61da8e77
-			Calculated Checksum 0x61da8e77  (OK)
-		0x060228-0x0d61cf is the non-Checksummed range (unusual endpoint)	
+	    Checksum code found at 0x000d30
+	    0x000000-0x060227 is the Checksummed Range (excluding 0x000020-0x000027 where Checksum is stored)
+	        Expected Checksum   0x61da8e77
+	        Calculated Checksum 0x61da8e77  (OK)
+	    0x060228-0x0d61cf is the non-Checksummed range (unusual endpoint)
 	*/
 	ROM_REGION( 0x400000, "game_prg", ROMREGION_ERASEFF )
 	ROM_LOAD32_WORD( "0200954v.u7",  0x000000, 0x80000, CRC(752e54c5) SHA1(9317544a7cf2d9bf29347d31fe72331fc3d018ef) )
@@ -3567,120 +4158,137 @@ ROM_END
 GAME( 1995, aristmk5,  0,        aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "MKV Set/Clear Chips (USA)",                    MACHINE_FLAGS|MACHINE_IS_BIOS_ROOT )
 
 // Dates listed below are for the combination (reel layout), not release dates
-GAME( 1998, adonis,    aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Adonis (0200751V, NSW/ACT)",                   MACHINE_FLAGS )  // 602/9,    A - 25/05/98, Rev 10
-GAME( 1998, adonisa,   adonis,   aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Adonis (0100751V, NSW/ACT)",                   MACHINE_FLAGS )  // 602/9,    A - 25/05/98, Rev 9
-GAME( 2001, adonisu,   adonis,   aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Adonis (BHG1508, US)",                         MACHINE_FLAGS )  // MV4124/1, B - 31/07/01 - BAD DUMP
-GAME( 1999, adonisce,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Adonis - Cash Express (0201005V, NSW/ACT)",    MACHINE_FLAGS )  // 602/9, C - 06/07/99
-GAME( 1996, baddog,    aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Bad Dog Poker (0200428V, NSW/ACT)",            MACHINE_FLAGS )  // 386/56, A - 17/12/96
-GAME( 1996, blackpnt,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Black Panther (0200818V, Victoria)",           MACHINE_FLAGS )  // 594/1, A - 30/07/96
-GAME( 1998, bootsctn,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Boot Scootin' (0100812V, NSW/ACT)",            MACHINE_FLAGS )  // 616/1, B - 11/12/98
-GAME( 1999, bootsctnu, bootsctn, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Boot Scootin' (GHG1012-02, US)",               MACHINE_FLAGS )  // MV4098,   A - 25/08/99 - BAD DUMP
-GAME( 1996, bumblbug,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Bumble Bugs (0200510V, NSW/ACT)",              MACHINE_FLAGS )  // 593, D - 5/07/96
-GAME( 1996, bumblbugql,bumblbug, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Bumble Bugs (0200456V, Queensland)",           MACHINE_FLAGS )  // 593,      D - 5/07/96
-GAME( 1997, bumblbugu, bumblbug, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Bumble Bugs (CHG0479-03, US)",                 MACHINE_FLAGS )  // 593,      D - 05/07/97 - BAD DUMP
-GAME( 1995, buttdeli,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Butterfly Delight (0200143V, NSW/ACT)",        MACHINE_FLAGS )  // 571/4, A - 19/12/95
-GAME( 1999, cashcat,   aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Cash Cat (0300863V, New Zealand)",             MACHINE_FLAGS )  // MV4089, A - 4/1/99
-GAME( 1997, cashcham,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Cash Chameleon (0100438V, NSW/ACT)",           MACHINE_FLAGS )  // 603/1, C  - 15/4/97
-GAME( 1996, cashchamu, cashcham, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Cash Chameleon (DHG4078-99, US)",              MACHINE_FLAGS )  // 603(a),   B - 06/12/96 - BAD DUMP
-GAME( 1998, cashchama, cashcham, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Cash Chameleon (0200437V, NSW/ACT)",           MACHINE_FLAGS )  // 603(a), D - 18/02/98
-GAME( 1998, cashchamnz,cashcham, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Cash Chameleon (0300781V, New Zealand)",       MACHINE_FLAGS )  // MV4067, A - 31/08/98
-GAME( 1997, cashcra5,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Cash Crop (0300467V, NSW/ACT)",                MACHINE_FLAGS )  // 607, C - 14/07/97
-GAME( 1998, chariotc,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "The Chariot Challenge (04J00714, NSW/ACT)",    MACHINE_FLAGS )  // 630,      A - 10/08/98, Rev 12
-GAME( 1998, chariotca, chariotc, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "The Chariot Challenge (0100787V, NSW/ACT)",    MACHINE_FLAGS )  // 630/1, A - 10/08/98
-GAME( 2001, checkma5,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Checkmate (01J00681, NSW/ACT)",                MACHINE_FLAGS )  // JB011, B - 06/07/01
-GAME( 1996, chickna5,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Chicken (0100351V, NSW/ACT)",                  MACHINE_FLAGS )  // 596, A - 27/08/96
-GAME( 1998, chickna5u, chickna5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Chicken (RHG0730-03, US)",                     MACHINE_FLAGS )  // 596,      C - 23/02/98 - BAD DUMP
-GAME( 1998, chickna5qld,chickna5,aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Chicken (0200530V, Queensland)",               MACHINE_FLAGS )  // 596, C - 23/02/98
-GAME( 1998, coralrc2,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Coral Riches II (0100919V, NSW/ACT)",          MACHINE_FLAGS )  // 577/7, A - 29/12/98
-GAME( 1998, cuckoo,    aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Cuckoo (0200753V, NSW/ACT)",                   MACHINE_FLAGS )  // 615/1, D - 03/07/98
-GAME( 2000, cuckoou,   cuckoo,   aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Cuckoo (CHG1195, US)",                         MACHINE_FLAGS )  // MV4104,   C - 02/02/00
-GAME( 1995, dstbloom,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Desert Bloom (0200111V, NSW/ACT)",             MACHINE_FLAGS )  // 577/2, A - 12/10/95
-GAME( 1999, diamdove,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Diamond Dove (0101018V, NSW/ACT)",             MACHINE_FLAGS )  // 640, B - 19/05/99
-GAME( 1996, dmdfever,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Diamond Fever (0200302V, NSW/ACT)",            MACHINE_FLAGS )  // 483/7, E - 05/09/96
-GAME( 1997, dimtouch,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Diamond Touch (0400433V, NSW/ACT)",            MACHINE_FLAGS )  // 604,      E - 30/06/97
-GAME( 1996, dolphntr,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Dolphin Treasure (0200424V, NSW/ACT)",         MACHINE_FLAGS )  // 602/1,    B - 06/12/96, Rev 3
-GAME( 1996, dolphntra, dolphntr, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Dolphin Treasure (0100424V, NSW/ACT)",         MACHINE_FLAGS )  // 602/1,    B - 06/12/96, Rev 1.24.4.0
-GAME( 1996, dolphntrb, dolphntr, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Dolphin Treasure (0100388V, NSW/ACT)",         MACHINE_FLAGS )  // 602, B - 10/12/96
-GAME( 1996, dolphntru, dolphntr, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Dolphin Treasure (FHG4077-02, US)",            MACHINE_FLAGS )  // 602/1,    B - 06/12/96
-GAME( 2000, dynajack,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Dynamite Jack (01J00081, NSW/ACT)",            MACHINE_FLAGS )  // JB004, A - 12/07/2000
-GAME( 1998, eldorda5,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "El Dorado (0100652V, NSW/ACT)",                MACHINE_FLAGS )  // 623, B - 24/03/98
-GAME( 1995, eforsta5,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Enchanted Forest (0400122V, NSW/ACT)",         MACHINE_FLAGS )  // 570/3,    E - 23/06/95
-GAME( 1997, eforsta5u, eforsta5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Enchanted Forest (JHG0415-03, US)",            MACHINE_FLAGS )  // MV4033,   B - 10/02/97
-GAME( 2000, fortellr,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Fortune Teller (01J00131, NSW/ACT)",           MACHINE_FLAGS )  // JB006, D - 24/11/2000
-GAME( 1998, gambler,   aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "The Gambler (EHG0916-02, US)",                 MACHINE_FLAGS )  // MV4084/1, A - 30/10/98 - POSSIBLE BAD DUMP
-GAME( 2001, geisha,    aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Geisha (0101408V, New Zealand)",               MACHINE_FLAGS )  // MV4127,   A - 05/03/01
-GAME( 1999, genmagi,   aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Genie Magic (0200894V, NSW/ACT)",              MACHINE_FLAGS )  // ???,   C - 15/02/99
-GAME( 1998, gnomeatw,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Gnome Around The World (0100767V, NSW/ACT)",   MACHINE_FLAGS )  // 625, C - 18/12/98
-GAME( 1997, goldpyr,   aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Golden Pyramids (AHG1205-03, US)",             MACHINE_FLAGS )  // MV4091,   B - 13/05/97
-GAME( 1997, goldpyra,  goldpyr,  aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Golden Pyramids (AHG1206-99, US)",             MACHINE_FLAGS )  // 602/2,    B - 13/05/97 - BAD DUMP
-GAME( 2000, goldenra,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Golden Ra (0101164V, NSW/ACT)",                MACHINE_FLAGS )  // 661, A - 10/04/00
-GAME( 1999, incasun,   aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Inca Sun (0100872V, NSW/ACT)",                 MACHINE_FLAGS )  // 631/3 B, B - 03/05/99
-GAME( 1999, incasunsp, incasun,  aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Inca Sun (0100872V, NSW/ACT, Show Program)",   MACHINE_FLAGS )  // 631/3 B, B - 03/05/99
-GAME( 2000, incasunnz, incasun,  aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Inca Sun (0101108V, New Zealand)",             MACHINE_FLAGS )  // MV4113, A - 6/3/00
-GAME( 2000, incasunu,  incasun,  aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Inca Sun (CHG1458, US)",                       MACHINE_FLAGS )  // MV4130/3, A - 05/09/00
-GAME( 1998, indrema5,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Indian Dreaming (0100845V, NSW/ACT)",          MACHINE_FLAGS )  // 628/1,    B - 15/12/98
-GAME( 1996, jungjuic,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Jungle Juice (0200240V, New Zealand)",         MACHINE_FLAGS )  // 566/3, F - 06/03/96
-GAME( 1995, kgalah,    aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "King Galah (0200536V, NSW/ACT)",               MACHINE_FLAGS )  // 613/6, A - 21/07/95
-GAME( 2001, koalamnt,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Koala Mint (CHG1573, US)",                     MACHINE_FLAGS )  // MV4137,   A - 12/09/01 - BAD DUMP
-GAME( 1998, kookabuk,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Kooka Bucks (0100677V, NSW/ACT)",              MACHINE_FLAGS )  // 661, A - 03/04/98
-GAME( 1997, locoloot,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Loco Loot (0100472V, NSW/ACT)",                MACHINE_FLAGS )  // 599/2, C - 17/06/97
-GAME( 1998, locolootnz,locoloot, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Loco Loot (0600725V, New Zealand)",            MACHINE_FLAGS )  // MV4064, A - 8/7/98
-GAME( 1997, lonewolf,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Lone Wolf (0100587V, NSW/ACT)",                MACHINE_FLAGS )  // 621, A - 29/10/97
-GAME( 1997, mgarden,   aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Magic Garden (AHG1211-99, US)",                MACHINE_FLAGS )  // MV4033,   B - 10/02/97 - BAD DUMP
-GAME( 2000, magimask,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Magic Mask (DHG1309, US)",                     MACHINE_FLAGS )  // MV4115,   A - 09/05/00
-GAME( 2000, magimaska, magimask, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Magic Mask (AHG1548, US)",                     MACHINE_FLAGS )  // MV4115,   A - 09/05/00
-GAME( 1997, magtcha5,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Magic Touch (0200455V, NSW/ACT)",              MACHINE_FLAGS )  // 606, A - 06/03/97
-GAME( 2000, marmagic,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Margarita Magic (01J00101, NSW/ACT)",          MACHINE_FLAGS )  // JB005,    A - 07/07/00
-GAME( 2000, marmagicu, marmagic, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Margarita Magic (EHG1559, US)",                MACHINE_FLAGS )  // US003,    A - 07/07/00 - BAD DUMP
-GAME( 1996, minemine,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Mine, Mine, Mine (VHG0416-99, US)",            MACHINE_FLAGS )  // 559/2,    E - 14/02/96
-GAME( 1997, monmouse,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Money Mouse (0400469V, NSW/ACT)",              MACHINE_FLAGS )  // 607/1, B - 08/04/97
-GAME( 2001, montree,   aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Money Tree (0201397V, New Zealand)",           MACHINE_FLAGS )  // MV4126, C - 12/04/01
-GAME( 1996, mountmon,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Mountain Money (0100294V, NSW/ACT)",           MACHINE_FLAGS )  //595/3, B - 11/06/96
-GAME( 2000, multidrw,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Multidraw - Free Games (0200956V, NSW/ACT)",   MACHINE_FLAGS )  // 386/64, E - 08/05/00
-GAME( 1996, mystgard,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Mystic Garden (0100275V, NSW/ACT)",            MACHINE_FLAGS )  // 595/1, B - 11/06/96
-GAME( 1999, orchidms,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Orchid Mist (0200849V, NSW/ACT)",              MACHINE_FLAGS )  // 601/3, C - 03/02/99
-GAME( 1996, oscara5,   aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Oscar (0200348V, NSW/ACT)",                    MACHINE_FLAGS )  // 593/2, C - 20/09/96
-GAME( 1999, pantmag,   aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Panther Magic (0101046V, NSW/ACT)",            MACHINE_FLAGS )  // 594/7, A - 06/10/99
-GAME( 2001, partygrs,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Party Gras (AHG1567, US)",                     MACHINE_FLAGS )  // MV4115/6, A - 10/11/01
-GAME( 2001, partygrsa, partygrs, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Party Gras (BHG1284, US)",                     MACHINE_FLAGS )  // MV4115/3, B - 06/02/01 - BAD DUMP
-GAME( 2000, peaflut,   aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Peacock Flutter (02J00011, NSW/ACT)",          MACHINE_FLAGS )  // JB001, A - 10/03/00
-GAME( 1997, pengpay,   aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Penguin Pays (0200460V, NSW/ACT)",             MACHINE_FLAGS )  // 586/4(a), D - 03/06/97
-GAME( 1996, pengpaya,  pengpay,  aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Penguin Pays (0200357V, NSW/ACT)",             MACHINE_FLAGS )  // 586/4, C - 12/11/96
-GAME( 1997, pengpayb,  pengpay,  aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Penguin Pays (0200359V, NSW/ACT)",             MACHINE_FLAGS )  // 586/3(a), D - 03/06/97
-GAME( 1997, pengpayu,  pengpay,  aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Penguin Pays (BHI0417-03, US)",                MACHINE_FLAGS )  // 586/7(b)  B - 14/07/97
-GAME( 1998, petshop,   aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Pet Shop (0100679V, NSW/ACT)",                 MACHINE_FLAGS )  // 618, A - 09/03/98 - BAD DUMP
-GAME( 1996, przfight,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Prize Fight (0100299V, NSW/ACT)",              MACHINE_FLAGS )  // 578/4, B - 08/08/96
-GAME( 1998, qcash,     aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Queens of Cash (0100706V, NSW/ACT)",           MACHINE_FLAGS )  // 603/6, C  - 23/07/98
-GAME( 1997, qnile,     aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Queen of the Nile (0100439V, NSW/ACT)",        MACHINE_FLAGS )  // 602/4, B - 13/05/97
-GAME( 1997, qnilea,    qnile,    aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Queen of the Nile (0300440V, NSW/ACT)",        MACHINE_FLAGS )  // 602/3, B - 13/05/97
-GAME( 1997, qnileb,    qnile,    aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Queen of the Nile (0200439V, NSW/ACT)",        MACHINE_FLAGS )  // 602/4,    B - 13/05/97
-GAME( 1997, qnilec,    qnile,    aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Queen of the Nile (0300439V, NSW/ACT)",        MACHINE_FLAGS )  // 602/4,    B - 13/05/97
-GAME( 1997, qnileu,    qnile,    aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Queen of the Nile (GHG4091-02, US)",           MACHINE_FLAGS )  // MV4091,   B - 13/05/97
-GAME( 1999, qnilemax,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Queen of the Nile - Maximillions (0401072V, NSW/ACT)", MACHINE_FLAGS )  // 602/4, D - 18/06/99
-GAME( 2000, rainwrce,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Rainbow Warriors - Cash Express (0101332V, NSW/ACT)",  MACHINE_FLAGS )  // 655, B - 02/03/00
-GAME( 1998, reelrock,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Reelin-n-Rockin (0100779V, NSW/ACT)",          MACHINE_FLAGS )  // 628,      A - 13/07/98
-GAME( 1997, retrsam,   aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Return of the Samurai (0400549V, NSW/ACT)",    MACHINE_FLAGS )  // 608, A - 17/04/97
-GAME( 1997, retrsama,  retrsam,  aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Return of the Samurai (0200506V, NSW/ACT)",    MACHINE_FLAGS )  // 608, A - 17/04/97
-GAME( 1997, retrsamb,  retrsam,  aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Return of the Samurai (0200549V, NSW/ACT)",    MACHINE_FLAGS )  // 608, A - 17/04/97
-GAME( 1997, sumospin,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Sumo Spins (0200606V, NSW/ACT)",               MACHINE_FLAGS )  // 622, A - 08/12/97
-GAME( 1999, sbuk2,     aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Super Bucks II (0400501V, NSW/ACT)",           MACHINE_FLAGS )  // 578, G - 26/07/99
-GAME( 1998, sbuk3,     aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Super Bucks III (0200711V, NSW/ACT)",          MACHINE_FLAGS )  // 626, A - 22/04/98
-GAME( 1995, swhr2,     aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Sweethearts II (0200004V, NSW/ACT)",           MACHINE_FLAGS )  // 577/1, C - 07/09/95
-GAME( 1998, swhr2u,    swhr2,    aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Sweethearts II (PHG0742-02, US)",              MACHINE_FLAGS )  // MV4061,   A - 29/06/98 - BAD DUMP
-GAME( 1995, swhr2v,    swhr2,    aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Sweet Hearts II (01J01986, Venezuela)",        MACHINE_FLAGS )  // 577/1,    C - 07/09/95
-GAME( 199?, topbana,   aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Top Banana (0100550V, NSW/ACT)",               MACHINE_FLAGS )  // BAD DUMP
-GAME( 2000, trstrove,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Treasure Trove (01J00161, NSW/ACT)",           MACHINE_FLAGS )  // JB001/3, A - 5/10/00
-GAME( 2002, tritreat,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Triple Treat (0201692V, NSW/ACT)",             MACHINE_FLAGS )  // 692, A - 17/05/02
-GAME( 2001, trojhors,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Trojan Horse (01J00851, NSW/ACT)",             MACHINE_FLAGS )  // JB001/5, A - 30/10/01
-GAME( 1997, trpdlght,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Tropical Delight (PHG0625-02, US)",            MACHINE_FLAGS )  // 577/3,    D - 24/09/97 - BAD DUMP
-GAME( 1998, unicornd,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Unicorn Dreaming (0100791V, NSW/ACT)",         MACHINE_FLAGS )  // 631/1, A - 31/08/98
-GAME( 2000, unicorndnz,unicornd, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Unicorn Dreaming (0101228V, New Zealand)",      MACHINE_FLAGS )  // MV4113/1, A - 05/04/2000
-GAME( 1996, wamazon,   aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Wild Amazon (0200285V, NSW/ACT)",              MACHINE_FLAGS )  // 506/6, A - 7/5/96
-GAME( 1996, wamazona,  wamazon,  aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Wild Amazon (0200507V, NSW/ACT)",              MACHINE_FLAGS )  // 506/8, A - 10/10/96
-GAME( 1996, wamazonv,  wamazon,  aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Wild Amazon (01J01996, Venezuela)",            MACHINE_FLAGS )  // 506/8, A - 10/10/96
-GAME( 1996, wildbill,  aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Wild Bill (0100297V, NSW/ACT)",                MACHINE_FLAGS )  // 543/8, C - 15/08/96
-GAME( 1996, wcougar,   aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Wild Cougar (0100167V, NSW/ACT)",              MACHINE_FLAGS )  // 569/9, B - 27/2/96
-GAME( 1997, wcougaru,  wcougar,  aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Wild Cougar (NHG0296-04, US)",                 MACHINE_FLAGS )  // 569/8,    D - 19/05/97
-GAME( 1999, wthing,    aristmk5, aristmk5_usa, aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Wild Thing (0101158V, NSW/ACT)",               MACHINE_FLAGS )  // 608/4, B - 14/12/99
-GAME( 1999, wtiger,    aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "White Tiger Classic (0200954V, NSW/ACT)",      MACHINE_FLAGS )  // 638/1,    B - 08/07/99
+GAMEL( 1998, adonis,    aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Adonis (0200751V, NSW/ACT)",                   MACHINE_FLAGS, layout_aristmk5 )  // 602/9,    A - 25/05/98, Rev 10
+GAMEL( 1998, adonisa,   adonis,   aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Adonis (0100751V, NSW/ACT)",                   MACHINE_FLAGS, layout_aristmk5 )  // 602/9,    A - 25/05/98, Rev 9
+GAMEL( 1999, adonisce,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Adonis - Cash Express (0201005V, NSW/ACT)",    MACHINE_FLAGS, layout_aristmk5 )  // 602/9, C - 06/07/99
+GAMEL( 1996, baddog,    aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Bad Dog Poker (0200428V, NSW/ACT)",            MACHINE_FLAGS, layout_aristmk5 )  // 386/56, A - 17/12/96
+GAMEL( 1998, bootsctn,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Boot Scootin' (0100812V, NSW/ACT)",            MACHINE_FLAGS, layout_aristmk5 )  // 616/1, B - 11/12/98
+GAMEL( 1996, bumblbug,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Bumble Bugs (0200510V, NSW/ACT)",              MACHINE_FLAGS, layout_aristmk5 )  // 593, D - 5/07/96
+GAMEL( 1996, bumblbugql,bumblbug, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Bumble Bugs (0200456V, Queensland)",           MACHINE_FLAGS, layout_aristmk5 )  // 593,      D - 5/07/96
+GAMEL( 1995, buttdeli,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Butterfly Delight (0200143V, NSW/ACT)",        MACHINE_FLAGS, layout_aristmk5 )  // 571/4, A - 19/12/95
+GAMEL( 1999, cashcat,   aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Cash Cat (0300863V, New Zealand)",             MACHINE_FLAGS, layout_aristmk5 )  // MV4089, A - 4/1/99
+GAMEL( 1997, cashcham,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Cash Chameleon (0100438V, NSW/ACT)",           MACHINE_FLAGS, layout_aristmk5 )  // 603/1, C  - 15/4/97
+GAMEL( 1998, cashchama, cashcham, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Cash Chameleon (0200437V, NSW/ACT)",           MACHINE_FLAGS, layout_aristmk5 )  // 603(a), D - 18/02/98
+GAMEL( 1998, cashchamnz,cashcham, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Cash Chameleon (0300781V, New Zealand)",       MACHINE_FLAGS, layout_aristmk5 )  // MV4067, A - 31/08/98
+GAMEL( 1997, cashcra5,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Cash Crop (0300467V, NSW/ACT)",                MACHINE_FLAGS, layout_aristmk5 )  // 607, C - 14/07/97
+GAMEL( 1998, chariotc,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "The Chariot Challenge (04J00714, Venezuela)",   MACHINE_FLAGS, layout_aristmk5 )  // 630,      A - 10/08/98, Rev 12
+GAMEL( 1998, chariotca, chariotc, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "The Chariot Challenge (0100787V, NSW/ACT)",    MACHINE_FLAGS, layout_aristmk5 )  // 630/1, A - 10/08/98
+GAMEL( 2001, checkma5,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Checkmate (01J00681, NSW/ACT)",                MACHINE_FLAGS, layout_aristmk5 )  // JB011, B - 06/07/01
+GAMEL( 1996, chickna5,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Chicken (0100351V, NSW/ACT)",                  MACHINE_FLAGS, layout_aristmk5 )  // 596, A - 27/08/96
+GAMEL( 1998, chickna5u, chickna5, aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Chicken (RHG0730-03, US)",                 MACHINE_FLAGS, layout_aristmk5_us )  // 596,      C - 23/02/98
+GAMEL( 1998, chickna5qld,chickna5,aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Chicken (0200530V, Queensland)",               MACHINE_FLAGS, layout_aristmk5 )  // 596, C - 23/02/98
+GAMEL( 1998, coralrc2,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Coral Riches II (0100919V, NSW/ACT)",          MACHINE_FLAGS, layout_aristmk5 )  // 577/7, A - 29/12/98
+GAMEL( 1998, cuckoo,    aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Cuckoo (0200753V, NSW/ACT)",                   MACHINE_FLAGS, layout_aristmk5 )  // 615/1, D - 03/07/98
+GAMEL( 2000, cuckoou,   cuckoo,   aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Cuckoo (CHG1195, US)",                     MACHINE_FLAGS, layout_aristmk5_us )  // MV4104,   C - 02/02/00
+GAMEL( 1995, dstbloom,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Desert Bloom (0200111V, NSW/ACT)",             MACHINE_FLAGS, layout_aristmk5 )  // 577/2, A - 12/10/95
+GAMEL( 1999, diamdove,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Diamond Dove (0101018V, NSW/ACT)",             MACHINE_FLAGS, layout_aristmk5 )  // 640, B - 19/05/99
+GAMEL( 1996, dmdfever,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Diamond Fever (0200302V, NSW/ACT)",            MACHINE_FLAGS, layout_aristmk5 )  // 483/7, E - 05/09/96 - jumps to service mode
+GAMEL( 1997, dimtouch,  aristmk5, aristmk5_touch,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Diamond Touch (0400433V, NSW/ACT)",      MACHINE_FLAGS, layout_aristmk5 )  // 604,      E - 30/06/97
+GAMEL( 1996, dolphntr,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Dolphin Treasure (0200424V, NSW/ACT)",         MACHINE_FLAGS, layout_aristmk5 )  // 602/1,    B - 06/12/96, Rev 3
+GAMEL( 1996, dolphntra, dolphntr, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Dolphin Treasure (0100424V, NSW/ACT)",         MACHINE_FLAGS, layout_aristmk5 )  // 602/1,    B - 06/12/96, Rev 1.24.4.0
+GAMEL( 1996, dolphntrb, dolphntr, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Dolphin Treasure (0100388V, NSW/ACT)",         MACHINE_FLAGS, layout_aristmk5 )  // 602, B - 10/12/96
+GAMEL( 1996, dolphntru, dolphntr, aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Dolphin Treasure (FHG4077-02, US)",        MACHINE_FLAGS, layout_aristmk5_us )  // 602/1,    B - 06/12/96
+GAMEL( 1999, dolphntrce,dolphntr, aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Dolphin Treasure - Cash Express (AHG1606, US)",MACHINE_FLAGS, layout_aristmk5_us ) //  MV4090, D - 22/12/99
+GAMEL( 1997, drgneye,   aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Dragon's Eye (0100521V, NSW/ACT)",             MACHINE_FLAGS, layout_aristmk5 )  // 610, A - 09/05/97
+GAMEL( 2000, dynajack,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Dynamite Jack (01J00081, NSW/ACT)",            MACHINE_FLAGS, layout_aristmk5 )  // JB004, A - 12/07/2000
+GAMEL( 1998, eldorda5,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "El Dorado (0100652V, NSW/ACT)",                MACHINE_FLAGS, layout_aristmk5 )  // 623, B - 24/03/98
+GAMEL( 1995, eforsta5,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Enchanted Forest (0400122V, NSW/ACT)",         MACHINE_FLAGS, layout_aristmk5 )  // 570/3,    E - 23/06/95
+GAMEL( 2000, fortellr,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Fortune Teller (01J00131, NSW/ACT)",           MACHINE_FLAGS, layout_aristmk5 )  // JB006, D - 24/11/2000
+GAMEL( 2001, geisha,    aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Geisha (0101408V, New Zealand)",               MACHINE_FLAGS, layout_aristmk5 )  // MV4127,   A - 05/03/01
+GAMEL( 1999, genmagi,   aristmk5, aristmk5_touch,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Genie Magic (0200894V, NSW/ACT)",        MACHINE_FLAGS, layout_aristmk5 )  // ???,   C - 15/02/99
+GAMEL( 1998, gnomeatw,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Gnome Around The World (0100767V, NSW/ACT)",   MACHINE_FLAGS, layout_aristmk5 )  // 625, C - 18/12/98
+GAMEL( 1997, goldpyr,   aristmk5, aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Golden Pyramids (AHG1205-03, US)",         MACHINE_FLAGS, layout_aristmk5_us )  // MV4091,   B - 13/05/97
+GAMEL( 1998, goldpyrb,  goldpyr,  aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Golden Pyramids (0100878V, Victoria)",         MACHINE_FLAGS, layout_aristmk5 ) // 602/5, C - 19/06/98
+GAMEL( 2000, goldenra,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Golden Ra (0101164V, NSW/ACT)",                MACHINE_FLAGS, layout_aristmk5 )  // 661, A - 10/04/00
+GAMEL( 1999, incasun,   aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Inca Sun (0100872V, NSW/ACT)",                 MACHINE_FLAGS, layout_aristmk5 )  // 631/3 B, B - 03/05/99
+GAMEL( 1999, incasunsp, incasun,  aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Inca Sun (0100872V, NSW/ACT, Show Program)",   MACHINE_FLAGS, layout_aristmk5 )  // 631/3 B, B - 03/05/99
+GAMEL( 2000, incasunnz, incasun,  aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Inca Sun (0101108V, New Zealand)",             MACHINE_FLAGS, layout_aristmk5 )  // MV4113, A - 6/3/00
+GAMEL( 2000, incasunu,  incasun,  aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Inca Sun (CHG1458, US)",                   MACHINE_FLAGS, layout_aristmk5_us )  // MV4130/3, A - 05/09/00
+GAMEL( 1998, indrema5,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Indian Dreaming (0100845V, NSW/ACT)",          MACHINE_FLAGS, layout_aristmk5 )  // 628/1,    B - 15/12/98
+GAMEL( 1996, jungjuic,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Jungle Juice (0200240V, New Zealand)",         MACHINE_FLAGS, layout_aristmk5 )  // 566/3, F - 06/03/96
+GAMEL( 1995, kgalah,    aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "King Galah (0200536V, NSW/ACT)",               MACHINE_FLAGS, layout_aristmk5 )  // 613/6, A - 21/07/95
+GAMEL( 1994, kgbirdmk5, aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "K.G. Bird (0200024V, NSW/ACT)",               MACHINE_FLAGS, layout_aristmk5 )  // 540/3, D - 10/10/94
+GAMEL( 1998, kookabuk,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Kooka Bucks (0100677V, NSW/ACT)",              MACHINE_FLAGS, layout_aristmk5 )  // 661, A - 03/04/98
+GAMEL( 1997, locoloot,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Loco Loot (0100472V, NSW/ACT)",                MACHINE_FLAGS, layout_aristmk5 )  // 599/2, C - 17/06/97
+GAMEL( 1998, locolootnz,locoloot, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Loco Loot (0600725V, New Zealand)",            MACHINE_FLAGS, layout_aristmk5 )  // MV4064, A - 8/7/98
+GAMEL( 1997, lonewolf,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Lone Wolf (0100587V, NSW/ACT)",                MACHINE_FLAGS, layout_aristmk5 )  // 621, A - 29/10/97
+GAMEL( 2000, magimask,  aristmk5, aristmk5_usa_touch, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Magic Mask (DHG1309, US)",           MACHINE_FLAGS, layout_aristmk5_us )  // MV4115,   A - 09/05/00
+GAMEL( 2000, magimaska, magimask, aristmk5_usa_touch, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Magic Mask (AHG1548, US)",           MACHINE_FLAGS, layout_aristmk5_us )  // MV4115,   A - 09/05/00
+GAMEL( 1997, magtcha5,  aristmk5, aristmk5_touch,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Magic Touch (0200455V, NSW/ACT)",        MACHINE_FLAGS, layout_aristmk5 )  // 606, A - 06/03/97
+GAMEL( 2000, marmagic,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Margarita Magic (01J00101, NSW/ACT)",          MACHINE_FLAGS, layout_aristmk5 )  // JB005,    A - 07/07/00
+GAMEL( 2000, marmagicua,marmagic, aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Margarita Magic (EHG1558, US)",            MACHINE_FLAGS, layout_aristmk5_us )  // US003, 07/07/2000
+GAMEL( 1996, minemine,  aristmk5, aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Mine, Mine, Mine (VHG0416-99, US)",        MACHINE_FLAGS, layout_aristmk5_us )  // 559/2,    E - 14/02/96
+GAMEL( 1997, monmouse,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Money Mouse (0400469V, NSW/ACT)",              MACHINE_FLAGS, layout_aristmk5 )  // 607/1, B - 08/04/97
+GAMEL( 2001, montree,   aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Money Tree (0201397V, New Zealand)",           MACHINE_FLAGS, layout_aristmk5 )  // MV4126, C - 12/04/01
+GAMEL( 1996, mountmon,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Mountain Money (0100294V, NSW/ACT)",           MACHINE_FLAGS, layout_aristmk5 )  // 595/3, B - 11/06/96
+GAMEL( 2000, multidrw,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Multidraw - Free Games (0200956V, NSW/ACT)",   MACHINE_FLAGS, layout_aristmk5 )  // 386/64, E - 08/05/00
+GAMEL( 1996, mystgard,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Mystic Garden (0100275V, NSW/ACT)",            MACHINE_FLAGS, layout_aristmk5 )  // 595/1, B - 11/06/96
+GAMEL( 1999, orchidms,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Orchid Mist (0200849V, NSW/ACT)",              MACHINE_FLAGS, layout_aristmk5 )  // 601/3, C - 03/02/99
+GAMEL( 1996, oscara5,   aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Oscar (0200348V, NSW/ACT)",                    MACHINE_FLAGS, layout_aristmk5 )  // 593/2, C - 20/09/96
+GAMEL( 1999, pantmag,   aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Panther Magic (0101046V, NSW/ACT)",            MACHINE_FLAGS, layout_aristmk5 )  // 594/7, A - 06/10/99
+GAMEL( 1999, pantmaga,  pantmag,  aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Panther Magic (0100716V, NSW/ACT)",            MACHINE_FLAGS, layout_aristmk5 )  // 594/4, A - 13/05/98
+GAMEL( 2001, partygrs,  aristmk5, aristmk5_usa_touch, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Party Gras (AHG1567, US)",           MACHINE_FLAGS, layout_aristmk5_us )  // MV4115/6, A - 10/11/01
+GAMEL( 2000, peaflut,   aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Peacock Flutter (02J00011, NSW/ACT)",          MACHINE_FLAGS, layout_aristmk5 )  // JB001, A - 10/03/00
+GAMEL( 1997, pengpay,   aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Penguin Pays (0200460V, NSW/ACT)",             MACHINE_FLAGS, layout_aristmk5 )  // 586/4(a), D - 03/06/97
+GAMEL( 1996, pengpaya,  pengpay,  aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Penguin Pays (0200357V, NSW/ACT)",             MACHINE_FLAGS, layout_aristmk5 )  // 586/4, C - 12/11/96
+GAMEL( 1997, pengpayb,  pengpay,  aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Penguin Pays (0200359V, NSW/ACT)",             MACHINE_FLAGS, layout_aristmk5 )  // 586/3(a), D - 03/06/97
+GAMEL( 1997, pengpayu,  pengpay,  aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Penguin Pays (BHI0417-03, US)",            MACHINE_FLAGS, layout_aristmk5_us )  // 586/7(b)  B - 14/07/97
+GAMEL( 1998, petshop,	aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Pet Shop (0100731V, NSW/ACT)",             MACHINE_FLAGS, layout_aristmk5 )  // 618/1, A - 17/04/98
+GAMEL( 1995, phantpay,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Phantom Pays (0500005V, NSW/ACT)",             MACHINE_FLAGS, layout_aristmk5 )  // 570/1, E - 12/09/95
+GAMEL( 1998, penpir2,   aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Penguin Pirate II (0100869V, Victoria)",             MACHINE_FLAGS, layout_aristmk5 )  // 619/3, A - 17/12/98
+GAMEL( 1996, przfight,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Prize Fight (0100299V, NSW/ACT)",              MACHINE_FLAGS, layout_aristmk5 )  // 578/4, B - 08/08/96
+GAMEL( 1998, qcash,     aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Queens of Cash (0100706V, NSW/ACT)",           MACHINE_FLAGS, layout_aristmk5 )  // 603/6, C  - 23/07/98
+GAMEL( 1997, qnile,     aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Queen of the Nile (0100439V, NSW/ACT)",        MACHINE_FLAGS, layout_aristmk5 )  // 602/4, B - 13/05/97
+GAMEL( 1997, qnilea,    qnile,    aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Queen of the Nile (0300440V, NSW/ACT)",        MACHINE_FLAGS, layout_aristmk5 )  // 602/3, B - 13/05/97
+GAMEL( 1997, qnileb,    qnile,    aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Queen of the Nile (0200439V, NSW/ACT)",        MACHINE_FLAGS, layout_aristmk5 )  // 602/4,    B - 13/05/97
+GAMEL( 1997, qnilec,    qnile,    aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Queen of the Nile (0300439V, NSW/ACT)",        MACHINE_FLAGS, layout_aristmk5 )  // 602/4,    B - 13/05/97
+GAMEL( 1997, qnileu,    qnile,    aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Queen of the Nile (GHG4091-02, US)",       MACHINE_FLAGS, layout_aristmk5_us )  // MV4091,   B - 13/05/97
+GAMEL( 1999, qnilemax,  aristmk5, aristmk5_touch,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Queen of the Nile - Maximillions (0401072V, NSW/ACT)", MACHINE_FLAGS, layout_aristmk5 )  // 602/4, D - 18/06/99
+GAMEL( 1994, qtbird,    aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Q.T. Bird (0500009V, NSW/ACT)",             MACHINE_FLAGS, layout_aristmk5 )  //  581, A - 27/10/94
+GAMEL( 2000, rainwrce,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Rainbow Warriors - Cash Express (0101332V, NSW/ACT)",  MACHINE_FLAGS, layout_aristmk5 )  // 655, B - 02/03/00
+GAMEL( 1998, reelrock,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Reelin-n-Rockin (0100779V, NSW/ACT)",          MACHINE_FLAGS, layout_aristmk5 )  // 628,      A - 13/07/98
+GAMEL( 1997, retrsam,   aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Return of the Samurai (0400549V, NSW/ACT)",    MACHINE_FLAGS, layout_aristmk5 )  // 608, A - 17/04/97
+GAMEL( 1997, retrsama,  retrsam,  aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Return of the Samurai (0200506V, NSW/ACT)",    MACHINE_FLAGS, layout_aristmk5 )  // 608, A - 17/04/97
+GAMEL( 1997, retrsamb,  retrsam,  aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Return of the Samurai (0200549V, NSW/ACT)",    MACHINE_FLAGS, layout_aristmk5 )  // 608, A - 17/04/97
+GAMEL( 1997, sumospin,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Sumo Spins (0200606V, NSW/ACT)",               MACHINE_FLAGS, layout_aristmk5 )  // 622, A - 08/12/97
+GAMEL( 1998, sbuk3,     aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Super Bucks III (0200711V, NSW/ACT)",          MACHINE_FLAGS, layout_aristmk5 )  // 626, A - 22/04/98
+GAMEL( 1995, swhr2,     aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Sweethearts II (0200004V, NSW/ACT)",           MACHINE_FLAGS, layout_aristmk5 )  // 577/1, C - 07/09/95
+GAMEL( 1995, swhr2v,    swhr2,    aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Sweet Hearts II (01J01986, Venezuela)",        MACHINE_FLAGS, layout_aristmk5 )  // 577/1,    C - 07/09/95
+GAMEL( 1997, topbana,   aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Top Banana (0100550V, NSW/ACT)",               MACHINE_FLAGS, layout_aristmk5 )  // 594/3, A - 18/08/97
+GAMEL( 1998, toutango,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Toucan Tango (0100782V, NSW/ACT)",             MACHINE_FLAGS, layout_aristmk5 )  // 616/1, A - 17/06/98
+GAMEL( 2000, trstrove,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Treasure Trove (01J00161, NSW/ACT)",           MACHINE_FLAGS, layout_aristmk5 )  // JB001/3, A - 5/10/00
+GAMEL( 2002, tritreat,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Triple Treat (0201692V, NSW/ACT)",             MACHINE_FLAGS, layout_aristmk5 )  // 692, A - 17/05/02
+GAMEL( 2001, trojhors,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Trojan Horse (01J00851, NSW/ACT)",             MACHINE_FLAGS, layout_aristmk5 )  // JB001/5, A - 30/10/01
+GAMEL( 1998, unicornd,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Unicorn Dreaming (0100791V, NSW/ACT)",         MACHINE_FLAGS, layout_aristmk5 )  // 631/1, A - 31/08/98
+GAMEL( 2000, unicorndnz,unicornd, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Unicorn Dreaming (0101228V, New Zealand)",     MACHINE_FLAGS, layout_aristmk5 )  // MV4113/1, A - 05/04/2000
+GAMEL( 1996, wamazon,   aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Wild Amazon (0200507V, NSW/ACT)",              MACHINE_FLAGS, layout_aristmk5 )  // 506/8, A - 10/10/96
+GAMEL( 1996, wamazonv,  wamazon,  aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Wild Amazon (01J01996, Venezuela)",            MACHINE_FLAGS, layout_aristmk5 )  // 506/8, A - 10/10/96
+GAMEL( 1996, wildbill,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Wild Bill (0100297V, NSW/ACT)",                MACHINE_FLAGS, layout_aristmk5 )  // 543/8, C - 15/08/96
+GAMEL( 1996, wcougar,   aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Wild Cougar (0100167V, NSW/ACT)",              MACHINE_FLAGS, layout_aristmk5 )  // 569/9, B - 27/2/96
+GAMEL( 1997, wcougaru,  wcougar,  aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Wild Cougar (NHG0296-04, US)",             MACHINE_FLAGS, layout_aristmk5_us )  // 569/8,    D - 19/05/97
+GAMEL( 1996, wizways,   aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Wizard Ways (0200396V, NSW/ACT)",              MACHINE_FLAGS, layout_aristmk5 )  // 598/3, A - 04/11/96
+GAMEL( 1997, wnpost,    aristmk5, aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Winning Post (RHG0418-04, US)",       MACHINE_FLAGS, layout_aristmk5_us )  // 541/2, G - 11/02/97
+GAMEL( 1999, wthing,    aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Wild Thing (0101158V, NSW/ACT)",               MACHINE_FLAGS, layout_aristmk5 )  // 608/4, B - 14/12/99
+GAMEL( 1999, wtiger,    aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "White Tiger Classic (0200954V, NSW/ACT)",      MACHINE_FLAGS, layout_aristmk5 )  // 638/1,    B - 08/07/99
 
+// the following might be bad dumps or need different hardware (unconfirmed)
+GAMEL( 1996, blackpnt,  aristmk5, aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Black Panther (0200818V, Victoria)",           MACHINE_FLAGS, layout_aristmk5 )  // 594/1, A - 30/07/96 - doesn't boot, 'needs VLC (Video Lottery Consultants) comms instead of QCOM' (or bad?)
+
+// the following parent sets are known bad dumps, and do not boot (confirmed)
+GAMEL( 1998, gambler,   aristmk5, aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "The Gambler (EHG0916-02, US)",             MACHINE_FLAGS, layout_aristmk5_us )  // MV4084/1, A - 30/10/98
+GAMEL( 2001, koalamnt,  aristmk5, aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Koala Mint (CHG1573, US)",                 MACHINE_FLAGS, layout_aristmk5_us )  // MV4137,   A - 12/09/01
+GAMEL( 1997, mgarden,   aristmk5, aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Magic Garden (AHG1211-99, US)",            MACHINE_FLAGS, layout_aristmk5_us )  // MV4033,   B - 10/02/97
+GAMEL( 1997, trpdlght,  aristmk5, aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Tropical Delight (PHG0625-02, US)",        MACHINE_FLAGS, layout_aristmk5_us )  // 577/3,    D - 24/09/97
+GAMEL( 1999, sbuk2,     aristmk5, aristmk5,     aristmk5,     aristmk5_state, aristmk5, ROT0, "Aristocrat", "Super Bucks II (0400501V, NSW/ACT)",       MACHINE_FLAGS, layout_aristmk5 )  // 578, G - 26/07/99
+// the following clone sets are known bad dumps, and do not boot (confirmed)
+GAMEL( 2001, adonisu,   adonis,   aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Adonis (BHG1508, US)",                     MACHINE_FLAGS, layout_aristmk5_us )  // MV4124/1, B - 31/07/01
+GAMEL( 1999, bootsctnu, bootsctn, aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Boot Scootin' (GHG1012-02, US)",           MACHINE_FLAGS, layout_aristmk5_us )  // MV4098,   A - 25/08/99
+GAMEL( 1997, bumblbugu, bumblbug, aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Bumble Bugs (CHG0479-03, US)",             MACHINE_FLAGS, layout_aristmk5_us )  // 593,      D - 05/07/97
+GAMEL( 1996, cashchamu, cashcham, aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Cash Chameleon (DHG4078-99, US)",          MACHINE_FLAGS, layout_aristmk5_us )  // 603(a),   B - 06/12/96
+GAMEL( 1997, eforsta5u, eforsta5, aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Enchanted Forest (JHG0415-03, US)",        MACHINE_FLAGS, layout_aristmk5_us )  // MV4033,   B - 10/02/97
+GAMEL( 1997, goldpyra,  goldpyr,  aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Golden Pyramids (AHG1206-99, US)",         MACHINE_FLAGS, layout_aristmk5_us )  // 602/2,    B - 13/05/97
+GAMEL( 2000, marmagicu, marmagic, aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Margarita Magic (EHG1559, US)",            MACHINE_FLAGS, layout_aristmk5_us )  // US003,    A - 07/07/00
+GAMEL( 2001, partygrsa, partygrs, aristmk5_usa_touch, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Party Gras (BHG1284, US)",           MACHINE_FLAGS, layout_aristmk5_us )  // MV4115/3, B - 06/02/01
+GAMEL( 1998, petshopa,  petshop,  aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Pet Shop (0100679V, NSW/ACT)",                 MACHINE_FLAGS, layout_aristmk5 )  // 618, A - 09/03/98
+GAMEL( 1998, swhr2u,    swhr2,    aristmk5_usa, aristmk5_usa, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Sweethearts II (PHG0742-02, US)",          MACHINE_FLAGS, layout_aristmk5_us )  // MV4061,   A - 29/06/98
+GAMEL( 1996, wamazona,  wamazon,  aristmk5,     aristmk5, aristmk5_state, aristmk5, ROT0, "Aristocrat", "Wild Amazon (0200285V, NSW/ACT)",              MACHINE_FLAGS, layout_aristmk5 )  // 506/6, A - 7/5/96

@@ -6,13 +6,14 @@
     KL5C80A12 CPU (KL5C80A12CFP on hng64.c)
 
     Binary compatible with Z80, significantly faster opcode timings, operating at up to 10Mhz
-    Timers / Counters, Parrallel / Serial ports/ MMU, Interrupt Controller
+    Timers / Counters, Parallel / Serial ports/ MMU, Interrupt Controller
 
     (is this different enough to need it's own core?)
     (todo: everything, some code currently lives in machine/hng64_net.c but not much)
 
 ***************************************************************************/
 
+#include "emu.h"
 #include "kl5c80a12.h"
 
 const device_type KL5C80A12 = &device_creator<kl5c80a12_device>;

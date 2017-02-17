@@ -168,7 +168,6 @@ TODO:
 #include "emu.h"
 #include "includes/taitosj.h"
 #include "cpu/z80/z80.h"
-#include "cpu/m6805/m6805.h"
 #include "machine/watchdog.h"
 
 
@@ -368,16 +367,6 @@ static ADDRESS_MAP_START( taitosj_audio_map, AS_PROGRAM, 8, taitosj_state )
 ADDRESS_MAP_END
 
 
-static ADDRESS_MAP_START( taitosj_mcu_map, AS_PROGRAM, 8, taitosj_state )
-	ADDRESS_MAP_GLOBAL_MASK(0x7ff)
-	AM_RANGE(0x0000, 0x0000) AM_READWRITE(taitosj_68705_portA_r, taitosj_68705_portA_w)
-	AM_RANGE(0x0001, 0x0001) AM_READWRITE(taitosj_68705_portB_r, taitosj_68705_portB_w)
-	AM_RANGE(0x0002, 0x0002) AM_READ(taitosj_68705_portC_r)
-	AM_RANGE(0x0003, 0x007f) AM_RAM
-	AM_RANGE(0x0080, 0x07ff) AM_ROM
-ADDRESS_MAP_END
-
-
 #define DSW2_PORT \
 	PORT_DIPNAME( 0x0f, 0x00, DEF_STR( Coin_A ) ) \
 	PORT_DIPSETTING(    0x0f, DEF_STR( 9C_1C ) ) \
@@ -568,7 +557,7 @@ static INPUT_PORTS_START( spacecr )
 	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_BUTTON1 )
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_UNKNOWN )
+	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_NAME("P1 Continue")
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_UNKNOWN )
 
@@ -578,7 +567,7 @@ static INPUT_PORTS_START( spacecr )
 	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_COCKTAIL
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_UNKNOWN )
+	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_COCKTAIL PORT_NAME("P2 Continue")
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_UNKNOWN )
 
@@ -1824,8 +1813,10 @@ static MACHINE_CONFIG_DERIVED( mcu, nomcu )
 	MCFG_CPU_MODIFY("maincpu")
 	MCFG_CPU_PROGRAM_MAP(taitosj_main_mcu_map)
 
-	MCFG_CPU_ADD("mcu", M68705,XTAL_3MHz)      /* xtal is 3MHz, divided by 4 internally */
-	MCFG_CPU_PROGRAM_MAP(taitosj_mcu_map)
+	MCFG_CPU_ADD("mcu", M68705P3, XTAL_3MHz)   /* xtal is 3MHz, divided by 4 internally */
+	MCFG_M68705_PORTA_W_CB(WRITE8(taitosj_state, taitosj_68705_portA_w))
+	MCFG_M68705_PORTB_W_CB(WRITE8(taitosj_state, taitosj_68705_portB_w))
+	MCFG_M68705_PORTC_R_CB(READ8(taitosj_state, taitosj_68705_portC_r))
 
 	MCFG_QUANTUM_TIME(attotime::from_hz(6000))
 MACHINE_CONFIG_END
@@ -2523,7 +2514,7 @@ ROM_END
 
 ROM_START( elevator4 ) // later 4 board set, with rom data on 2764s, split between gfx and cpu data.
 	ROM_REGION( 0x12000, "maincpu", 0 ) // on L-shaped rom board
-	ROM_LOAD( "ba3__01.2764.ic1",  0x0000, 0x2000, CRC(da775a24) SHA1(b4341d2c87285d7a3d1773e2d94B3f621ebb4489) ) // == ea_12.2732.ic69 + ea_13.2732.ic68
+	ROM_LOAD( "ba3__01.2764.ic1",  0x0000, 0x2000, CRC(da775a24) SHA1(b4341d2c87285d7a3d1773e2d94b3f621ebb4489) ) // == ea_12.2732.ic69 + ea_13.2732.ic68
 	ROM_LOAD( "ba3__02.2764.ic2",  0x2000, 0x2000, CRC(fbfd8b3a) SHA1(9dff36dcaf43a2403b9a3497512dfec228144a7c) ) // == ea_14.2732.ic67 + ea_15.2732.ic66
 	ROM_LOAD( "ba3__03-1.2764.ic3",0x4000, 0x2000, CRC(a2e69833) SHA1(0f324c3adec27fcfebd779328db6f1da6cc8d227) ) // == ea_16.2732.ic65 + ea_17.2732.ic64
 	ROM_LOAD( "ba3__04-1.2764.ic6",0x6000, 0x2000, CRC(2b78c462) SHA1(ae41e0089c7f445fa271f6af7e141b112f0009e6) ) // == ea_18.2732.ic55 + ea_19.2732.ic54

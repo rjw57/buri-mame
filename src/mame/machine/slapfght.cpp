@@ -12,194 +12,24 @@
 #include "includes/slapfght.h"
 
 
-/***************************************************************************
-
-    Tiger Heli MCU
-
-***************************************************************************/
-
-READ8_MEMBER(slapfght_state::tigerh_mcu_r)
-{
-	m_mcu_sent = false;
-	return m_from_mcu;
-}
-
-WRITE8_MEMBER(slapfght_state::tigerh_mcu_w)
-{
-	m_from_main = data;
-	m_main_sent = true;
-	m_mcu->set_input_line(0, ASSERT_LINE);
-}
-
-
 /**************************************************************************/
 
 READ8_MEMBER(slapfght_state::tigerh_mcu_status_r)
 {
-	// d0 is vblank
-	uint8_t res = m_screen->vblank() ? 1 : 0;
-
-	if (!m_main_sent)
-		res |= 0x02;
-	if (!m_mcu_sent)
-		res |= 0x04;
-
-	return res;
+	return
+			(m_screen->vblank() ? 0x01 : 0x00) |
+			((m_bmcu && (CLEAR_LINE == m_bmcu->host_semaphore_r())) ? 0x02 : 0x00) |
+			((m_bmcu && (CLEAR_LINE == m_bmcu->mcu_semaphore_r())) ? 0x04 : 0x00);
 }
 
-
-/**************************************************************************/
-
-READ8_MEMBER(slapfght_state::tigerh_68705_portA_r)
+WRITE8_MEMBER(slapfght_state::scroll_from_mcu_w)
 {
-	return (m_portA_out & m_ddrA) | (m_portA_in & ~m_ddrA);
-}
-
-WRITE8_MEMBER(slapfght_state::tigerh_68705_portA_w)
-{
-	m_portA_out = data;
-}
-
-WRITE8_MEMBER(slapfght_state::tigerh_68705_ddrA_w)
-{
-	m_ddrA = data;
-}
-
-READ8_MEMBER(slapfght_state::tigerh_68705_portB_r)
-{
-	return (m_portB_out & m_ddrB) | (m_portB_in & ~m_ddrB);
-}
-
-WRITE8_MEMBER(slapfght_state::tigerh_68705_portB_w)
-{
-	if ((m_ddrB & 0x02) && (~data & 0x02) && (m_portB_out & 0x02))
+	switch (offset)
 	{
-		if (m_main_sent)
-			m_mcu->set_input_line(0, CLEAR_LINE);
-
-		m_portA_in = m_from_main;
-		m_main_sent = false;
+	case 0x01: m_scrollx_lo = data; break;  // PB3
+	case 0x02: m_scrollx_hi = data; break;  // PB4
 	}
-	if ((m_ddrB & 0x04) && (data & 0x04) && (~m_portB_out & 0x04))
-	{
-		m_from_mcu = m_portA_out;
-		m_mcu_sent = true;
-	}
-
-	m_portB_out = data;
 }
-
-WRITE8_MEMBER(slapfght_state::tigerh_68705_ddrB_w)
-{
-	m_ddrB = data;
-}
-
-
-READ8_MEMBER(slapfght_state::tigerh_68705_portC_r)
-{
-	m_portC_in = 0;
-
-	if (!m_main_sent)
-		m_portC_in |= 0x01;
-	if (m_mcu_sent)
-		m_portC_in |= 0x02;
-
-	return (m_portC_out & m_ddrC) | (m_portC_in & ~m_ddrC);
-}
-
-WRITE8_MEMBER(slapfght_state::tigerh_68705_portC_w)
-{
-	m_portC_out = data;
-}
-
-WRITE8_MEMBER(slapfght_state::tigerh_68705_ddrC_w)
-{
-	m_ddrC = data;
-}
-
-
-
-/***************************************************************************
-
-    Slap Fight MCU
-
-***************************************************************************/
-
-READ8_MEMBER(slapfght_state::slapfight_68705_portA_r)
-{
-	return (m_portA_out & m_ddrA) | (m_portA_in & ~m_ddrA);
-}
-
-WRITE8_MEMBER(slapfght_state::slapfight_68705_portA_w)
-{
-	m_portA_out = data;
-}
-
-WRITE8_MEMBER(slapfght_state::slapfight_68705_ddrA_w)
-{
-	m_ddrA = data;
-}
-
-READ8_MEMBER(slapfght_state::slapfight_68705_portB_r)
-{
-	return (m_portB_out & m_ddrB) | (m_portB_in & ~m_ddrB);
-}
-
-WRITE8_MEMBER(slapfght_state::slapfight_68705_portB_w)
-{
-	if ((m_ddrB & 0x02) && (~data & 0x02) && (m_portB_out & 0x02))
-	{
-		if (m_main_sent)
-			m_mcu->set_input_line(0, CLEAR_LINE);
-
-		m_portA_in = m_from_main;
-		m_main_sent = false;
-	}
-	if ((m_ddrB & 0x04) && (data & 0x04) && (~m_portB_out & 0x04))
-	{
-		m_from_mcu = m_portA_out;
-		m_mcu_sent = true;
-	}
-	if ((m_ddrB & 0x08) && (~data & 0x08) && (m_portB_out & 0x08))
-	{
-		m_scrollx_lo = m_portA_out;
-	}
-	if ((m_ddrB & 0x10) && (~data & 0x10) && (m_portB_out & 0x10))
-	{
-		m_scrollx_hi = m_portA_out;
-	}
-
-	m_portB_out = data;
-}
-
-WRITE8_MEMBER(slapfght_state::slapfight_68705_ddrB_w)
-{
-	m_ddrB = data;
-}
-
-READ8_MEMBER(slapfght_state::slapfight_68705_portC_r)
-{
-	m_portC_in = 0;
-
-	if (m_main_sent)
-		m_portC_in |= 0x01;
-	if (!m_mcu_sent)
-		m_portC_in |= 0x02;
-
-	return (m_portC_out & m_ddrC) | (m_portC_in & ~m_ddrC);
-}
-
-WRITE8_MEMBER(slapfght_state::slapfight_68705_portC_w)
-{
-	m_portC_out = data;
-}
-
-WRITE8_MEMBER(slapfght_state::slapfight_68705_ddrC_w)
-{
-	m_ddrC = data;
-}
-
-
 
 /***************************************************************************
 

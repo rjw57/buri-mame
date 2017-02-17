@@ -1,5 +1,5 @@
 --
--- Copyright 2010-2016 Branimir Karadzic. All rights reserved.
+-- Copyright 2010-2017 Branimir Karadzic. All rights reserved.
 -- License: https://github.com/bkaradzic/bx#license-bsd-2-clause
 --
 
@@ -52,6 +52,10 @@ project "bx.test"
 		path.join(BX_DIR, "tests/*_test.cpp"),
 		path.join(BX_DIR, "tests/*_test.H"),
 		path.join(BX_DIR, "tests/dbg.*"),
+	}
+
+	links {
+		"bx",
 	}
 
 	configuration { "vs* or mingw*" }
@@ -107,6 +111,10 @@ project "bx.bench"
 		path.join(BX_DIR, "tests/*_bench.cpp"),
 		path.join(BX_DIR, "tests/*_bench.h"),
 		path.join(BX_DIR, "tests/dbg.*"),
+	}
+
+	links {
+		"bx",
 	}
 
 	configuration { "vs* or mingw*" }

@@ -13,7 +13,6 @@
 #ifndef __ACIA6850_H__
 #define __ACIA6850_H__
 
-#include "emu.h"
 
 #define MCFG_ACIA6850_TXD_HANDLER(_devcb) \
 	devcb = &acia6850_device::set_txd_handler(*device, DEVCB_##_devcb);
@@ -142,5 +141,8 @@ private:
 
 // device type definition
 extern const device_type ACIA6850;
+
+extern template class device_finder<acia6850_device, false>;
+extern template class device_finder<acia6850_device, true>;
 
 #endif /* __ACIA6850_H__ */

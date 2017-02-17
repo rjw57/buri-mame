@@ -4,7 +4,7 @@
 
     library.h
 
-    Code relevant to the Imgtool library; analgous to the MESS/MAME driver
+    Code relevant to the Imgtool library; analogous to the MESS/MAME driver
     list.
 
     Unlike MESS and MAME which have static driver lists, Imgtool has a
@@ -165,7 +165,6 @@ enum
 	IMGTOOLINFO_INT_CREATION_UNTESTED,
 	IMGTOOLINFO_INT_SUPPORTS_BOOTBLOCK,
 	IMGTOOLINFO_INT_BLOCK_SIZE,
-	IMGTOOLINFO_INT_CHARSET,
 
 	IMGTOOLINFO_INT_CLASS_SPECIFIC = 0x08000,
 
@@ -205,6 +204,7 @@ enum
 	IMGTOOLINFO_PTR_WRITEFILE_OPTGUIDE,
 	IMGTOOLINFO_PTR_MAKE_CLASS,
 	IMGTOOLINFO_PTR_LIST_PARTITIONS,
+	IMGTOOLINFO_PTR_CHARCONVERTER,
 
 	IMGTOOLINFO_PTR_CLASS_SPECIFIC = 0x18000,
 
@@ -263,7 +263,7 @@ namespace imgtool
 		uint64_t block_count() const { return m_block_count; }
 
 	private:
-		imgtool_class			m_imgclass;
+		imgtool_class           m_imgclass;
 		uint64_t                m_base_block;
 		uint64_t                m_block_count;
 	};
@@ -311,6 +311,7 @@ union imgtoolinfo
 
 	const util::option_guide *createimage_optguide;
 	const util::option_guide *writefile_optguide;
+	const imgtool::charconverter *charconverter;
 };
 
 

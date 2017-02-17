@@ -5,17 +5,15 @@
  *
  */
 
+#include "emu.h"
 #include "modules/osdmodule.h"
 #include "monitor_module.h"
 
 #if defined(OSD_WINDOWS)
 
 // standard windows headers
-#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #undef interface
-#undef min
-#undef max
 
 #include "strconv.h"
 #include "windows/video.h"
@@ -31,7 +29,7 @@ private:
 
 public:
 	win32_monitor_info(monitor_module& module, const HMONITOR handle, const char* monitor_device, float aspect)
-		: osd_monitor_info(module, std::intptr_t(handle), monitor_device, aspect)
+		: osd_monitor_info(module, std::uintptr_t(handle), monitor_device, aspect)
 	{
 		win32_monitor_info::refresh();
 	}

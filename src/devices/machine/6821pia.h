@@ -6,7 +6,7 @@
 
     Notes:
         * get_port_b_z_mask() gives the caller the bitmask that shows
-          which bits are high-impendance when reading port B, and thus
+          which bits are high-impedance when reading port B, and thus
           neither 0 or 1. get_output_cb2_z() returns the same info
           for the CB2 pin.
         * set_port_a_z_mask allows the input callback to indicate
@@ -24,7 +24,6 @@
 #ifndef __6821PIA_H__
 #define __6821PIA_H__
 
-#include "emu.h"
 
 
 
@@ -82,20 +81,20 @@ public:
 
 	// static configuration helpers
 	// TODO: REMOVE THESE
-	template<class _Object> static devcb_base &set_readpa_handler(device_t &device, _Object object) { return downcast<pia6821_device &>(device).m_in_a_handler.set_callback(object); }
-	template<class _Object> static devcb_base &set_readpb_handler(device_t &device, _Object object) { return downcast<pia6821_device &>(device).m_in_b_handler.set_callback(object); }
-	template<class _Object> static devcb_base &set_readca1_handler(device_t &device, _Object object) { return downcast<pia6821_device &>(device).m_in_ca1_handler.set_callback(object); }
-	template<class _Object> static devcb_base &set_readca2_handler(device_t &device, _Object object) { return downcast<pia6821_device &>(device).m_in_ca2_handler.set_callback(object); }
-	template<class _Object> static devcb_base &set_readcb1_handler(device_t &device, _Object object) { return downcast<pia6821_device &>(device).m_in_cb1_handler.set_callback(object); }
+	template<class Obj> static devcb_base &set_readpa_handler(device_t &device, Obj &&object) { return downcast<pia6821_device &>(device).m_in_a_handler.set_callback(std::forward<Obj>(object)); }
+	template<class Obj> static devcb_base &set_readpb_handler(device_t &device, Obj &&object) { return downcast<pia6821_device &>(device).m_in_b_handler.set_callback(std::forward<Obj>(object)); }
+	template<class Obj> static devcb_base &set_readca1_handler(device_t &device, Obj &&object) { return downcast<pia6821_device &>(device).m_in_ca1_handler.set_callback(std::forward<Obj>(object)); }
+	template<class Obj> static devcb_base &set_readca2_handler(device_t &device, Obj &&object) { return downcast<pia6821_device &>(device).m_in_ca2_handler.set_callback(std::forward<Obj>(object)); }
+	template<class Obj> static devcb_base &set_readcb1_handler(device_t &device, Obj &&object) { return downcast<pia6821_device &>(device).m_in_cb1_handler.set_callback(std::forward<Obj>(object)); }
 
 	// TODO: CONVERT THESE TO WRITE LINE
-	template<class _Object> static devcb_base &set_writepa_handler(device_t &device, _Object object) { return downcast<pia6821_device &>(device).m_out_a_handler.set_callback(object); }
-	template<class _Object> static devcb_base &set_writepb_handler(device_t &device, _Object object) { return downcast<pia6821_device &>(device).m_out_b_handler.set_callback(object); }
+	template<class Obj> static devcb_base &set_writepa_handler(device_t &device, Obj &&object) { return downcast<pia6821_device &>(device).m_out_a_handler.set_callback(std::forward<Obj>(object)); }
+	template<class Obj> static devcb_base &set_writepb_handler(device_t &device, Obj &&object) { return downcast<pia6821_device &>(device).m_out_b_handler.set_callback(std::forward<Obj>(object)); }
 
-	template<class _Object> static devcb_base &set_ca2_handler(device_t &device, _Object object) { return downcast<pia6821_device &>(device).m_ca2_handler.set_callback(object); }
-	template<class _Object> static devcb_base &set_cb2_handler(device_t &device, _Object object) { return downcast<pia6821_device &>(device).m_cb2_handler.set_callback(object); }
-	template<class _Object> static devcb_base &set_irqa_handler(device_t &device, _Object object) { return downcast<pia6821_device &>(device).m_irqa_handler.set_callback(object); }
-	template<class _Object> static devcb_base &set_irqb_handler(device_t &device, _Object object) { return downcast<pia6821_device &>(device).m_irqb_handler.set_callback(object); }
+	template<class Obj> static devcb_base &set_ca2_handler(device_t &device, Obj &&object) { return downcast<pia6821_device &>(device).m_ca2_handler.set_callback(std::forward<Obj>(object)); }
+	template<class Obj> static devcb_base &set_cb2_handler(device_t &device, Obj &&object) { return downcast<pia6821_device &>(device).m_cb2_handler.set_callback(std::forward<Obj>(object)); }
+	template<class Obj> static devcb_base &set_irqa_handler(device_t &device, Obj &&object) { return downcast<pia6821_device &>(device).m_irqa_handler.set_callback(std::forward<Obj>(object)); }
+	template<class Obj> static devcb_base &set_irqb_handler(device_t &device, Obj &&object) { return downcast<pia6821_device &>(device).m_irqb_handler.set_callback(std::forward<Obj>(object)); }
 
 	DECLARE_READ8_MEMBER( read ) { return reg_r(offset); }
 	DECLARE_WRITE8_MEMBER( write ) { reg_w(offset, data); }
@@ -228,6 +227,9 @@ private:
 
 // device type definition
 extern const device_type PIA6821;
+
+extern template class device_finder<pia6821_device, false>;
+extern template class device_finder<pia6821_device, true>;
 
 
 #endif /* __6821PIA_H__ */

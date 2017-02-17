@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2016 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2017 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
  */
 
@@ -497,6 +497,8 @@ namespace bgfx { namespace d3d12
 
 			ErrorState::Enum errorState = ErrorState::Default;
 			LUID luid;
+
+//			m_renderdocdll = loadRenderDoc();
 
 			m_fbh.idx = invalidHandle;
 			memset(m_uniforms, 0, sizeof(m_uniforms) );
@@ -1181,6 +1183,7 @@ namespace bgfx { namespace d3d12
 #endif // USE_D3D12_DYNAMIC_LIB
 			case ErrorState::Default:
 			default:
+				unloadRenderDoc(m_renderdocdll);
 				break;
 			}
 
@@ -1237,6 +1240,8 @@ namespace bgfx { namespace d3d12
 			DX_RELEASE(m_device, 0);
 			DX_RELEASE(m_adapter, 0);
 			DX_RELEASE(m_factory, 0);
+
+			unloadRenderDoc(m_renderdocdll);
 
 #if USE_D3D12_DYNAMIC_LIB
 			bx::dlclose(m_dxgidll);
@@ -1599,10 +1604,11 @@ namespace bgfx { namespace d3d12
 
 			void* data;
 			readback->Map(0, NULL, (void**)&data);
-			imageSwizzleBgra8(width
+			imageSwizzleBgra8(
+				  data
+				, width
 				, height
 				, (uint32_t)pitch
-				, data
 				, data
 				);
 			g_callback->screenShot(_filePath
@@ -2391,8 +2397,8 @@ data.NumQualityLevels = 0;
 					{
 						if (0 != memcmp(&program.m_fsh->m_code->data[ii], &temp->data[ii], 16) )
 						{
-// 							dbgPrintfData(&program.m_fsh->m_code->data[ii], temp->size-ii, "");
-// 							dbgPrintfData(&temp->data[ii], temp->size-ii, "");
+// 							bx::debugPrintfData(&program.m_fsh->m_code->data[ii], temp->size-ii, "");
+// 							bx::debugPrintfData(&temp->data[ii], temp->size-ii, "");
 							break;
 						}
 					}
@@ -3880,7 +3886,7 @@ data.NumQualityLevels = 0;
 				}
 				else if (0 == (BGFX_UNIFORM_SAMPLERBIT & type) )
 				{
-					const UniformInfo* info = s_renderD3D12->m_uniformReg.find(name);
+					const UniformRegInfo* info = s_renderD3D12->m_uniformReg.find(name);
 					BX_WARN(NULL != info, "User defined uniform '%s' is not found, it won't be set.", name);
 
 					if (NULL != info)
@@ -4065,11 +4071,11 @@ data.NumQualityLevels = 0;
 							uint32_t slice = bx::strideAlign( (mip.m_height/blockInfo.blockHeight)*pitch,           D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
 
 							uint8_t* temp = (uint8_t*)BX_ALLOC(g_allocator, slice);
-							imageCopy(mip.m_height/blockInfo.blockHeight
+							imageCopy(temp
+									, mip.m_height/blockInfo.blockHeight
 									, (mip.m_width /blockInfo.blockWidth )*mip.m_blockSize
 									, mip.m_data
 									, pitch
-									, temp
 									);
 
 							srd[kk].pData      = temp;
@@ -4083,11 +4089,11 @@ data.NumQualityLevels = 0;
 							const uint32_t slice = bx::strideAlign(pitch * mip.m_height,      D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
 
 							uint8_t* temp = (uint8_t*)BX_ALLOC(g_allocator, slice);
-							imageCopy(mip.m_height
+							imageCopy(temp
+									, mip.m_height
 									, mip.m_width*mip.m_bpp / 8
 									, mip.m_data
 									, pitch
-									, temp
 									);
 
 							srd[kk].pData = temp;
@@ -4098,7 +4104,7 @@ data.NumQualityLevels = 0;
 
  						if (swizzle)
  						{
-// 							imageSwizzleBgra8(width, height, mip.m_width*4, data, temp);
+// 							imageSwizzleBgra8(temp, width, height, mip.m_width*4, data);
  						}
 
 						srd[kk].SlicePitch = mip.m_height*srd[kk].RowPitch;
@@ -4247,7 +4253,7 @@ data.NumQualityLevels = 0;
 					m_uavd.Texture2D.PlaneSlice = 0;
 				}
 
-				if( m_type==TextureCube )
+				if (TextureCube == m_type)
 				{
 					m_uavd.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
 					m_uavd.Texture2DArray.MipSlice   = 0;
@@ -4359,7 +4365,6 @@ data.NumQualityLevels = 0;
 		desc.Height = _rect.m_height;
 
 		uint32_t numRows;
-		uint64_t rowPitch;
 		uint64_t totalBytes;
 		D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout;
 		s_renderD3D12->m_device->GetCopyableFootprints(&desc
@@ -4368,12 +4373,13 @@ data.NumQualityLevels = 0;
 			, 0
 			, &layout
 			, &numRows
-			, &rowPitch
+			, NULL
 			, &totalBytes
 			);
 
-		ID3D12Resource* staging = createCommittedResource(s_renderD3D12->m_device, HeapProperty::Upload, totalBytes);
+		const uint32_t rowPitch = layout.Footprint.RowPitch;
 
+		ID3D12Resource* staging = createCommittedResource(s_renderD3D12->m_device, HeapProperty::Upload, totalBytes);
 		uint8_t* data;
 
 		DX_CHECK(staging->Map(0, NULL, (void**)&data) );
@@ -4423,6 +4429,7 @@ data.NumQualityLevels = 0;
 
 	void FrameBufferD3D12::create(uint8_t _num, const Attachment* _attachment)
 	{
+		m_denseIdx = UINT16_MAX;
 		m_numTh = _num;
 		memcpy(m_attachment, _attachment, _num*sizeof(Attachment) );
 
@@ -4849,7 +4856,8 @@ data.NumQualityLevels = 0;
 			int32_t numItems = _render->m_num;
 			for (int32_t item = 0, restartItem = numItems; item < numItems || restartItem < numItems;)
 			{
-				const bool isCompute = key.decode(_render->m_sortKeys[item], _render->m_viewRemap);
+				const uint64_t encodedKey = _render->m_sortKeys[item];
+				const bool isCompute = key.decode(encodedKey, _render->m_viewRemap);
 				statsKeyType[isCompute]++;
 
 				const bool viewChanged = 0
@@ -4907,7 +4915,8 @@ data.NumQualityLevels = 0;
 
 					prim = s_primInfo[BX_COUNTOF(s_primName)]; // Force primitive type update.
 
-					for (; blitItem < numBlitItems && blitKey.m_view <= view; blitItem++)
+					const uint8_t blitView = SortKey::decodeView(encodedKey);
+					for (; blitItem < numBlitItems && blitKey.m_view <= blitView; blitItem++)
 					{
 						const BlitItem& blit = _render->m_blitItem[blitItem];
 						blitKey.decode(_render->m_blitKeys[blitItem+1]);
@@ -5364,6 +5373,11 @@ data.NumQualityLevels = 0;
 							restoreScissor = true;
 							Rect scissorRect;
 							scissorRect.intersect(viewScissorRect,_render->m_rectCache.m_cache[scissor]);
+							if (scissorRect.isZeroArea() )
+							{
+								continue;
+							}
+
 							D3D12_RECT rc;
 							rc.left   = scissorRect.m_x;
 							rc.top    = scissorRect.m_y;
@@ -5473,16 +5487,20 @@ data.NumQualityLevels = 0;
 
 		const int64_t timerFreq = bx::getHPFrequency();
 
-		perfStats.cpuTimeEnd   = now;
-		perfStats.cpuTimerFreq = timerFreq;
-		perfStats.gpuTimeBegin = m_gpuTimer.m_begin;
-		perfStats.gpuTimeEnd   = m_gpuTimer.m_end;
-		perfStats.gpuTimerFreq = m_gpuTimer.m_frequency;
+		perfStats.cpuTimeEnd    = now;
+		perfStats.cpuTimerFreq  = timerFreq;
+		perfStats.gpuTimeBegin  = m_gpuTimer.m_begin;
+		perfStats.gpuTimeEnd    = m_gpuTimer.m_end;
+		perfStats.gpuTimerFreq  = m_gpuTimer.m_frequency;
+		perfStats.numDraw       = statsKeyType[0];
+		perfStats.numCompute    = statsKeyType[1];
+		perfStats.maxGpuLatency = maxGpuLatency;
 
-		if (_render->m_debug & (BGFX_DEBUG_IFH | BGFX_DEBUG_STATS) )
+		if (_render->m_debug & (BGFX_DEBUG_IFH|BGFX_DEBUG_STATS) )
 		{
 //			PIX_BEGINEVENT(D3DCOLOR_FRAME, L"debugstats");
 
+//			m_needPresent = true;
 			TextVideoMem& tvm = m_textVideoMem;
 
 			static int64_t next = now;
@@ -5605,10 +5623,10 @@ data.NumQualityLevels = 0;
 					, m_batch.m_stats.m_numImmediate[BatchD3D12::DrawIndexed]
 					);
 
-// 				if (NULL != m_renderdocdll)
-// 				{
-// 					tvm.printf(tvm.m_width-27, 0, 0x1f, " [F11 - RenderDoc capture] ");
-// 				}
+				if (NULL != m_renderdocdll)
+				{
+					tvm.printf(tvm.m_width-27, 0, 0x1f, " [F11 - RenderDoc capture] ");
+				}
 
 				tvm.printf(10, pos++, 0x8e, "      Indices: %7d ", statsNumIndices);
 				tvm.printf(10, pos++, 0x8e, " Uniform size: %7d, Max: %7d ", _render->m_uniformEnd, _render->m_uniformMax);

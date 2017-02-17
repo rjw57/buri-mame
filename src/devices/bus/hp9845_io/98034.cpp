@@ -2,17 +2,18 @@
 // copyright-holders: F. Ulivi
 /*********************************************************************
 
-	98034.cpp
+    98034.cpp
 
-	98034 module (HPIB interface)
+    98034 module (HPIB interface)
 
-	TODO: Implement Parallel Poll response
+    TODO: Implement Parallel Poll response
 
-	The main reference for this module is:
-	HP 98034-90001, 98034 Installation and Service Manual
+    The main reference for this module is:
+    HP 98034-90001, 98034 Installation and Service Manual
 
 *********************************************************************/
 
+#include "emu.h"
 #include "98034.h"
 #include "coreutil.h"
 
@@ -132,6 +133,9 @@ READ16_MEMBER(hp98034_io_card::reg_r)
 	m_force_flg = true;
 
 	update_flg();
+	// PPU yields to let NP see FLG=0 immediately
+	// (horrible race conditions lurking...)
+	space.device().execute().yield();
 
 	LOG(("read R%u=%04x\n" , offset + 4 , res));
 	return res;
@@ -146,12 +150,15 @@ WRITE16_MEMBER(hp98034_io_card::reg_w)
 	// ==========
 	// 7-4  1
 	// 3-2  ~offset
-	// 1	0
-	// 0	1
+	// 1    0
+	// 0    1
 	m_mode_reg = (uint8_t)((offset << 2) ^ 0xfd);
 	m_force_flg = true;
 
 	update_flg();
+	// PPU yields to let NP see FLG=0 immediately
+	// (horrible race conditions lurking...)
+	space.device().execute().yield();
 	LOG(("write R%u=%04x\n" , offset + 4 , data));
 }
 
@@ -356,6 +363,7 @@ static MACHINE_CONFIG_FRAGMENT(hp98034)
 	MCFG_HP_NANO_READ_DC_CB(READ8(hp98034_io_card , dc_r))
 	MCFG_CPU_IRQ_ACKNOWLEDGE_DRIVER(hp98034_io_card , irq_callback)
 
+	MCFG_IEEE488_SLOT_ADD("ieee_dev" , 0 , hp_ieee488_devices , nullptr)
 	MCFG_IEEE488_BUS_ADD()
 	MCFG_IEEE488_IFC_CALLBACK(WRITELINE(hp98034_io_card , ieee488_ctrl_w))
 	MCFG_IEEE488_ATN_CALLBACK(WRITELINE(hp98034_io_card , ieee488_ctrl_w))

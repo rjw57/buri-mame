@@ -13,7 +13,6 @@
 #ifndef APOLLO_H_
 #define APOLLO_H_
 
-#include "emu.h"
 
 #include "cpu/m68000/m68000.h"
 #include "bus/rs232/rs232.h"
@@ -326,18 +325,17 @@ void apollo_csr_set_status_register(uint16_t mask, uint16_t data);
 class apollo_sio: public mc68681_device
 {
 public:
-	apollo_sio(const machine_config &mconfig, const char *tag,
-			device_t *owner, uint32_t clock);
+	apollo_sio(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
 
-	DECLARE_READ8_MEMBER(read);
-	DECLARE_WRITE8_MEMBER(write);
+	virtual DECLARE_READ8_MEMBER(read) override;
+	virtual DECLARE_WRITE8_MEMBER(write) override;
 
 protected:
 	virtual void device_reset() override;
 
 private:
-		uint8_t m_csrb;
-		uint8_t m_ip6;
+	uint8_t m_csrb;
+	uint8_t m_ip6;
 };
 
 extern const device_type APOLLO_SIO;
@@ -378,7 +376,7 @@ public:
 
 protected:
 	// device-level overrides
-	virtual void device_config_complete() override ;
+	virtual void device_config_complete() override;
 	virtual void device_start() override;
 	virtual void device_reset() override;
 
@@ -427,9 +425,9 @@ public:
 
 protected:
 	// device-level overrides
-	virtual void device_config_complete() override;
 	virtual void device_start() override;
 	virtual void device_reset() override;
+
 protected:
 	class lut_fifo;
 	class bt458;
@@ -639,9 +637,9 @@ public:
 	apollo_graphics_19i(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
 protected:
 	// device-level overrides
-	virtual void device_config_complete() override;
 	virtual void device_start() override;
 	virtual void device_reset() override;
+
 private:
 	// internal state
 };

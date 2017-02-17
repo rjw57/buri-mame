@@ -211,6 +211,18 @@ end
 
 --------------------------------------------------
 --
+--@src/lib/formats/apd_dsk.h,FORMATS["APD_DSK"] = true
+--------------------------------------------------
+
+if (FORMATS["APD_DSK"]~=null  or _OPTIONS["with-tools"]) then
+	files {
+		MAME_DIR.. "src/lib/formats/apd_dsk.cpp",
+		MAME_DIR.. "src/lib/formats/apd_dsk.h",
+	}
+end
+
+--------------------------------------------------
+--
 --@src/lib/formats/apf_apt.h,FORMATS["APF_APT"] = true
 --------------------------------------------------
 
@@ -1034,6 +1046,18 @@ if (FORMATS["MM_DSK"]~=null  or _OPTIONS["with-tools"]) then
 	files {
 		MAME_DIR.. "src/lib/formats/mm_dsk.cpp",
 		MAME_DIR.. "src/lib/formats/mm_dsk.h",
+	}
+end
+
+--------------------------------------------------
+--
+--@src/lib/formats/ms0515_dsk.h,FORMATS["MS0515_DSK"] = true
+--------------------------------------------------
+
+if (FORMATS["MS0515_DSK"]~=null  or _OPTIONS["with-tools"]) then
+	files {
+		MAME_DIR.. "src/lib/formats/ms0515_dsk.cpp",
+		MAME_DIR.. "src/lib/formats/ms0515_dsk.h",
 	}
 end
 

@@ -21,7 +21,7 @@ Ernesto Corvi & Mariusz Wojcieszek
 #include "machine/msm6242.h"
 #include "machine/akiko.h"
 #include "machine/i2cmem.h"
-#include "sound/amiga.h"
+#include "machine/8364_paula.h"
 #include "video/amigaaga.h"
 
 
@@ -336,7 +336,7 @@ public:
 	m_cia_1(*this, "cia_1"),
 	m_rs232(*this, "rs232"),
 	m_centronics(*this, "centronics"),
-	m_sound(*this, "amiga"),
+	m_paula(*this, "amiga"),
 	m_fdc(*this, "fdc"),
 	m_screen(*this, "screen"),
 	m_palette(*this, "palette"),
@@ -378,10 +378,22 @@ public:
 	{
 		return EXPECTED(byteoffs < m_chip_ram.bytes()) ? m_chip_ram.read(byteoffs >> 1) : 0xffff;
 	}
+
 	void chip_ram_w(offs_t byteoffs, uint16_t data)
 	{
 		if (EXPECTED(byteoffs < m_chip_ram.bytes()))
 			m_chip_ram.write(byteoffs >> 1, data);
+	}
+
+	DECLARE_READ16_MEMBER(chip_ram_r)
+	{
+		return chip_ram_r(offset & ~1) & mem_mask;
+	}
+
+	DECLARE_WRITE16_MEMBER(chip_ram_w)
+	{
+		uint16_t val = chip_ram_r(offset & ~1) & ~mem_mask;
+		chip_ram_w(offset & ~1, val | data);
 	}
 
 	/* sprite states */
@@ -467,6 +479,8 @@ public:
 	DECLARE_READ16_MEMBER( custom_chip_r );
 	DECLARE_WRITE16_MEMBER( custom_chip_w );
 
+	DECLARE_WRITE_LINE_MEMBER( paula_int_w );
+
 	DECLARE_READ16_MEMBER( rom_mirror_r );
 	DECLARE_READ32_MEMBER( rom_mirror32_r );
 
@@ -503,6 +517,8 @@ public:
 	{
 		custom_chip_w(m_maincpu->space(AS_PROGRAM), offset, data, mem_mask);
 	}
+
+	void blitter_setup();
 
 protected:
 	// agnus/alice chip id
@@ -561,7 +577,7 @@ protected:
 	required_device<mos8520_device> m_cia_1;
 	optional_device<rs232_port_device> m_rs232;
 	optional_device<centronics_device> m_centronics;
-	required_device<amiga_sound_device> m_sound;
+	required_device<paula_8364_device> m_paula;
 	optional_device<amiga_fdc> m_fdc;
 	required_device<screen_device> m_screen;
 	optional_device<palette_device> m_palette;
@@ -660,7 +676,7 @@ private:
 
 	void serial_adjust();
 	void serial_shift();
-	void rx_write(amiga_state *state, int level);
+	void rx_write(int level);
 
 	uint32_t amiga_gethvpos();
 };

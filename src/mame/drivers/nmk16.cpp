@@ -154,6 +154,7 @@ Afega stands for "Art-Fiction Electronic Game"
 #include "sound/2203intf.h"
 #include "sound/okim6295.h"
 #include "sound/3812intf.h"
+#include "sound/ym2151.h"
 #include "machine/nmk004.h"
 #include "cpu/pic16c5x/pic16c5x.h"
 #include "includes/nmk16.h"
@@ -1123,28 +1124,20 @@ ADDRESS_MAP_END
 
 static ADDRESS_MAP_START( atombjt_map, AS_PROGRAM, 16, nmk16_state )
 	AM_RANGE(0x000000, 0x03ffff) AM_ROM
-
-	AM_RANGE(0x0C2010, 0x0C2011) AM_READ_PORT("IN0")
-	AM_RANGE(0x0C2012, 0x0C2013) AM_READ(atombjt_unkr_r)
-	AM_RANGE(0x0C2014, 0x0C2015) AM_READ(atombjt_unkr_r)
-
-	AM_RANGE(0x0C2016, 0x0C2017) AM_READ_PORT("DSW1")
-	AM_RANGE(0x0C2018, 0x0C2019) AM_READ_PORT("DSW2")
-
-	AM_RANGE(0x100000, 0x101fff) AM_RAM
-
-	AM_RANGE(0x080000, 0x080001) AM_READ_PORT("IN0")
-	AM_RANGE(0x080002, 0x080003) AM_READ_PORT("IN1")
-
-	AM_RANGE(0x080014, 0x080015) AM_WRITE(nmk_flipscreen_w)
-//  AM_RANGE(0x084000, 0x084001) AM_DEVREADWRITE8("oki1", okim6295_device, read, write, 0x00ff)
-//  AM_RANGE(0x084010, 0x084011) AM_DEVREADWRITE8("oki2", okim6295_device, read, write, 0x00ff)
-//  AM_RANGE(0x084020, 0x08402f) AM_DEVWRITE("nmk112", nmk112_device, okibank_lsb_w)
+	AM_RANGE(0x080014, 0x080015) AM_NOP // always 1 in this bootleg. Flip-screen switch not present according to dip sheet.
 	AM_RANGE(0x088000, 0x0887ff) AM_RAM_DEVWRITE("palette", palette_device, write) AM_SHARE("palette")
 	AM_RANGE(0x094000, 0x094001) AM_WRITE(nmk_tilebank_w)
 	AM_RANGE(0x094002, 0x094003) AM_WRITENOP    /* IRQ enable? */
 	AM_RANGE(0x09c000, 0x09cfff) AM_MIRROR(0x1000) AM_RAM_WRITE(nmk_bgvideoram0_w) AM_SHARE("nmk_bgvideoram0")
+	AM_RANGE(0x0c2010, 0x0c2011) AM_READ_PORT("IN0")
+	AM_RANGE(0x0c2012, 0x0c2013) AM_READ_PORT("IN1")
+	AM_RANGE(0x0c2014, 0x0c2015) AM_READ(atombjt_unkr_r)
+	AM_RANGE(0x0c2016, 0x0c2017) AM_READ_PORT("DSW1")
+	AM_RANGE(0x0c2018, 0x0c2019) AM_READ_PORT("DSW2")
+//  AM_RANGE(0x0c201c, 0x0c201d) // oki banking related?
+	AM_RANGE(0x0c201e, 0x0c201f) AM_DEVREADWRITE8("oki1", okim6295_device, read, write, 0x00ff)
 	AM_RANGE(0x0f0000, 0x0fffff) AM_RAM AM_SHARE("mainram")
+	AM_RANGE(0x100000, 0x101fff) AM_RAM
 ADDRESS_MAP_END
 
 static INPUT_PORTS_START( vandyke )
@@ -2955,6 +2948,20 @@ static INPUT_PORTS_START( bjtwin )
 	PORT_DIPSETTING(    0x00, DEF_STR( Free_Play ) )
 INPUT_PORTS_END
 
+static INPUT_PORTS_START( atombjt ) // verified with dip sheet
+	PORT_INCLUDE(bjtwin)
+
+	PORT_MODIFY("DSW1")
+	PORT_DIPNAME( 0x01, 0x00, DEF_STR( Unused ) )       PORT_DIPLOCATION("SW1:8")
+	PORT_DIPSETTING(    0x00, DEF_STR( Off ) )
+	PORT_DIPSETTING(    0x01, DEF_STR( On ) )
+
+	PORT_MODIFY("DSW2")
+	PORT_DIPNAME( 0x01, 0x00, DEF_STR( Unused ) )       PORT_DIPLOCATION("SW2:8")
+	PORT_DIPSETTING(    0x00, DEF_STR( Off ) )
+	PORT_DIPSETTING(    0x01, DEF_STR( On ) )
+INPUT_PORTS_END
+
 static INPUT_PORTS_START( nouryoku )
 	PORT_START("IN0")
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_COIN1 )
@@ -3950,7 +3957,8 @@ static MACHINE_CONFIG_START( mustangb, nmk16_state )
 	MCFG_CPU_PROGRAM_MAP(mustangb_map)
 	NMK_HACKY_INTERRUPT_TIMING
 
-	SEIBU_SOUND_SYSTEM_CPU(14318180/4)
+	MCFG_CPU_ADD("audiocpu", Z80, 14318180/4)
+	MCFG_CPU_PROGRAM_MAP(seibu_sound_map)
 
 	/* video hardware */
 	NMK_HACKY_SCREEN_LOWRES
@@ -3964,8 +3972,20 @@ static MACHINE_CONFIG_START( mustangb, nmk16_state )
 	MCFG_VIDEO_START_OVERRIDE(nmk16_state,macross)
 
 	/* sound hardware */
-	SEIBU_SOUND_SYSTEM_YM3812_INTERFACE(14318180/4, 1320000)
+	MCFG_SPEAKER_STANDARD_MONO("mono")
 
+	MCFG_SOUND_ADD("ymsnd", YM3812, 14318180/4)
+	MCFG_YM3812_IRQ_HANDLER(DEVWRITELINE("seibu_sound", seibu_sound_device, fm_irqhandler))
+	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "mono", 1.0)
+
+	MCFG_OKIM6295_ADD("oki", 1320000, OKIM6295_PIN7_LOW)
+	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "mono", 0.40)
+
+	MCFG_DEVICE_ADD("seibu_sound", SEIBU_SOUND, 0)
+	MCFG_SEIBU_SOUND_CPU("audiocpu")
+	MCFG_SEIBU_SOUND_ROMBANK("seibu_bank1")
+	MCFG_SEIBU_SOUND_YM_READ_CB(DEVREAD8("ymsnd", ym3812_device, read))
+	MCFG_SEIBU_SOUND_YM_WRITE_CB(DEVWRITE8("ymsnd", ym3812_device, write))
 MACHINE_CONFIG_END
 
 #define BIOSHIP_CRYSTAL1 10000000
@@ -4124,7 +4144,8 @@ static MACHINE_CONFIG_START( tdragonb, nmk16_state )    /* bootleg using Raiden 
 	MCFG_CPU_PROGRAM_MAP(tdragonb_map)
 	NMK_HACKY_INTERRUPT_TIMING
 
-	SEIBU_SOUND_SYSTEM_CPU(14318180/4)
+	MCFG_CPU_ADD("audiocpu", Z80, 14318180/4)
+	MCFG_CPU_PROGRAM_MAP(seibu_sound_map)
 
 	/* video hardware */
 	NMK_HACKY_SCREEN_LOWRES
@@ -4138,7 +4159,20 @@ static MACHINE_CONFIG_START( tdragonb, nmk16_state )    /* bootleg using Raiden 
 	MCFG_VIDEO_START_OVERRIDE(nmk16_state,macross)
 
 	/* sound hardware */
-	SEIBU_SOUND_SYSTEM_YM3812_INTERFACE(14318180/4, 1320000)
+	MCFG_SPEAKER_STANDARD_MONO("mono")
+
+	MCFG_SOUND_ADD("ymsnd", YM3812, 14318180/4)
+	MCFG_YM3812_IRQ_HANDLER(DEVWRITELINE("seibu_sound", seibu_sound_device, fm_irqhandler))
+	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "mono", 1.0)
+
+	MCFG_OKIM6295_ADD("oki", 1320000, OKIM6295_PIN7_LOW)
+	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "mono", 0.40)
+
+	MCFG_DEVICE_ADD("seibu_sound", SEIBU_SOUND, 0)
+	MCFG_SEIBU_SOUND_CPU("audiocpu")
+	MCFG_SEIBU_SOUND_ROMBANK("seibu_bank1")
+	MCFG_SEIBU_SOUND_YM_READ_CB(DEVREAD8("ymsnd", ym3812_device, read))
+	MCFG_SEIBU_SOUND_YM_WRITE_CB(DEVWRITE8("ymsnd", ym3812_device, write))
 MACHINE_CONFIG_END
 
 static MACHINE_CONFIG_START( tdragon, nmk16_state )
@@ -4605,7 +4639,7 @@ static MACHINE_CONFIG_START( atombjt, nmk16_state )
 	/* sound hardware */
 	MCFG_SPEAKER_STANDARD_MONO("mono")
 
-	MCFG_OKIM6295_ADD("oki1", 16000000/4, OKIM6295_PIN7_LOW) // ?? mhz, I see no 16 crystal
+	MCFG_OKIM6295_ADD("oki1", 10000000/8, OKIM6295_PIN7_LOW) // divider and pin not verified
 	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "mono", 0.20)
 MACHINE_CONFIG_END
 
@@ -6982,6 +7016,59 @@ ROM_START( redhawki )
 	ROM_LOAD( "5", 0x00000, 0x40000, CRC(e911ce33) SHA1(a29c4dea98a22235122303325c63c15fadd3431d) )
 ROM_END
 
+ROM_START( redhawkg ) // original Afega PCB with Delta Coin sticker
+	ROM_REGION( 0x80000, "maincpu", 0 )     /* 68000 Code */
+	ROM_LOAD16_BYTE( "2.bin", 0x000000, 0x002000, CRC(ccd459eb) SHA1(677b03f1e3973f0e1f09272d336c2dd9da8f843c) )
+	ROM_CONTINUE(0x20000,0x2000)
+	ROM_CONTINUE(0x10000,0x2000)
+	ROM_CONTINUE(0x30000,0x2000)
+	ROM_CONTINUE(0x04000,0x2000)
+	ROM_CONTINUE(0x24000,0x2000)
+	ROM_CONTINUE(0x14000,0x2000)
+	ROM_CONTINUE(0x34000,0x2000)
+	ROM_CONTINUE(0x08000,0x2000)
+	ROM_CONTINUE(0x28000,0x2000)
+	ROM_CONTINUE(0x18000,0x2000)
+	ROM_CONTINUE(0x38000,0x2000)
+	ROM_CONTINUE(0x0c000,0x2000)
+	ROM_CONTINUE(0x2c000,0x2000)
+	ROM_CONTINUE(0x1c000,0x2000)
+	ROM_CONTINUE(0x3c000,0x2000)
+
+	ROM_LOAD16_BYTE( "3.bin", 0x000001, 0x002000, CRC(483802fd) SHA1(4ec2b15bc89c12806dab78ae30f5fe24e26d46eb) )
+	ROM_CONTINUE(0x20001,0x2000)
+	ROM_CONTINUE(0x10001,0x2000)
+	ROM_CONTINUE(0x30001,0x2000)
+	ROM_CONTINUE(0x04001,0x2000)
+	ROM_CONTINUE(0x24001,0x2000)
+	ROM_CONTINUE(0x14001,0x2000)
+	ROM_CONTINUE(0x34001,0x2000)
+	ROM_CONTINUE(0x08001,0x2000)
+	ROM_CONTINUE(0x28001,0x2000)
+	ROM_CONTINUE(0x18001,0x2000)
+	ROM_CONTINUE(0x38001,0x2000)
+	ROM_CONTINUE(0x0c001,0x2000)
+	ROM_CONTINUE(0x2c001,0x2000)
+	ROM_CONTINUE(0x1c001,0x2000)
+	ROM_CONTINUE(0x3c001,0x2000)
+
+	ROM_REGION( 0x10000, "audiocpu", 0 )        /* Z80 Code */
+	ROM_LOAD( "1.bin", 0x00000, 0x10000, CRC(5d8cf28e) SHA1(2a440bf5136f95af137b6688e566a14e65be94b1) )
+
+	ROM_REGION( 0x100000, "sprites", 0 )   /* Sprites, 16x16x4 */
+	ROM_LOAD16_BYTE( "6.bin", 0x000001, 0x080000, CRC(710c9e3c) SHA1(0fcefffa5334554729d5c278bceb48ba66921361) )
+	ROM_LOAD16_BYTE( "7.bin", 0x000000, 0x080000, CRC(a28c8454) SHA1(c4e14d18c24de73da196230f8ea824300d53e64d) )
+
+	ROM_REGION( 0x080000, "bgtile", 0 )   /* Layer 0, 16x16x8 */
+	ROM_LOAD( "4.bin", 0x000000, 0x080000, CRC(aafb3cc4) SHA1(b5f6608c1e05470fdfb22e0a35a8a74974c4d3cf) )
+
+	ROM_REGION( 0x00100, "fgtile", ROMREGION_ERASEFF )    /* Layer 1, 8x8x4 */
+	// Unused
+
+	ROM_REGION( 0x40000, "oki1", 0 )    /* Samples */
+	ROM_LOAD( "5", 0x00000, 0x40000, CRC(e911ce33) SHA1(a29c4dea98a22235122303325c63c15fadd3431d) )
+ROM_END
+
 ROM_START( redhawkb )
 	ROM_REGION( 0x80000, "maincpu", 0 )     /* 68000 Code */
 	ROM_LOAD16_BYTE( "rhb-1.bin", 0x000000, 0x020000, CRC(e733ea07) SHA1(b1ffeda633d5e701f0e97c79930a54d7b89a85c5) )
@@ -7886,11 +7973,11 @@ GAME( 1992, sabotenb, 0,        bjtwin,   sabotenb, nmk16_state, nmk,      ROT0,
 GAME( 1992, sabotenba,sabotenb, bjtwin,   sabotenb, nmk16_state, nmk,      ROT0,   "NMK / Tecmo",                  "Saboten Bombers (set 2)", MACHINE_NO_COCKTAIL )
 GAME( 1992, cactus,   sabotenb, bjtwin,   sabotenb, nmk16_state, nmk,      ROT0,   "bootleg",                      "Cactus (bootleg of Saboten Bombers)", MACHINE_NO_COCKTAIL ) // PCB marked 'Cactus', no title screen
 
-GAME( 1993, bjtwin,   0,        bjtwin,   bjtwin, nmk16_state,   bjtwin,   ROT270, "NMK",                          "Bombjack Twin (set 1)", MACHINE_NO_COCKTAIL )
-GAME( 1993, bjtwina,  bjtwin,   bjtwin,   bjtwin, nmk16_state,   bjtwin,   ROT270, "NMK",                          "Bombjack Twin (set 2)", MACHINE_NO_COCKTAIL )
-GAME( 1993, bjtwinp,  bjtwin,   bjtwin,   bjtwin, driver_device, 0,        ROT270, "NMK",                          "Bombjack Twin (prototype? with adult pictures, set 1)", MACHINE_NO_COCKTAIL ) // Cheap looking PCB, but Genuine NMK PCB, GFX aren't encrypted (maybe Korean version not proto?)
-GAME( 1993, bjtwinpa, bjtwin,   bjtwin,   bjtwin, nmk16_state,   bjtwin,   ROT270, "NMK",                          "Bombjack Twin (prototype? with adult pictures, set 2)", MACHINE_NO_COCKTAIL ) // same PCB as above, different program revision, GFX are encrypted
-GAME( 1993, atombjt,  bjtwin,   atombjt,  bjtwin, driver_device, 0,        ROT270, "bootleg",                      "Atom (bootleg of Bombjack Twin)", MACHINE_NO_COCKTAIL | MACHINE_NOT_WORKING ) // some non-trivial mods to the gfx and sound hw (playmark hardware?)
+GAME( 1993, bjtwin,   0,        bjtwin,   bjtwin,  nmk16_state,   bjtwin,   ROT270, "NMK",                          "Bombjack Twin (set 1)", MACHINE_NO_COCKTAIL )
+GAME( 1993, bjtwina,  bjtwin,   bjtwin,   bjtwin,  nmk16_state,   bjtwin,   ROT270, "NMK",                          "Bombjack Twin (set 2)", MACHINE_NO_COCKTAIL )
+GAME( 1993, bjtwinp,  bjtwin,   bjtwin,   bjtwin,  driver_device, 0,        ROT270, "NMK",                          "Bombjack Twin (prototype? with adult pictures, set 1)", MACHINE_NO_COCKTAIL ) // Cheap looking PCB, but Genuine NMK PCB, GFX aren't encrypted (maybe Korean version not proto?)
+GAME( 1993, bjtwinpa, bjtwin,   bjtwin,   bjtwin,  nmk16_state,   bjtwin,   ROT270, "NMK",                          "Bombjack Twin (prototype? with adult pictures, set 2)", MACHINE_NO_COCKTAIL ) // same PCB as above, different program revision, GFX are encrypted
+GAME( 1993, atombjt,  bjtwin,   atombjt,  atombjt, driver_device, 0,        ROT270, "bootleg (Kyon K.)",            "Atom (bootleg of Bombjack Twin)", MACHINE_NO_COCKTAIL | MACHINE_IMPERFECT_SOUND | MACHINE_NOT_WORKING ) // some non-trivial mods to the gfx and sound hw (playmark hardware?)
 
 
 GAME( 1995, nouryoku, 0,        bjtwin,   nouryoku, nmk16_state,   nmk,      ROT0,   "Tecmo",                        "Nouryoku Koujou Iinkai", MACHINE_NO_COCKTAIL )
@@ -7917,6 +8004,7 @@ GAME( 1995, dolmen, 0,          twinactn, dolmen,   driver_device, 0,        ROT
 GAME( 1998, stagger1, 0,        stagger1, stagger1, driver_device, 0,        ROT270, "Afega",                             "Stagger I (Japan)", 0 )
 GAME( 1997, redhawk,  stagger1, stagger1, stagger1, nmk16_state,   redhawk,  ROT270, "Afega (New Vision Ent. license)",   "Red Hawk (US)", 0 )
 GAME( 1997, redhawki, stagger1, redhawki, stagger1, driver_device, 0,        ROT0,   "Afega (Hea Dong Corp license)",     "Red Hawk (Italy)", 0 ) // bootleg? strange scroll regs
+GAME( 1997, redhawkg, stagger1, redhawki, stagger1, driver_device, 0,        ROT0,   "Afega",                             "Red Hawk (Greece)", 0 )
 GAME( 1997, redhawke, stagger1, stagger1, stagger1, driver_device, 0,        ROT270, "Afega (Excellent Co. license)",     "Red Hawk (Excellent Co., Ltd)", 0 )
 GAME( 1997, redhawkk, stagger1, stagger1, stagger1, driver_device, 0,        ROT270, "Afega",                             "Red Hawk (Korea)", 0 )
 GAME( 1997, redhawkb, stagger1, redhawkb, redhawkb, driver_device, 0,        ROT0,   "bootleg",                           "Red Hawk (bootleg)", 0 )

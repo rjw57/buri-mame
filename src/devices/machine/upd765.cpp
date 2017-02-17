@@ -1,6 +1,7 @@
 // license:BSD-3-Clause
 // copyright-holders:Olivier Galibert
 
+#include "emu.h"
 #include "upd765.h"
 #include "debugger.h"
 
@@ -2070,7 +2071,7 @@ void upd765_family_device::format_track_continue(floppy_info &fi)
 			result[3] = 0;
 			result[4] = 0;
 			result[5] = 0;
-			result[6] = 0;
+			result[6] = command[2];
 			result_pos = 7;
 			command_end(fi, true);
 			return;

@@ -9,7 +9,6 @@
 #ifndef swtpc09_H_
 #define swtpc09_H_
 
-#include "emu.h"
 #include "cpu/m6809/m6809.h"
 #include "video/generic.h"
 #include "machine/wd_fdc.h"
@@ -113,7 +112,7 @@ public:
 	uint8_t m_fdc_dma_address_reg;     // dmf2 or dmf3 dma extended address reg
 	uint8_t m_system_type;             // flag to indicate hw and rom combination
 	uint8_t m_fdc_status;              // for floppy controller
-	uint8_t m_via_ca1_input;           // dmf3 fdc interupt is connected here
+	uint8_t m_via_ca1_input;           // dmf3 fdc interrupt is connected here
 	uint8_t m_dmf3_via_porta;
 	uint8_t m_piaide_porta;
 	uint8_t m_piaide_portb;

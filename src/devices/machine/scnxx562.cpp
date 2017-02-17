@@ -77,6 +77,7 @@ DONE (x) (p=partly)         NMOS         CMOS
    x/p = Features that has been implemented  n/a = features that will not
 ***************************************************************************/
 
+#include "emu.h"
 #include "scnxx562.h"
 
 //**************************************************************************
@@ -88,12 +89,12 @@ DONE (x) (p=partly)         NMOS         CMOS
 #define VERBOSE 0
 
 #define LOGPRINT(x) { do { if (VERBOSE) logerror x; } while (0); }
-#define LOG(x)		{} 
-#define LOGR(x)		{} 
-#define LOGTX(x)   	{} 
-#define LOGRX(x)	{} 
-#define LOGSETUP(x)	{} LOGPRINT(x)
-#define LOGINT(x)	{} 
+#define LOG(x)      {}
+#define LOGR(x)     {}
+#define LOGTX(x)    {}
+#define LOGRX(x)    {}
+#define LOGSETUP(x) {} LOGPRINT(x)
+#define LOGINT(x)   {}
 
 #if VERBOSE > 1
 #define logerror printf
@@ -526,7 +527,7 @@ void duscc_device::trigger_interrupt(int index, int state)
 	m_int_state[priority_level] |= Z80_DAISY_INT;
 	LOGINT((" - Interrupt Priority Level %d, caused by Source %02x with vector %02x\n",priority_level, source, m_ivrm ));
 
-	// check for interupts
+	// check for interrupts
 	check_interrupts();
 }
 
@@ -2544,13 +2545,13 @@ void duscc_channel::update_serial()
 
 	if (m_brg_rx_rate != 0)
 	{
-		if (m_brg_rx_rate == 1) m_brg_rx_rate = 0; // BRG beeing disabled
+		if (m_brg_rx_rate == 1) m_brg_rx_rate = 0; // BRG being disabled
 		set_rcv_rate(m_brg_rx_rate);
 		LOG(("   - Baud Rate Generator: %d mode: RX:%dx\n", m_brg_rx_rate, get_rx_clock_mode()));
 	}
 	if (m_brg_tx_rate != 0)
 	{
-		if (m_brg_tx_rate == 1) m_brg_tx_rate = 0; // BRG beeing disabled
+		if (m_brg_tx_rate == 1) m_brg_tx_rate = 0; // BRG being disabled
 		set_tra_rate(m_brg_tx_rate);
 		LOG(("   - Baud Rate Generator: %d mode: TX:%dx\n", m_brg_tx_rate, get_tx_clock_mode()));
 	}

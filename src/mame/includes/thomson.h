@@ -11,7 +11,6 @@
 #ifndef _THOMSON_H_
 #define _THOMSON_H_
 
-#include "emu.h"
 #include "bus/rs232/rs232.h"
 #include "cpu/m6809/m6809.h"
 #include "machine/6821pia.h"
@@ -423,8 +422,8 @@ protected:
 	uint8_t  m_to9_kbd_in;      /* data from keyboard */
 	uint8_t  m_to9_kbd_status;  /* status */
 	uint8_t  m_to9_kbd_overrun; /* character lost */
-	uint8_t  m_to9_kbd_periph;     /* peripherial mode */
-	uint8_t  m_to9_kbd_byte_count; /* byte-count in peripherial mode */
+	uint8_t  m_to9_kbd_periph;     /* peripheral mode */
+	uint8_t  m_to9_kbd_byte_count; /* byte-count in peripheral mode */
 	uint16_t m_to9_mouse_x;
 	uint16_t m_to9_mouse_y;
 	uint8_t  m_to9_kbd_last_key;  /* for key repetition */
@@ -454,7 +453,7 @@ protected:
 	/* We allow choosing dynamically:
 	   - the border size
 	   - whether we use 640 pixels or 320 pixels in an active row
-	   (now this is automatically choosen by default for each frame)
+	   (now this is automatically chosen by default for each frame)
 	*/
 	uint16_t m_thom_bwidth;
 	uint16_t m_thom_bheight;
@@ -474,7 +473,7 @@ protected:
 	/* lightpen callback function to call from timer */
 	void (thomson_state::*m_thom_lightpen_cb)(int step);
 	uint8_t* m_thom_vram; /* pointer to video memory */
-	emu_timer* m_thom_scanline_timer; /* scan-line udpate */
+	emu_timer* m_thom_scanline_timer; /* scan-line update */
 	uint16_t m_thom_last_pal[16];   /* palette at last scanline start */
 	uint16_t m_thom_pal[16];        /* current palette */
 	uint8_t  m_thom_pal_changed;    /* whether pal != old_pal */

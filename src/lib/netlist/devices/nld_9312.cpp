@@ -20,16 +20,17 @@
  *          | 1 | 1 | 1 | 0 || D7|D7Q|
  *          +---+---+---+---++---+---+
 */
+#include  "nlid_truthtable.h"
 #include "nld_9312.h"
-#include "nld_truthtable.h"
 
 namespace netlist
 {
 	namespace devices
 	{
 	#if (USE_TRUTHTABLE)
-	/* The truthtable implementation is a lot faster than
+	/* FIXME: The truthtable implementation is a lot faster than
 	 * the carefully crafted code :-(
+	 * Convert this into a macro module.
 	 */
 	NETLIB_TRUTHTABLE(9312, 12, 2);
 	#else
@@ -129,7 +130,7 @@ namespace netlist
 	 *        do this right now.
 	 */
 
-	const char *nld_9312::m_desc[] = {
+	const pstring nld_9312::m_desc[] = {
 			" C, B, A, G,D0,D1,D2,D3,D4,D5,D6,D7| Y,YQ",
 			" X, X, X, 1, X, X, X, X, X, X, X, X| 0, 1|33,19",
 			" 0, 0, 0, 0, 0, X, X, X, X, X, X, X| 0, 1|33,28",

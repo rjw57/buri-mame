@@ -9,7 +9,6 @@
 #ifndef __CRTC_EGA__
 #define __CRTC_EGA__
 
-#include "emu.h"
 
 /* callback definitions */
 typedef device_delegate<void (bitmap_ind16 &bitmap, const rectangle &cliprect)> crtc_ega_begin_update_delegate;
@@ -100,7 +99,7 @@ public:
 	void set_hpixels_per_column(int hpixels_per_column);
 
 	/* updates the screen -- this will call begin_update(), */
-	/* followed by update_row() reapeatedly and after all row */
+	/* followed by update_row() repeatedly and after all row */
 	/* updating is complete, end_update() */
 	uint32_t screen_update(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
 

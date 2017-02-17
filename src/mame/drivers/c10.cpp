@@ -25,19 +25,20 @@ public:
 	};
 
 	c10_state(const machine_config &mconfig, device_type type, const char *tag)
-		: driver_device(mconfig, type, tag),
-	m_maincpu(*this, "maincpu"),
-	m_p_videoram(*this, "p_videoram"){ }
+		: driver_device(mconfig, type, tag)
+		, m_maincpu(*this, "maincpu")
+		, m_p_videoram(*this, "videoram")
+		, m_p_chargen(*this, "chargen")
+		{ }
 
-	required_device<cpu_device> m_maincpu;
-	const uint8_t *m_p_chargen;
-	required_shared_ptr<uint8_t> m_p_videoram;
-	virtual void machine_reset() override;
-	virtual void video_start() override;
 	uint32_t screen_update(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
 	DECLARE_DRIVER_INIT(c10);
 
-protected:
+private:
+	required_device<cpu_device> m_maincpu;
+	required_shared_ptr<uint8_t> m_p_videoram;
+	required_region_ptr<u8> m_p_chargen;
+	virtual void machine_reset() override;
 	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
 };
 
@@ -49,7 +50,7 @@ static ADDRESS_MAP_START(c10_mem, AS_PROGRAM, 8, c10_state)
 	AM_RANGE(0x1000, 0x7fff) AM_RAM
 	AM_RANGE(0x8000, 0xbfff) AM_ROM
 	AM_RANGE(0xc000, 0xf0a1) AM_RAM
-	AM_RANGE(0xf0a2, 0xffff) AM_RAM AM_SHARE("p_videoram")
+	AM_RANGE(0xf0a2, 0xffff) AM_RAM AM_SHARE("videoram")
 ADDRESS_MAP_END
 
 static ADDRESS_MAP_START( c10_io, AS_IO, 8, c10_state)
@@ -77,11 +78,6 @@ void c10_state::machine_reset()
 {
 	membank("boot")->set_entry(1);
 	timer_set(attotime::from_usec(4), TIMER_RESET);
-}
-
-void c10_state::video_start()
-{
-	m_p_chargen = memregion("chargen")->base();
 }
 
 /* This system appears to have inline attribute bytes of unknown meaning.

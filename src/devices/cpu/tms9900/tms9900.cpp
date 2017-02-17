@@ -101,13 +101,14 @@
     - State save
     - HOLD state should be tested; I don't have test cases yet
 
-	
-	Previous implementation with valuable info inside:
-	https://github.com/mamedev/mame/blob/677ec78eb50decdc40fad3d30daa3560feaff3cc/src/devices/cpu/tms9900/99xxcore.h
-	
+
+    Previous implementation with valuable info inside:
+    https://github.com/mamedev/mame/blob/677ec78eb50decdc40fad3d30daa3560feaff3cc/src/devices/cpu/tms9900/99xxcore.h
+
     Michael Zapf, June 2012
 */
 
+#include "emu.h"
 #include "tms9900.h"
 
 #define NOPRG -1

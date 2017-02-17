@@ -94,7 +94,7 @@
 #include "pairmtch.lh"
 #include "sag.lh"
 
-#include "hh_hmcs40_test.lh" // common test-layout - no svg artwork(yet), use external artwork
+//#include "hh_hmcs40_test.lh" // common test-layout - no svg artwork(yet), use external artwork
 
 
 class hh_hmcs40_state : public driver_device
@@ -122,34 +122,34 @@ public:
 	optional_device<speaker_sound_device> m_speaker;
 
 	// misc common
-	uint8_t m_r[8];                       // MCU R ports write data (optional)
-	uint16_t m_d;                         // MCU D port write data (optional)
-	uint8_t m_int[2];                     // MCU INT0/1 pins state
-	uint16_t m_inp_mux;                   // multiplexed inputs mask
+	u8 m_r[8];                      // MCU R ports write data (optional)
+	u16 m_d;                        // MCU D port write data (optional)
+	u8 m_int[2];                    // MCU INT0/1 pins state
+	u16 m_inp_mux;                  // multiplexed inputs mask
 
-	uint16_t read_inputs(int columns);
+	u16 read_inputs(int columns);
 	void refresh_interrupts(void);
 	void set_interrupt(int line, int state);
 	DECLARE_INPUT_CHANGED_MEMBER(single_interrupt_line);
 
 	// display common
-	int m_display_wait;                 // led/lamp off-delay in microseconds (default 33ms)
-	int m_display_maxy;                 // display matrix number of rows
-	int m_display_maxx;                 // display matrix number of columns (max 47 for now)
+	int m_display_wait;             // led/lamp off-delay in microseconds (default 33ms)
+	int m_display_maxy;             // display matrix number of rows
+	int m_display_maxx;             // display matrix number of columns (max 47 for now)
 
-	uint32_t m_grid;                      // VFD current row data
-	uint64_t m_plate;                     // VFD current column data
+	u32 m_grid;                     // VFD current row data
+	u64 m_plate;                    // VFD current column data
 
-	uint64_t m_display_state[0x20];       // display matrix rows data (last bit is used for always-on)
-	uint16_t m_display_segmask[0x20];     // if not 0, display matrix row is a digit, mask indicates connected segments
-	uint64_t m_display_cache[0x20];       // (internal use)
-	uint8_t m_display_decay[0x20][0x40];  // (internal use)
+	u64 m_display_state[0x20];      // display matrix rows data (last bit is used for always-on)
+	u16 m_display_segmask[0x20];    // if not 0, display matrix row is a digit, mask indicates connected segments
+	u64 m_display_cache[0x20];      // (internal use)
+	u8 m_display_decay[0x20][0x40]; // (internal use)
 
 	TIMER_DEVICE_CALLBACK_MEMBER(display_decay_tick);
 	void display_update();
 	void set_display_size(int maxx, int maxy);
-	void set_display_segmask(uint32_t digits, uint32_t mask);
-	void display_matrix(int maxx, int maxy, uint64_t setx, uint32_t sety, bool update = true);
+	void set_display_segmask(u32 digits, u32 mask);
+	void display_matrix(int maxx, int maxy, u64 setx, u32 sety, bool update = true);
 
 protected:
 	virtual void machine_start() override;
@@ -210,7 +210,7 @@ void hh_hmcs40_state::machine_reset()
 
 void hh_hmcs40_state::display_update()
 {
-	uint64_t active_state[0x20];
+	u64 active_state[0x20];
 
 	for (int y = 0; y < m_display_maxy; y++)
 	{
@@ -223,7 +223,7 @@ void hh_hmcs40_state::display_update()
 				m_display_decay[y][x] = m_display_wait;
 
 			// determine active state
-			uint64_t ds = (m_display_decay[y][x] != 0) ? 1 : 0;
+			u64 ds = (m_display_decay[y][x] != 0) ? 1 : 0;
 			active_state[y] |= (ds << x);
 		}
 	}
@@ -278,7 +278,7 @@ void hh_hmcs40_state::set_display_size(int maxx, int maxy)
 	m_display_maxy = maxy;
 }
 
-void hh_hmcs40_state::set_display_segmask(uint32_t digits, uint32_t mask)
+void hh_hmcs40_state::set_display_segmask(u32 digits, u32 mask)
 {
 	// set a segment mask per selected digit, but leave unselected ones alone
 	for (int i = 0; i < 0x20; i++)
@@ -289,12 +289,12 @@ void hh_hmcs40_state::set_display_segmask(uint32_t digits, uint32_t mask)
 	}
 }
 
-void hh_hmcs40_state::display_matrix(int maxx, int maxy, uint64_t setx, uint32_t sety, bool update)
+void hh_hmcs40_state::display_matrix(int maxx, int maxy, u64 setx, u32 sety, bool update)
 {
 	set_display_size(maxx, maxy);
 
 	// update current state
-	uint64_t mask = (u64(1) << maxx) - 1;
+	u64 mask = (u64(1) << maxx) - 1;
 	for (int y = 0; y < maxy; y++)
 		m_display_state[y] = (sety >> y & 1) ? ((setx & mask) | (u64(1) << maxx)) : 0;
 
@@ -305,9 +305,9 @@ void hh_hmcs40_state::display_matrix(int maxx, int maxy, uint64_t setx, uint32_t
 
 // generic input handlers
 
-uint16_t hh_hmcs40_state::read_inputs(int columns)
+u16 hh_hmcs40_state::read_inputs(int columns)
 {
-	uint16_t ret = 0;
+	u16 ret = 0;
 
 	// read selected input rows
 	for (int i = 0; i < columns; i++)
@@ -382,7 +382,7 @@ WRITE8_MEMBER(bambball_state::plate_w)
 	m_plate = (m_plate & ~(0xf << shift)) | (data << shift);
 
 	// update display
-	uint16_t plate = BITSWAP16(m_plate,13,8,4,12,9,10,14,1,7,0,15,11,6,3,5,2);
+	u16 plate = BITSWAP16(m_plate,13,8,4,12,9,10,14,1,7,0,15,11,6,3,5,2);
 	display_matrix(16, 9, plate, m_grid);
 }
 
@@ -491,8 +491,8 @@ public:
 
 void bmboxing_state::prepare_display()
 {
-	uint16_t grid = BITSWAP16(m_grid,15,14,13,12,11,10,9,0,1,2,3,4,5,6,7,8);
-	uint32_t plate = BITSWAP16(m_plate,15,14,13,12,1,2,0,3,11,4,10,7,5,6,9,8);
+	u16 grid = BITSWAP16(m_grid,15,14,13,12,11,10,9,0,1,2,3,4,5,6,7,8);
+	u32 plate = BITSWAP16(m_plate,15,14,13,12,1,2,0,3,11,4,10,7,5,6,9,8);
 	display_matrix(12, 9, plate, grid);
 }
 
@@ -630,8 +630,8 @@ public:
 
 void bfriskyt_state::prepare_display()
 {
-	uint16_t grid = BITSWAP16(m_grid,15,14,13,12,11,10,9,8,0,1,2,3,4,5,6,7);
-	uint32_t plate = BITSWAP24(m_plate,23,22,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21);
+	u16 grid = BITSWAP16(m_grid,15,14,13,12,11,10,9,8,0,1,2,3,4,5,6,7);
+	u32 plate = BITSWAP24(m_plate,23,22,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21);
 	display_matrix(22, 8, plate, grid);
 }
 
@@ -649,7 +649,7 @@ WRITE16_MEMBER(bfriskyt_state::grid_w)
 	m_speaker->level_w(data >> 6 & 1);
 
 	// D11-D15: input mux
-	uint8_t inp_mux = data >> 11 & 0x1f;
+	u8 inp_mux = data >> 11 & 0x1f;
 	if (inp_mux != m_inp_mux)
 	{
 		m_inp_mux = inp_mux;
@@ -697,7 +697,6 @@ INPUT_CHANGED_MEMBER(bfriskyt_state::input_changed)
 {
 	update_int1();
 }
-
 
 static MACHINE_CONFIG_START( bfriskyt, bfriskyt_state )
 
@@ -763,8 +762,8 @@ WRITE8_MEMBER(packmon_state::plate_w)
 	m_plate = (m_plate & ~(0xf << shift)) | (data << shift);
 
 	// update display
-	uint16_t grid = BITSWAP16(m_grid,15,14,13,12,11,10,0,1,2,3,4,5,6,7,8,9);
-	uint32_t plate = BITSWAP24(m_plate,23,22,21,20,0,1,2,3,4,5,6,19,18,17,16,15,14,13,12,11,10,9,8,7);
+	u16 grid = BITSWAP16(m_grid,15,14,13,12,11,10,0,1,2,3,4,5,6,7,8,9);
+	u32 plate = BITSWAP24(m_plate,23,22,21,20,0,1,2,3,4,5,6,19,18,17,16,15,14,13,12,11,10,9,8,7);
 	display_matrix(20, 10, plate, grid);
 }
 
@@ -873,8 +872,8 @@ public:
 
 void msthawk_state::prepare_display()
 {
-	uint16_t grid = BITSWAP16(m_grid,15,14,13,12,11,10,0,1,2,3,4,5,6,7,8,9);
-	uint32_t plate = BITSWAP24(m_plate,23,22,21,19,20,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0);
+	u16 grid = BITSWAP16(m_grid,15,14,13,12,11,10,0,1,2,3,4,5,6,7,8,9);
+	u32 plate = BITSWAP24(m_plate,23,22,21,19,20,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0);
 	display_matrix(21, 10, plate, grid);
 }
 
@@ -892,7 +891,7 @@ WRITE16_MEMBER(msthawk_state::grid_w)
 	m_speaker->level_w(data >> 5 & 1);
 
 	// D10-D15: input mux
-	uint8_t inp_mux = data >> 10 & 0x3f;
+	u8 inp_mux = data >> 10 & 0x3f;
 	if (inp_mux != m_inp_mux)
 	{
 		m_inp_mux = inp_mux;
@@ -943,7 +942,6 @@ INPUT_CHANGED_MEMBER(msthawk_state::input_changed)
 {
 	update_int0();
 }
-
 
 static MACHINE_CONFIG_START( msthawk, msthawk_state )
 
@@ -1006,8 +1004,8 @@ WRITE8_MEMBER(bzaxxon_state::plate_w)
 	m_plate = (m_plate & ~(0xf << shift)) | (data << shift);
 
 	// update display
-	uint16_t grid = BITSWAP16(m_grid,15,14,13,12,11,6,7,8,9,10,5,4,3,2,1,0);
-	uint32_t plate = BITSWAP24(m_plate,23,22,21,20,5,7,0,1,2,3,4,6,19,16,17,18,15,14,13,12,10,8,9,11) | 0x800;
+	u16 grid = BITSWAP16(m_grid,15,14,13,12,11,6,7,8,9,10,5,4,3,2,1,0);
+	u32 plate = BITSWAP24(m_plate,23,22,21,20,5,7,0,1,2,3,4,6,19,16,17,18,15,14,13,12,10,8,9,11) | 0x800;
 	display_matrix(20, 11, plate, grid);
 }
 
@@ -1017,7 +1015,7 @@ WRITE16_MEMBER(bzaxxon_state::grid_w)
 	m_speaker->level_w(data >> 4 & 1);
 
 	// D7-D10: input mux
-	uint8_t inp_mux = data >> 7 & 0xf;
+	u8 inp_mux = data >> 7 & 0xf;
 	if (inp_mux != m_inp_mux)
 	{
 		m_inp_mux = inp_mux;
@@ -1065,7 +1063,6 @@ INPUT_CHANGED_MEMBER(bzaxxon_state::input_changed)
 {
 	update_int1();
 }
-
 
 static MACHINE_CONFIG_START( bzaxxon, bzaxxon_state )
 
@@ -1127,8 +1124,8 @@ WRITE8_MEMBER(zackman_state::plate_w)
 	m_plate = (m_plate & ~(0xf << shift)) | (data << shift);
 
 	// update display
-	uint8_t grid = BITSWAP8(m_grid,0,1,2,3,4,5,6,7);
-	uint32_t plate = BITSWAP32(m_plate,31,30,27,0,1,2,3,4,5,6,7,8,9,10,11,24,25,26,29,28,23,22,21,20,19,18,17,16,15,14,13,12);
+	u8 grid = BITSWAP8(m_grid,0,1,2,3,4,5,6,7);
+	u32 plate = BITSWAP32(m_plate,31,30,27,0,1,2,3,4,5,6,7,8,9,10,11,24,25,26,29,28,23,22,21,20,19,18,17,16,15,14,13,12);
 	display_matrix(29, 8, plate, grid);
 }
 
@@ -1138,7 +1135,7 @@ WRITE16_MEMBER(zackman_state::grid_w)
 	m_speaker->level_w(data >> 2 & 1);
 
 	// D11-D14: input mux
-	uint8_t inp_mux = data >> 11 & 0xf;
+	u8 inp_mux = data >> 11 & 0xf;
 	if (inp_mux != m_inp_mux)
 	{
 		m_inp_mux = inp_mux;
@@ -1182,7 +1179,6 @@ INPUT_CHANGED_MEMBER(zackman_state::input_changed)
 {
 	update_int0();
 }
-
 
 static MACHINE_CONFIG_START( zackman, zackman_state )
 
@@ -1243,8 +1239,8 @@ public:
 
 void bpengo_state::prepare_display()
 {
-	uint8_t grid = BITSWAP8(m_grid,0,1,2,3,4,5,6,7);
-	uint32_t plate = BITSWAP32(m_plate,31,30,29,28,23,22,21,16,17,18,19,20,27,26,25,24,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0);
+	u8 grid = BITSWAP8(m_grid,0,1,2,3,4,5,6,7);
+	u32 plate = BITSWAP32(m_plate,31,30,29,28,23,22,21,16,17,18,19,20,27,26,25,24,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0);
 	display_matrix(25, 8, plate, grid);
 }
 
@@ -1262,7 +1258,7 @@ WRITE16_MEMBER(bpengo_state::grid_w)
 	m_speaker->level_w(data >> 10 & 1);
 
 	// D12-D15: input mux
-	uint8_t inp_mux = data >> 12 & 0xf;
+	u8 inp_mux = data >> 12 & 0xf;
 	if (inp_mux != m_inp_mux)
 	{
 		m_inp_mux = inp_mux;
@@ -1310,7 +1306,6 @@ INPUT_CHANGED_MEMBER(bpengo_state::input_changed)
 {
 	update_int0();
 }
-
 
 static MACHINE_CONFIG_START( bpengo, bpengo_state )
 
@@ -1372,8 +1367,8 @@ public:
 
 void bbtime_state::prepare_display()
 {
-	uint8_t grid = BITSWAP8(m_grid,7,6,0,1,2,3,4,5);
-	uint32_t plate = BITSWAP32(m_plate,31,30,29,28,25,24,26,27,22,23,15,14,12,11,10,8,7,6,4,1,5,9,13,3,2,16,17,18,19,20,0,21) | 0x1;
+	u8 grid = BITSWAP8(m_grid,7,6,0,1,2,3,4,5);
+	u32 plate = BITSWAP32(m_plate,31,30,29,28,25,24,26,27,22,23,15,14,12,11,10,8,7,6,4,1,5,9,13,3,2,16,17,18,19,20,0,21) | 0x1;
 	display_matrix(28, 6, plate, grid);
 }
 
@@ -1391,7 +1386,7 @@ WRITE16_MEMBER(bbtime_state::grid_w)
 	m_speaker->level_w(data >> 3 & 1);
 
 	// D10-D14: input mux
-	uint8_t inp_mux = data >> 10 & 0x1f;
+	u8 inp_mux = data >> 10 & 0x1f;
 	if (inp_mux != m_inp_mux)
 	{
 		m_inp_mux = inp_mux;
@@ -1436,7 +1431,6 @@ INPUT_CHANGED_MEMBER(bbtime_state::input_changed)
 {
 	update_int0();
 }
-
 
 static MACHINE_CONFIG_START( bbtime, bbtime_state )
 
@@ -1498,8 +1492,8 @@ WRITE8_MEMBER(bdoramon_state::plate_w)
 	m_plate = (m_plate & ~(0xf << shift)) | (data << shift);
 
 	// update display
-	uint8_t grid = BITSWAP8(m_grid,0,1,2,3,4,5,7,6);
-	uint32_t plate = BITSWAP24(m_plate,23,22,21,20,11,19,18,17,16,15,14,13,12,10,9,8,7,6,5,4,3,2,1,0);
+	u8 grid = BITSWAP8(m_grid,0,1,2,3,4,5,7,6);
+	u32 plate = BITSWAP24(m_plate,23,22,21,20,11,19,18,17,16,15,14,13,12,10,9,8,7,6,5,4,3,2,1,0);
 	display_matrix(19, 8, plate, grid);
 }
 
@@ -1597,8 +1591,8 @@ WRITE8_MEMBER(bultrman_state::plate_w)
 	m_plate = (m_plate & ~(0xf << shift)) | (data << shift);
 
 	// update display
-	uint8_t grid = BITSWAP8(m_grid,0,1,2,3,4,5,6,7);
-	uint32_t plate = BITSWAP24(m_plate,23,22,21,20,19,0,18,17,16,15,14,13,12,3,11,10,9,8,7,6,5,4,1,2);
+	u8 grid = BITSWAP8(m_grid,0,1,2,3,4,5,6,7);
+	u32 plate = BITSWAP24(m_plate,23,22,21,20,19,0,18,17,16,15,14,13,12,3,11,10,9,8,7,6,5,4,1,2);
 	display_matrix(18, 8, plate, grid);
 }
 
@@ -1684,7 +1678,7 @@ public:
 
 void machiman_state::prepare_display()
 {
-	uint32_t plate = BITSWAP24(m_plate,23,22,21,20,19,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18);
+	u32 plate = BITSWAP24(m_plate,23,22,21,20,19,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18);
 	display_matrix(19, 5, plate, m_grid);
 }
 
@@ -1938,7 +1932,7 @@ WRITE8_MEMBER(alnattck_state::plate_w)
 	m_plate = (m_plate & ~(0xf << shift)) | (data << shift);
 
 	// update display
-	uint32_t plate = BITSWAP24(m_plate,23,22,21,20,19,18,17,16,11,9,8,10,7,2,0,1,3,4,5,6,12,13,14,15);
+	u32 plate = BITSWAP24(m_plate,23,22,21,20,19,18,17,16,11,9,8,10,7,2,0,1,3,4,5,6,12,13,14,15);
 	display_matrix(20, 10, plate, m_grid);
 }
 
@@ -2025,6 +2019,7 @@ MACHINE_CONFIG_END
   Coleco Donkey Kong (manufactured in Taiwan, licensed from Nintendo)
   * PCB label Coleco Rev C 75790 DK
   * Hitachi QFP HD38820A45 MCU
+  * RC circuit for speaker volume decay
   * cyan/red VFD display Futaba DM-47ZK 2K, with color overlay
 
 ***************************************************************************/
@@ -2040,8 +2035,9 @@ public:
 	DECLARE_WRITE8_MEMBER(plate_w);
 	DECLARE_WRITE16_MEMBER(grid_w);
 
-	int m_speaker_volume;
+	void speaker_decay_reset();
 	TIMER_DEVICE_CALLBACK_MEMBER(speaker_decay_sim);
+	double m_speaker_volume;
 
 protected:
 	virtual void machine_start() override;
@@ -2049,31 +2045,32 @@ protected:
 
 // handlers
 
-// Sound is controlled by two pins: D3 for pitch, and R13 for on/off. When turned
-// off, it does not mute instantly, but volume slowly decays. Until we emulate it
-// with discrete audio, this crude simulation will do.
+void cdkong_state::speaker_decay_reset()
+{
+	if (m_r[1] & 8)
+		m_speaker_volume = 1.0;
 
-#define CDKONG_SPEAKER_MAX 0x10000
-#define CDKONG_SPEAKER_DECAY 50
+	m_speaker->set_output_gain(0, m_speaker_volume);
+}
 
 TIMER_DEVICE_CALLBACK_MEMBER(cdkong_state::speaker_decay_sim)
 {
-	m_speaker->set_output_gain(0, m_speaker_volume / (double)CDKONG_SPEAKER_MAX);
-	m_speaker_volume /= 2;
+	// volume decays when speaker is off (divisor and timer period determine duration)
+	speaker_decay_reset();
+	m_speaker_volume /= 1.015;
 }
-
 
 void cdkong_state::prepare_display()
 {
-	uint32_t plate = BITSWAP32(m_plate,31,30,29,24,0,16,8,1,23,17,9,2,18,10,25,27,26,3,15,27,11,11,14,22,6,13,21,5,19,12,20,4) | 0x800800;
+	u32 plate = BITSWAP32(m_plate,31,30,29,24,0,16,8,1,23,17,9,2,18,10,25,27,26,3,15,27,11,11,14,22,6,13,21,5,19,12,20,4) | 0x800800;
 	display_matrix(29, 11, plate, m_grid);
 }
 
 WRITE8_MEMBER(cdkong_state::plate_w)
 {
 	// R13: speaker on
-	if (offset == HMCS40_PORT_R1X && data & 8)
-		m_speaker_volume = CDKONG_SPEAKER_MAX;
+	m_r[offset] = data;
+	speaker_decay_reset();
 
 	// R0x-R6x: vfd matrix plate
 	int shift = offset * 4;
@@ -2105,7 +2102,6 @@ static INPUT_PORTS_START( cdkong )
 	PORT_BIT( 0x8000, IP_ACTIVE_HIGH, IPT_JOYSTICK_LEFT )
 	PORT_BIT( 0x7ff8, IP_ACTIVE_HIGH, IPT_UNUSED )
 INPUT_PORTS_END
-
 
 void cdkong_state::machine_start()
 {
@@ -2142,7 +2138,7 @@ static MACHINE_CONFIG_START( cdkong, cdkong_state )
 	MCFG_SPEAKER_STANDARD_MONO("mono")
 	MCFG_SOUND_ADD("speaker", SPEAKER_SOUND, 0)
 	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "mono", 0.25)
-	MCFG_TIMER_DRIVER_ADD_PERIODIC("speaker_decay", cdkong_state, speaker_decay_sim, attotime::from_msec(CDKONG_SPEAKER_DECAY))
+	MCFG_TIMER_DRIVER_ADD_PERIODIC("speaker_decay", cdkong_state, speaker_decay_sim, attotime::from_msec(1))
 MACHINE_CONFIG_END
 
 
@@ -2154,6 +2150,7 @@ MACHINE_CONFIG_END
   Coleco Galaxian (manufactured in Taiwan)
   * PCB label Coleco Rev A 75718
   * Hitachi HD38800A70 MCU
+  * discrete sound (when alien attacks)
   * cyan/red VFD display Futaba DM-36Z 2H, with color overlay
 
   Select game mode on start:
@@ -2183,8 +2180,8 @@ public:
 
 void cgalaxn_state::prepare_display()
 {
-	uint16_t grid = BITSWAP16(m_grid,15,14,13,12,1,2,0,11,10,9,8,7,6,5,4,3);
-	uint16_t plate = BITSWAP16(m_plate,15,14,6,5,4,3,2,1,7,8,9,10,11,0,12,13);
+	u16 grid = BITSWAP16(m_grid,15,14,13,12,1,2,0,11,10,9,8,7,6,5,4,3);
+	u16 plate = BITSWAP16(m_plate,15,14,6,5,4,3,2,1,7,8,9,10,11,0,12,13);
 	display_matrix(15, 12, plate, grid);
 }
 
@@ -2247,7 +2244,6 @@ INPUT_CHANGED_MEMBER(cgalaxn_state::player_switch)
 	m_plate = (m_plate & 0x3fff) | (newval ? 0 : 0x4000);
 	prepare_display();
 }
-
 
 static MACHINE_CONFIG_START( cgalaxn, cgalaxn_state )
 
@@ -2319,8 +2315,8 @@ WRITE8_MEMBER(cpacman_state::plate_w)
 	m_plate = (m_plate & ~(0xf << shift)) | (data << shift);
 
 	// update display
-	uint16_t grid = BITSWAP16(m_grid,15,14,13,12,11,0,1,2,3,4,5,6,7,8,9,10);
-	uint32_t plate = BITSWAP32(m_plate,31,30,29,28,27,0,1,2,3,8,9,10,11,16,17,18,19,25,26,23,22,21,20,24,15,14,13,12,4,5,6,7);
+	u16 grid = BITSWAP16(m_grid,15,14,13,12,11,0,1,2,3,4,5,6,7,8,9,10);
+	u32 plate = BITSWAP32(m_plate,31,30,29,28,27,0,1,2,3,8,9,10,11,16,17,18,19,25,26,23,22,21,20,24,15,14,13,12,4,5,6,7);
 	display_matrix(27, 11, plate, grid);
 }
 
@@ -2436,8 +2432,8 @@ WRITE8_MEMBER(cmspacmn_state::plate_w)
 	m_plate = (m_plate & ~(0xf << shift)) | (data << shift);
 
 	// update display
-	uint16_t grid = BITSWAP16(m_grid,15,14,13,11,10,9,8,7,6,5,4,3,2,1,0,1);
-	uint64_t plate = BIT(m_plate,15)<<32 | BITSWAP32(m_plate,14,13,12,4,5,6,7,24,23,25,22,21,20,13,24,3,19,14,12,11,24,2,10,8,7,25,0,9,1,18,17,16) | 0x1004080;
+	u16 grid = BITSWAP16(m_grid,15,14,13,11,10,9,8,7,6,5,4,3,2,1,0,1);
+	u64 plate = BIT(m_plate,15)<<32 | BITSWAP32(m_plate,14,13,12,4,5,6,7,24,23,25,22,21,20,13,24,3,19,14,12,11,24,2,10,8,7,25,0,9,1,18,17,16) | 0x1004080;
 	display_matrix(33, 12, plate, grid);
 }
 
@@ -2552,7 +2548,7 @@ void sag_state::prepare_display()
 
 	// grid 8-11 are 7segs
 	set_display_segmask(0xf00, 0x7f);
-	uint8_t seg = BITSWAP8(m_plate,3,4,5,6,7,8,9,10);
+	u8 seg = BITSWAP8(m_plate,3,4,5,6,7,8,9,10);
 	for (int y = 8; y < 12; y++)
 		m_display_state[y] = (m_grid >> y & 1) ? seg : 0;
 
@@ -2682,8 +2678,8 @@ public:
 
 void egalaxn2_state::prepare_display()
 {
-	uint16_t grid = BITSWAP16(m_grid,15,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14);
-	uint32_t plate = BITSWAP24(m_plate,23,22,21,20,15,14,13,12,7,6,5,4,3,2,1,0,19,18,17,16,11,10,9,8);
+	u16 grid = BITSWAP16(m_grid,15,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14);
+	u32 plate = BITSWAP24(m_plate,23,22,21,20,15,14,13,12,7,6,5,4,3,2,1,0,19,18,17,16,11,10,9,8);
 	display_matrix(24, 15, plate, grid);
 }
 
@@ -2865,7 +2861,7 @@ public:
 	DECLARE_WRITE8_MEMBER(plate_w);
 	DECLARE_WRITE16_MEMBER(grid_w);
 
-	uint8_t m_cop_irq;
+	u8 m_cop_irq;
 	DECLARE_WRITE_LINE_MEMBER(speaker_w);
 	DECLARE_WRITE8_MEMBER(cop_irq_w);
 	DECLARE_READ8_MEMBER(cop_latch_r);
@@ -2882,8 +2878,8 @@ protected:
 
 void eturtles_state::prepare_display()
 {
-	uint16_t grid = BITSWAP16(m_grid,15,1,14,13,12,11,10,9,8,7,6,5,4,3,2,0);
-	uint32_t plate = BITSWAP32(m_plate,31,30,11,12,18,19,16,17,22,15,20,21,27,26,23,25,24,2,3,1,0,6,4,5,10,9,2,8,7,14,1,13);
+	u16 grid = BITSWAP16(m_grid,15,1,14,13,12,11,10,9,8,7,6,5,4,3,2,0);
+	u32 plate = BITSWAP32(m_plate,31,30,11,12,18,19,16,17,22,15,20,21,27,26,23,25,24,2,3,1,0,6,4,5,10,9,2,8,7,14,1,13);
 	display_matrix(30, 15, plate | (grid >> 5 & 8), grid); // grid 8 also forces plate 3 high
 }
 
@@ -2902,7 +2898,7 @@ WRITE16_MEMBER(eturtles_state::grid_w)
 	m_d = data;
 
 	// D1-D6: input mux
-	uint8_t inp_mux = data >> 1 & 0x3f;
+	u8 inp_mux = data >> 1 & 0x3f;
 	if (inp_mux != m_inp_mux)
 	{
 		m_inp_mux = inp_mux;
@@ -2917,7 +2913,7 @@ WRITE16_MEMBER(eturtles_state::grid_w)
 void eturtles_state::update_int()
 {
 	// INT0/1 on multiplexed inputs, and from COP D0
-	uint8_t inp = read_inputs(6);
+	u8 inp = read_inputs(6);
 	set_interrupt(0, (inp & 1) | m_cop_irq);
 	set_interrupt(1, inp & 2);
 }
@@ -2987,7 +2983,6 @@ INPUT_CHANGED_MEMBER(eturtles_state::input_changed)
 {
 	update_int();
 }
-
 
 void eturtles_state::machine_start()
 {
@@ -3062,8 +3057,8 @@ public:
 
 void estargte_state::prepare_display()
 {
-	uint16_t grid = BITSWAP16(m_grid,15,0,14,13,12,11,10,9,8,7,6,5,4,3,2,1);
-	uint32_t plate = BITSWAP32(m_plate,31,30,29,15,17,19,21,23,25,27,26,24,3,22,20,18,16,14,12,10,8,6,4,2,0,1,3,5,7,9,11,13);
+	u16 grid = BITSWAP16(m_grid,15,0,14,13,12,11,10,9,8,7,6,5,4,3,2,1);
+	u32 plate = BITSWAP32(m_plate,31,30,29,15,17,19,21,23,25,27,26,24,3,22,20,18,16,14,12,10,8,6,4,2,0,1,3,5,7,9,11,13);
 	display_matrix(29, 14, plate, grid);
 }
 
@@ -3179,8 +3174,8 @@ WRITE8_MEMBER(ghalien_state::plate_w)
 	m_plate = (m_plate & ~(0xf << shift)) | (data << shift);
 
 	// update display
-	uint16_t grid = BITSWAP16(m_grid,15,14,13,12,11,10,0,1,2,3,4,5,6,7,8,9);
-	uint32_t plate = BITSWAP24(m_plate,23,22,21,20,14,12,10,8,9,13,15,2,0,1,3,11,7,5,4,6,19,17,16,18);
+	u16 grid = BITSWAP16(m_grid,15,14,13,12,11,10,0,1,2,3,4,5,6,7,8,9);
+	u32 plate = BITSWAP24(m_plate,23,22,21,20,14,12,10,8,9,13,15,2,0,1,3,11,7,5,4,6,19,17,16,18);
 	display_matrix(20, 10, plate, grid);
 }
 
@@ -3298,8 +3293,8 @@ WRITE8_MEMBER(gckong_state::plate_w)
 	m_plate = (m_plate & ~(0xf << shift)) | (data << shift);
 
 	// update display
-	uint16_t grid = BITSWAP16(m_grid,15,14,13,12,11,0,1,2,3,4,5,6,7,8,9,10);
-	uint32_t plate = BITSWAP32(m_plate,31,30,29,28,27,26,25,6,7,8,12,13,14,15,16,17,18,17,16,12,11,10,9,8,7,6,5,4,3,2,1,0) | 0x8000;
+	u16 grid = BITSWAP16(m_grid,15,14,13,12,11,0,1,2,3,4,5,6,7,8,9,10);
+	u32 plate = BITSWAP32(m_plate,31,30,29,28,27,26,25,6,7,8,12,13,14,15,16,17,18,17,16,12,11,10,9,8,7,6,5,4,3,2,1,0) | 0x8000;
 	display_matrix(32, 11, plate, grid);
 }
 
@@ -3309,7 +3304,7 @@ WRITE16_MEMBER(gckong_state::grid_w)
 	m_speaker->level_w(data >> 2 & 1);
 
 	// D5-D8: input mux
-	uint8_t inp_mux = data >> 5 & 0xf;
+	u8 inp_mux = data >> 5 & 0xf;
 	if (inp_mux != m_inp_mux)
 	{
 		m_inp_mux = inp_mux;
@@ -3359,7 +3354,6 @@ INPUT_CHANGED_MEMBER(gckong_state::input_changed)
 {
 	update_int1();
 }
-
 
 static MACHINE_CONFIG_START( gckong, gckong_state )
 
@@ -3422,7 +3416,7 @@ WRITE8_MEMBER(gdigdug_state::plate_w)
 	m_plate = (m_plate & ~(0xf << shift)) | (data << shift);
 
 	// update display
-	uint32_t plate = BITSWAP32(m_plate,30,31,0,1,2,3,4,5,6,7,20,21,22,27,26,25,28,29,24,23,15,14,13,12,8,9,10,11,19,18,17,16);
+	u32 plate = BITSWAP32(m_plate,30,31,0,1,2,3,4,5,6,7,20,21,22,27,26,25,28,29,24,23,15,14,13,12,8,9,10,11,19,18,17,16);
 	display_matrix(32, 9, plate, m_grid);
 }
 
@@ -3432,7 +3426,7 @@ WRITE16_MEMBER(gdigdug_state::grid_w)
 	m_speaker->level_w(data >> 6 & 1);
 
 	// D11-D15: input mux
-	uint8_t inp_mux = data >> 11 & 0x1f;
+	u8 inp_mux = data >> 11 & 0x1f;
 	if (inp_mux != m_inp_mux)
 	{
 		m_inp_mux = inp_mux;
@@ -3479,7 +3473,6 @@ INPUT_CHANGED_MEMBER(gdigdug_state::input_changed)
 {
 	update_int1();
 }
-
 
 static MACHINE_CONFIG_START( gdigdug, gdigdug_state )
 
@@ -3543,7 +3536,7 @@ public:
 
 void mwcbaseb_state::prepare_display()
 {
-	uint8_t grid = BITSWAP8(m_grid,0,1,2,3,4,5,6,7);
+	u8 grid = BITSWAP8(m_grid,0,1,2,3,4,5,6,7);
 	display_matrix(16, 8, m_plate, grid);
 }
 
@@ -3641,7 +3634,7 @@ static INPUT_PORTS_START( mwcbaseb )
 	PORT_BIT( 0x08, IP_ACTIVE_HIGH, IPT_KEYPAD ) PORT_CODE(KEYCODE_1) PORT_CODE(KEYCODE_1_PAD) PORT_NAME("P1 1")
 INPUT_PORTS_END
 
-static const int16_t mwcbaseb_speaker_levels[] = { 0, 0x3fff, -0x4000, 0, -0x4000, 0, -0x8000, -0x4000 };
+static const s16 mwcbaseb_speaker_levels[] = { 0, 0x3fff, -0x4000, 0, -0x4000, 0, -0x8000, -0x4000 };
 
 static MACHINE_CONFIG_START( mwcbaseb, mwcbaseb_state )
 
@@ -3703,7 +3696,7 @@ WRITE8_MEMBER(pbqbert_state::plate_w)
 	m_plate = (m_plate & ~(0xf << shift)) | (data << shift);
 
 	// update display
-	uint32_t plate = BITSWAP32(m_plate,31,30,24,25,26,27,28,15,14,29,13,12,11,10,9,8,7,6,5,4,3,2,1,0,16,17,18,19,20,21,22,23) | 0x400000;
+	u32 plate = BITSWAP32(m_plate,31,30,24,25,26,27,28,15,14,29,13,12,11,10,9,8,7,6,5,4,3,2,1,0,16,17,18,19,20,21,22,23) | 0x400000;
 	display_matrix(30, 8, plate, m_grid);
 }
 
@@ -3791,8 +3784,8 @@ public:
 
 void kingman_state::prepare_display()
 {
-	uint16_t grid = BITSWAP16(m_grid,15,14,13,12,11,10,9,0,1,2,3,4,5,6,7,8);
-	uint32_t plate = BITSWAP24(m_plate,23,6,7,5,4,3,2,1,0,13,12,20,19,18,17,16,10,11,9,8,14,15,13,12);
+	u16 grid = BITSWAP16(m_grid,15,14,13,12,11,10,9,0,1,2,3,4,5,6,7,8);
+	u32 plate = BITSWAP24(m_plate,23,6,7,5,4,3,2,1,0,13,12,20,19,18,17,16,10,11,9,8,14,15,13,12);
 	display_matrix(23, 9, plate, grid);
 }
 
@@ -3810,7 +3803,7 @@ WRITE16_MEMBER(kingman_state::grid_w)
 	m_speaker->level_w(data >> 6 & 1);
 
 	// D12-D15: input mux
-	uint8_t inp_mux = data >> 12 & 0xf;
+	u8 inp_mux = data >> 12 & 0xf;
 	if (inp_mux != m_inp_mux)
 	{
 		m_inp_mux = inp_mux;
@@ -3855,7 +3848,6 @@ INPUT_CHANGED_MEMBER(kingman_state::input_changed)
 {
 	update_int0();
 }
-
 
 static MACHINE_CONFIG_START( kingman, kingman_state )
 
@@ -3913,8 +3905,8 @@ public:
 
 void tmtron_state::prepare_display()
 {
-	uint16_t grid = BITSWAP16(m_grid,15,14,13,12,11,10,1,2,3,4,5,6,7,8,9,0);
-	uint32_t plate = BITSWAP24(m_plate,23,5,2,21,1,6,7,9,10,11,21,0,19,3,4,8,3,18,17,16,12,13,14,15);
+	u16 grid = BITSWAP16(m_grid,15,14,13,12,11,10,1,2,3,4,5,6,7,8,9,0);
+	u32 plate = BITSWAP24(m_plate,23,5,2,21,1,6,7,9,10,11,21,0,19,3,4,8,3,18,17,16,12,13,14,15);
 	display_matrix(23, 10, plate, grid);
 }
 
@@ -3932,7 +3924,7 @@ WRITE16_MEMBER(tmtron_state::grid_w)
 	m_speaker->level_w(data >> 4 & 1);
 
 	// D12-D15: input mux
-	uint8_t inp_mux = data >> 12 & 0xf;
+	u8 inp_mux = data >> 12 & 0xf;
 	if (inp_mux != m_inp_mux)
 	{
 		m_inp_mux = inp_mux;
@@ -3977,7 +3969,6 @@ INPUT_CHANGED_MEMBER(tmtron_state::input_changed)
 {
 	update_int1();
 }
-
 
 static MACHINE_CONFIG_START( tmtron, tmtron_state )
 
@@ -4040,7 +4031,7 @@ WRITE8_MEMBER(vinvader_state::plate_w)
 	m_plate = (m_plate & ~(0xf << shift)) | (data << shift);
 
 	// update display
-	uint16_t plate = BITSWAP16(m_plate,15,11,7,3,10,6,14,2,9,5,13,1,8,4,12,0);
+	u16 plate = BITSWAP16(m_plate,15,11,7,3,10,6,14,2,9,5,13,1,8,4,12,0);
 	display_matrix(12, 9, plate, m_grid);
 }
 
@@ -4472,7 +4463,7 @@ CONS( 1984, machiman,  0,        0, machiman, machiman, driver_device, 0, "Banda
 CONS( 1984, pairmtch,  0,        0, pairmtch, pairmtch, driver_device, 0, "Bandai", "Pair Match", MACHINE_SUPPORTS_SAVE )
 
 CONS( 1981, alnattck,  0,        0, alnattck, alnattck, driver_device, 0, "Coleco", "Alien Attack", MACHINE_SUPPORTS_SAVE )
-CONS( 1982, cdkong,    0,        0, cdkong,   cdkong,   driver_device, 0, "Coleco", "Donkey Kong (Coleco)", MACHINE_SUPPORTS_SAVE )
+CONS( 1982, cdkong,    0,        0, cdkong,   cdkong,   driver_device, 0, "Coleco", "Donkey Kong (Coleco)", MACHINE_SUPPORTS_SAVE | MACHINE_IMPERFECT_SOUND )
 CONS( 1982, cgalaxn,   0,        0, cgalaxn,  cgalaxn,  driver_device, 0, "Coleco", "Galaxian (Coleco)", MACHINE_SUPPORTS_SAVE | MACHINE_IMPERFECT_SOUND )
 CONS( 1981, cpacman,   0,        0, cpacman,  cpacman,  driver_device, 0, "Coleco", "Pac-Man (Coleco, Rev. 29)", MACHINE_SUPPORTS_SAVE )
 CONS( 1981, cpacmanr1, cpacman,  0, cpacman,  cpacman,  driver_device, 0, "Coleco", "Pac-Man (Coleco, Rev. 28)", MACHINE_SUPPORTS_SAVE )

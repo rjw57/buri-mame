@@ -11,7 +11,6 @@
 #ifndef __APRICOT_KEYBOARD_HLE_H__
 #define __APRICOT_KEYBOARD_HLE_H__
 
-#include "emu.h"
 #include "keyboard.h"
 #include "machine/keyboard.h"
 #include "machine/msm5832.h"
@@ -57,7 +56,12 @@ private:
 
 	enum {
 		CMD_REQ_TIME_AND_DATE = 0xe1,
-		CMD_SET_TIME_AND_DATE = 0xe4
+		CMD_SET_TIME_AND_DATE = 0xe4,
+		CMD_KEYBOARD_RESET    = 0xe8
+	};
+
+	enum {
+		ACK_DIAGNOSTICS = 0xfb
 	};
 
 	int m_rtc_index;

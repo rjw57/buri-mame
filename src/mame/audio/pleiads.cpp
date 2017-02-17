@@ -43,16 +43,6 @@ pleiads_sound_device::pleiads_sound_device(const machine_config &mconfig, device
 }
 
 //-------------------------------------------------
-//  device_config_complete - perform any
-//  operations now that the configuration is
-//  complete
-//-------------------------------------------------
-
-void pleiads_sound_device::device_config_complete()
-{
-}
-
-//-------------------------------------------------
 //  device_start - device-specific startup
 //-------------------------------------------------
 
@@ -125,16 +115,6 @@ naughtyb_sound_device::naughtyb_sound_device(const machine_config &mconfig, cons
 }
 
 //-------------------------------------------------
-//  device_config_complete - perform any
-//  operations now that the configuration is
-//  complete
-//-------------------------------------------------
-
-void naughtyb_sound_device::device_config_complete()
-{
-}
-
-//-------------------------------------------------
 //  device_start - device-specific startup
 //-------------------------------------------------
 
@@ -199,16 +179,6 @@ const device_type POPFLAME = &device_creator<popflame_sound_device>;
 
 popflame_sound_device::popflame_sound_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 	: pleiads_sound_device(mconfig, POPFLAME, "Pop Flamer Audio Custom", tag, owner, clock, "popflame_sound", __FILE__)
-{
-}
-
-//-------------------------------------------------
-//  device_config_complete - perform any
-//  operations now that the configuration is
-//  complete
-//-------------------------------------------------
-
-void popflame_sound_device::device_config_complete()
 {
 }
 
@@ -371,7 +341,7 @@ inline int pleiads_sound_device::tone23(int samplerate)
 /*****************************************************************************
  * Tone #4 comes from upper half of the lower 556 (IC98 in Pop Flamer)
  * It's modulated by the voltage at C49, which is then divided between
- * 0V or 5V, depending on the polynome output bit.
+ * 0V or 5V, depending on the polynomial output bit.
  * The tone signal gates two signals (bits 5 of latches A and C), but
  * these are also swept between two levels (C52 and C53 in Pop Flamer).
  *****************************************************************************/
@@ -575,7 +545,7 @@ inline int pleiads_sound_device::noise(int samplerate)
 		m_polybit = (m_poly18[m_noise.polyoffs>>5] >> (m_noise.polyoffs & 31)) & 1;
 	}
 
-	/* The polynome output bit is used to gate bits 6 + 7 of
+	/* The polynomial output bit is used to gate bits 6 + 7 of
 	 * sound latch A through the upper half of a 4066 chip.
 	 * Bit 6 is sweeping a capacitor between 0V and 4.7V
 	 * while bit 7 is connected directly to the 4066.

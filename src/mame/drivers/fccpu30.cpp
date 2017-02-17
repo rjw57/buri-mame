@@ -70,6 +70,14 @@
  *
  * History of Force Computers
  *---------------------------
+ * 1981 Force Computers was founded in San Jose, California. Over time a European headquarter was opened
+ *      in Munich, Germany, and a Japanese headquarter in Tokyo
+ * 1996 Force was aquired by Solectron Corporation in 1996
+ * 2004 Force was sold off from Solectron to Motorola
+ * 2008 Force was aquired by Emerson as part of the Motorola Embedded Division
+ * 2016 Force was aquired by Platinum Equity as part of the Emerson Network Power Division
+ *
+ * Force developed and produced VME board products based on SPARC, Pentium, PowerPC and 68K.
  *
  * Misc links about Force Computes and this board:
  *------------------------------------------------
@@ -188,6 +196,9 @@
 
 #include "emu.h"
 #include "cpu/m68000/m68000.h"
+#include "bus/vme/vme.h"
+#include "bus/vme/vme_fcisio.h"
+#include "bus/vme/vme_fcscsi.h"
 #include "machine/msm6242.h"
 #include "machine/ram.h" // For variants that only differs in amount of RAM
 #include "machine/scnxx562.h"
@@ -198,17 +209,21 @@
 #include "machine/clock.h"
 //#include "machine/timekpr.h"
 
-#define VERBOSE 0
+//#define LOG_GENERAL (1U <<  0)
+#define LOG_SETUP   (1U <<  1)
+#define LOG_READ    (1U <<  2)
+#define LOG_INT     (1U <<  3)
+#define LOG_INIT    (1U <<  4)
 
-#define LOGPRINT(x)  { do { if (VERBOSE) logerror x; } while (0); }
-#define LOG(x) 		{} LOGPRINT(x)
-#define LOGINIT(x)	{} LOGPRINT(x)
-#define LOGR(x)		{}
-#define LOGSETUP(x)	{}
-#define LOGINT(x)	{}
-#if VERBOSE >= 2
-#define logerror printf
-#endif
+//#define VERBOSE (LOG_GENERAL | LOG_SETUP)
+//#define LOG_OUTPUT_FUNC printf
+
+#include "logmacro.h"
+
+#define LOGSETUP(...) LOGMASKED(LOG_SETUP,  __VA_ARGS__)
+#define LOGR(...)     LOGMASKED(LOG_READ,   __VA_ARGS__)
+#define LOGINT(...)   LOGMASKED(LOG_INT,    __VA_ARGS__)
+#define LOGINIT(...)  LOGMASKED(LOG_INIT,   __VA_ARGS__)
 
 #ifdef _MSC_VER
 #define FUNCNAME __func__
@@ -306,16 +321,16 @@ static ADDRESS_MAP_START (cpu30_mem, AS_PROGRAM, 32, cpu30_state)
 	ADDRESS_MAP_UNMAP_HIGH
 	AM_RANGE (0x00000000, 0x00000007) AM_ROM AM_READ  (bootvect_r)   /* ROM mirror just during reset */
 	AM_RANGE (0x00000000, 0x00000007) AM_RAM AM_WRITE (bootvect_w)   /* After first write we act as RAM */
-//	AM_RANGE (0x00000008, 0x003fffff) AM_RAM /* RAM  installed in machine start */
+//  AM_RANGE (0x00000008, 0x003fffff) AM_RAM /* RAM  installed in machine start */
 	AM_RANGE (0xff000000, 0xff7fffff) AM_ROM AM_REGION("roms", 0x000000)
 	AM_RANGE (0xff800c00, 0xff800dff) AM_DEVREADWRITE8("pit1", pit68230_device, read, write, 0xffffffff)
 	AM_RANGE (0xff800e00, 0xff800fff) AM_DEVREADWRITE8("pit2", pit68230_device, read, write, 0xffffffff)
 	AM_RANGE (0xff802000, 0xff8021ff) AM_DEVREADWRITE8("duscc", duscc68562_device, read, write, 0xffffffff) /* Port 1&2 - Dual serial port DUSCC   */
 	AM_RANGE (0xff802200, 0xff8023ff) AM_DEVREADWRITE8("duscc2", duscc68562_device, read, write, 0xffffffff) /* Port 3&4 - Dual serial port DUSCC   */
 	AM_RANGE (0xff803000, 0xff8031ff) AM_DEVREADWRITE8("rtc", rtc72423_device, read, write, 0xffffffff)
-//	AM_RANGE (0xff803400, 0xff8035ff) AM_DEVREADWRITE8("scsi", mb87033_device, read, write, 0xffffffff) /* TODO: implement MB87344 SCSI device */
+//  AM_RANGE (0xff803400, 0xff8035ff) AM_DEVREADWRITE8("scsi", mb87033_device, read, write, 0xffffffff) /* TODO: implement MB87344 SCSI device */
 	AM_RANGE (0xff803400, 0xff8035ff) AM_READWRITE8(scsi_r, scsi_w, 0x000000ff) /* mock driver to log calls to device */
-//	AM_RANGE (0xff803800, 0xff80397f) AM_DEVREADWRITE8("fdc", wd37c65c_device, read, write, 0xffffffff) /* TODO: implement WD3/C65C fdc controller */
+//  AM_RANGE (0xff803800, 0xff80397f) AM_DEVREADWRITE8("fdc", wd37c65c_device, read, write, 0xffffffff) /* TODO: implement WD3/C65C fdc controller */
 	AM_RANGE (0xff803800, 0xff80397f) AM_READWRITE8(fdc_r, fdc_w, 0x000000ff) /* mock driver to log calls to device */
 	AM_RANGE (0xff803980, 0xff8039ff) AM_READ8(slot1_status_r, 0x000000ff)
 	AM_RANGE (0xffc00000, 0xffcfffff) AM_RAM AM_SHARE ("nvram") /* On-board SRAM with battery backup (nvram) */
@@ -333,7 +348,7 @@ INPUT_PORTS_END
 /* Start it up */
 void cpu30_state::machine_start ()
 {
-	LOGINIT(("%s\n", FUNCNAME));
+	LOGINIT("%s\n", FUNCNAME);
 
 	save_pointer (NAME (m_sysrom), sizeof(m_sysrom));
 	save_pointer (NAME (m_sysram), sizeof(m_sysram));
@@ -347,58 +362,58 @@ void cpu30_state::machine_start ()
 
 void cpu30_state::machine_reset ()
 {
-	LOGINIT(("%s\n", FUNCNAME));
+	LOGINIT("%s\n", FUNCNAME);
 
 	/* Reset pointer to bootvector in ROM for bootvector handler bootvect_r */
 	if (m_sysrom == &m_sysram[0]) /* Condition needed because memory map is not setup first time */
 		m_sysrom = (uint32_t*)(memregion ("roms")->base () + 0x800000);
 }
 
-/* 																				setup board ID */
-DRIVER_INIT_MEMBER( cpu30_state, cpu30x )      { LOGINIT(("%s\n", FUNCNAME)); m_board_id = 0x50; }
-DRIVER_INIT_MEMBER( cpu30_state, cpu30xa )     { LOGINIT(("%s\n", FUNCNAME)); m_board_id = 0x50; }
-DRIVER_INIT_MEMBER( cpu30_state, cpu30za )     { LOGINIT(("%s\n", FUNCNAME)); m_board_id = 0x50; }
-DRIVER_INIT_MEMBER( cpu30_state, cpu30zbe )    { LOGINIT(("%s\n", FUNCNAME)); m_board_id = 0x50; }
-DRIVER_INIT_MEMBER( cpu30_state, cpu30be8 )    { LOGINIT(("%s\n", FUNCNAME)); m_board_id = 0x50; }
-DRIVER_INIT_MEMBER( cpu30_state, cpu30be16 )   { LOGINIT(("%s\n", FUNCNAME)); m_board_id = 0x50; }
-DRIVER_INIT_MEMBER( cpu30_state, cpu30lite4 )  { LOGINIT(("%s\n", FUNCNAME)); m_board_id = 0x50; }
-DRIVER_INIT_MEMBER( cpu30_state, cpu30lite8 )  { LOGINIT(("%s\n", FUNCNAME)); m_board_id = 0x50; }
-DRIVER_INIT_MEMBER( cpu30_state, cpu33 )  	   { LOGINIT(("%s\n", FUNCNAME)); m_board_id = 0x68; } // 0x60 skips FGA prompt
+/*                                                                              setup board ID */
+DRIVER_INIT_MEMBER( cpu30_state, cpu30x )      { LOGINIT("%s\n", FUNCNAME); m_board_id = 0x50; }
+DRIVER_INIT_MEMBER( cpu30_state, cpu30xa )     { LOGINIT("%s\n", FUNCNAME); m_board_id = 0x50; }
+DRIVER_INIT_MEMBER( cpu30_state, cpu30za )     { LOGINIT("%s\n", FUNCNAME); m_board_id = 0x50; }
+DRIVER_INIT_MEMBER( cpu30_state, cpu30zbe )    { LOGINIT("%s\n", FUNCNAME); m_board_id = 0x50; }
+DRIVER_INIT_MEMBER( cpu30_state, cpu30be8 )    { LOGINIT("%s\n", FUNCNAME); m_board_id = 0x50; }
+DRIVER_INIT_MEMBER( cpu30_state, cpu30be16 )   { LOGINIT("%s\n", FUNCNAME); m_board_id = 0x50; }
+DRIVER_INIT_MEMBER( cpu30_state, cpu30lite4 )  { LOGINIT("%s\n", FUNCNAME); m_board_id = 0x50; }
+DRIVER_INIT_MEMBER( cpu30_state, cpu30lite8 )  { LOGINIT("%s\n", FUNCNAME); m_board_id = 0x50; }
+DRIVER_INIT_MEMBER( cpu30_state, cpu33 )       { LOGINIT("%s\n", FUNCNAME); m_board_id = 0x68; } // 0x60 skips FGA prompt
 
 /* Mock FDC driver */
 READ8_MEMBER (cpu30_state::fdc_r){
-	LOG(("%s\n * FDC read Offset: %04x\n", FUNCNAME, offset));
+	LOG("%s\n * FDC read Offset: %04x\n", FUNCNAME, offset);
 	return 1;
 }
 
 WRITE8_MEMBER (cpu30_state::fdc_w){
-	LOG(("%s\n * FDC write Offset: %04x Data: %02x\n", FUNCNAME, offset, data));
+	LOG("%s\n * FDC write Offset: %04x Data: %02x\n", FUNCNAME, offset, data);
 }
 
 /* Mock SCSI driver */
 READ8_MEMBER (cpu30_state::scsi_r){
-	LOG(("%s\n * SCSI read Offset: %04x\n", FUNCNAME, offset));
+	LOG("%s\n * SCSI read Offset: %04x\n", FUNCNAME, offset);
 	return 1;
 }
 
 WRITE8_MEMBER (cpu30_state::scsi_w){
-	LOG(("%s\n * SCSI write Offset: %04x Data: %02x\n", FUNCNAME, offset, data));
+	LOG("%s\n * SCSI write Offset: %04x Data: %02x\n", FUNCNAME, offset, data);
 }
 
 /* 1 = board is in slot 1, 0 = board is NOT in slot 1 */
 READ8_MEMBER (cpu30_state::slot1_status_r){
-	LOG(("%s\n", FUNCNAME));
+	LOG("%s\n", FUNCNAME);
 	return 1;
 }
 
 /* Boot vector handler, the PCB hardwires the first 8 bytes from 0xff800000 to 0x0 at reset*/
 READ32_MEMBER (cpu30_state::bootvect_r){
-	LOG(("%s\n", FUNCNAME));
+	LOG("%s\n", FUNCNAME);
 	return m_sysrom[offset];
 }
 
 WRITE32_MEMBER (cpu30_state::bootvect_w){
-	LOG(("%s\n", FUNCNAME));
+	LOG("%s\n", FUNCNAME);
 	m_sysram[offset % sizeof(m_sysram)] &= ~mem_mask;
 	m_sysram[offset % sizeof(m_sysram)] |= (data & mem_mask);
 	m_sysrom = &m_sysram[0]; // redirect all upcomming accesses to masking RAM until reset.
@@ -459,42 +474,42 @@ WRITE32_MEMBER (cpu30_state::bootvect_w){
  * "To start VMEPROM, the rotary switches must both be set to 'F':" Hmm...
  */
 READ8_MEMBER (cpu30_state::rotary_rd){
-	LOG(("%s\n", FUNCNAME));
+	LOG("%s\n", FUNCNAME);
 	return 0xff; // TODO: make this configurable from commandline or artwork
 }
 
 // PIT#1 Port B TODO: implement floppy and dma control
 READ8_MEMBER (cpu30_state::flop_dmac_r){
-	LOG(("%s\n", FUNCNAME));
+	LOG("%s\n", FUNCNAME);
 	return 0xff;
 }
 
 WRITE8_MEMBER (cpu30_state::flop_dmac_w){
-	LOG(("%s(%02x)\n", FUNCNAME, data));
+	LOG("%s(%02x)\n", FUNCNAME, data);
 }
 
 #define FPCP_SENSE 0x40 /* Port C bit 6 is low if a Floating Point Co Processor is installed */
 // PIT#1 Port C TODO: implement timer+port interrupts
 // TODO: Connect PC0, PC1, PC4 and PC7 to B5 and/or P2 connector
 READ8_MEMBER (cpu30_state::pit1c_r){
-	LOG(("%s\n", FUNCNAME));
+	LOG("%s\n", FUNCNAME);
 	m_maincpu->set_fpu_enable(1);    // Lets assume the FPCP is always installed ( which is default for 68030 atm )
 	return 0xff & ~FPCP_SENSE; // Should really be command line for the edge cases...
 }
 
 WRITE8_MEMBER (cpu30_state::pit1c_w){
-	LOG(("%s(%02x)\n", FUNCNAME, data));
+	LOG("%s(%02x)\n", FUNCNAME, data);
 }
 
 // PIT#2 Port A TODO: Connect to B5 and /or P2 connector
 READ8_MEMBER (cpu30_state::pit2a_r){
-	LOG(("%s\n", FUNCNAME));
+	LOG("%s\n", FUNCNAME);
 	logerror("Unsupported user i/o on PIT2 port A detected\n");
 	return 0xff;
 }
 
 WRITE8_MEMBER (cpu30_state::pit2a_w){
-	LOG(("%s(%02x)\n", FUNCNAME, data));
+	LOG("%s(%02x)\n", FUNCNAME, data);
 	logerror("Unsupported user i/o on PIT2 port A detected\n");
 }
 
@@ -519,18 +534,18 @@ WRITE8_MEMBER (cpu30_state::pit2a_w){
 READ8_MEMBER (cpu30_state::board_mem_id_rd)
 {
 	int sz;
-	LOG(("%s\n", FUNCNAME));
+	LOG("%s\n", FUNCNAME);
 	switch (m_ram->size())
 	{
 	case (1024 * 1024 * 32): sz = 0; break;
 	case (1024 * 1024 * 16): sz = 1; break;
-	case (1024 * 1024 * 8):	 sz = 2; break;
-	case (1024 * 1024 * 4):	 sz = 3; break;
-	case (1024 * 1024 * 2):	 sz = 4; break;
-	case (1024 * 1024 * 1):	 sz = 5; break;
-	case (1024 * 512  * 1):	 sz = 6; break;
-	case (1024 * 256  * 1):	 sz = 7; break;
-    default:
+	case (1024 * 1024 * 8):  sz = 2; break;
+	case (1024 * 1024 * 4):  sz = 3; break;
+	case (1024 * 1024 * 2):  sz = 4; break;
+	case (1024 * 1024 * 1):  sz = 5; break;
+	case (1024 * 512  * 1):  sz = 6; break;
+	case (1024 * 256  * 1):  sz = 7; break;
+	default:
 		logerror("No supported RAM size, telling VMEPROM 4Mb\n");
 		sz = 4;
 	}
@@ -550,63 +565,63 @@ READ8_MEMBER (cpu30_state::board_mem_id_rd)
 	// return 0x56;// CPU-30, 1Mb, 36MHz
 	// return 0x53;// CPU-30, 4Mb, 36MHz
 	// return 0x57;// CPU-30, 4Mb, 36MHz
-	//	return 0x48 + sz;// none
-	//	return 0x38 + sz;// none
-	//	return 0x28 + sz;// none
-	//	return 0x18 + sz;// CPU-23 p1
-	//	return 0x10 + sz;// CPU-22 p4
-	//	return 0x20 + sz;// p1: Wait until hard disk is up to speed
-	//	printf("SIZE:%02x\n", sz);
-	LOG(("- Board ID:%02x Size:%02x\n", m_board_id, sz));
+	//  return 0x48 + sz;// none
+	//  return 0x38 + sz;// none
+	//  return 0x28 + sz;// none
+	//  return 0x18 + sz;// CPU-23 p1
+	//  return 0x10 + sz;// CPU-22 p4
+	//  return 0x20 + sz;// p1: Wait until hard disk is up to speed
+	//  printf("SIZE:%02x\n", sz);
+	LOG("- Board ID:%02x Size:%02x\n", m_board_id, sz);
 	return m_board_id + sz;
 }
 
 // PIT#2 Port C TODO: implement timer interrupt, DMA i/o, memory control and Hardware ID
 READ8_MEMBER (cpu30_state::pit2c_r){
-	LOG(("%s\n", FUNCNAME));
+	LOG("%s\n", FUNCNAME);
 	return 0xfe;
 }
 
 WRITE8_MEMBER (cpu30_state::pit2c_w){
-	LOG(("%s(%02x)\n", FUNCNAME, data));
+	LOG("%s(%02x)\n", FUNCNAME, data);
 }
 
 #if 0
 /* Dummy VME access methods until the VME bus device is ready for use */
 READ16_MEMBER (cpu30_state::vme_a24_r){
-	LOG (logerror ("vme_a24_r\n"));
+	LOG("%s\n", FUNCNAME);
 	return (uint16_t) 0;
 }
 
 WRITE16_MEMBER (cpu30_state::vme_a24_w){
-	LOG (logerror ("vme_a24_w\n"));
+	LOG("%s(%02x)\n", FUNCNAME, data);
 }
 
 READ16_MEMBER (cpu30_state::vme_a16_r){
-	LOG (logerror ("vme_16_r\n"));
+	LOG("%s\n", FUNCNAME);
 	return (uint16_t) 0;
 }
 
 WRITE16_MEMBER (cpu30_state::vme_a16_w){
-	LOG (logerror ("vme_a16_w\n"));
+	LOG("%s(%02x)\n", FUNCNAME, data);
 }
 #endif
 
 WRITE_LINE_MEMBER(cpu30_state::fga_irq_callback)
 {
-	LOGINT(("%s(%02x)\n", FUNCNAME, state));
+	LOGINT("%s(%02x)\n", FUNCNAME, state);
 
 	fga_irq_state = state;
 	fga_irq_level = m_fga002->get_irq_level();
-	LOGINT((" - FGA irq level  %02x\n", fga_irq_level));
+	LOGINT(" - FGA irq level  %02x\n", fga_irq_level);
 	update_irq_to_maincpu();
 }
 
 void cpu30_state::update_irq_to_maincpu()
 {
-	LOGINT(("%s()\n", FUNCNAME));
-	LOGINT((" - fga_irq_level: %02x\n", fga_irq_level));
-	LOGINT((" - fga_irq_state: %02x\n", fga_irq_state));
+	LOGINT("%s()\n", FUNCNAME);
+	LOGINT(" - fga_irq_level: %02x\n", fga_irq_level);
+	LOGINT(" - fga_irq_state: %02x\n", fga_irq_state);
 	switch (fga_irq_level & 0x07)
 	{
 	case 1: m_maincpu->set_input_line(M68K_IRQ_1, fga_irq_state); break;
@@ -620,6 +635,11 @@ void cpu30_state::update_irq_to_maincpu()
 	}
 }
 
+static SLOT_INTERFACE_START(fccpu30_vme_cards)
+	SLOT_INTERFACE("fcisio", VME_FCISIO1)
+	SLOT_INTERFACE("fcscsi", VME_FCSCSI1)
+SLOT_INTERFACE_END
+
 /*
  * Machine configuration
  */
@@ -630,6 +650,8 @@ static MACHINE_CONFIG_START (cpu30, cpu30_state)
 	MCFG_CPU_IRQ_ACKNOWLEDGE_DEVICE("fga002", fga002_device, iack)
 	MCFG_NVRAM_ADD_0FILL("nvram")
 
+	MCFG_VME_DEVICE_ADD("vme")
+	MCFG_VME_SLOT_ADD ("vme", 1, fccpu30_vme_cards, nullptr)
 	/* Terminal Port config */
 	/* Force CPU30 series of boards has up to four serial ports, p1-p4, the FGA boot uses p4 as console and subsequent
 	   firmware uses p1 as console and in an operating system environment there may be user login shells on the other.
@@ -676,7 +698,7 @@ static MACHINE_CONFIG_START (cpu30, cpu30_state)
 	/* DUSCC2 interrupt signal REQN is connected to LOCAL IRQ5 of the FGA-002 and level is programmable */
 	MCFG_DUSCC_OUT_INT_CB(DEVWRITELINE("fga002", fga002_device, lirq5_w))
 
-	MCFG_RS232_PORT_ADD (RS232P1_TAG, default_rs232_devices, nullptr)
+	MCFG_RS232_PORT_ADD (RS232P1_TAG, default_rs232_devices, "terminal")
 	MCFG_RS232_RXD_HANDLER (DEVWRITELINE ("duscc", duscc68562_device, rxb_w))
 	MCFG_RS232_CTS_HANDLER (DEVWRITELINE ("duscc", duscc68562_device, ctsb_w))
 
@@ -688,7 +710,7 @@ static MACHINE_CONFIG_START (cpu30, cpu30_state)
 	MCFG_RS232_RXD_HANDLER (DEVWRITELINE ("duscc2", duscc68562_device, rxb_w))
 	MCFG_RS232_CTS_HANDLER (DEVWRITELINE ("duscc2", duscc68562_device, ctsb_w))
 
-	MCFG_RS232_PORT_ADD (RS232P4_TAG, default_rs232_devices, nullptr)
+	MCFG_RS232_PORT_ADD (RS232P4_TAG, default_rs232_devices, "terminal")
 	MCFG_RS232_RXD_HANDLER (DEVWRITELINE ("duscc", duscc68562_device, rxa_w))
 	MCFG_RS232_CTS_HANDLER (DEVWRITELINE ("duscc", duscc68562_device, ctsa_w))
 
@@ -699,7 +721,7 @@ static MACHINE_CONFIG_START (cpu30, cpu30_state)
 	MCFG_PIT68230_PB_OUTPUT_CB(WRITE8(cpu30_state, flop_dmac_w))
 	MCFG_PIT68230_PC_INPUT_CB(READ8(cpu30_state, pit1c_r))
 	MCFG_PIT68230_PC_OUTPUT_CB(WRITE8(cpu30_state, pit1c_w))
-// MCFG_PIT68230_OUT_INT_CB(DEVWRITELINE("fga002", fga002_device, lirq2_w)) // Interrupts not yet supported by 68230
+//  MCFG_PIT68230_TIMER_IRQ_CB(DEVWRITELINE("fga002", fga002_device, lirq2_w)) // The timer interrupt seems to silence the terminal interrupt, needs invectigation
 
 	MCFG_DEVICE_ADD ("pit2", PIT68230, XTAL_16MHz / 2) // Th PIT clock is not verified on schema but reversed from behaviour
 	MCFG_PIT68230_PB_INPUT_CB(READ8(cpu30_state, board_mem_id_rd))
@@ -707,7 +729,7 @@ static MACHINE_CONFIG_START (cpu30, cpu30_state)
 	MCFG_PIT68230_PA_OUTPUT_CB(WRITE8(cpu30_state, pit2a_w))
 	MCFG_PIT68230_PC_INPUT_CB(READ8(cpu30_state, pit2c_r))
 	MCFG_PIT68230_PC_OUTPUT_CB(WRITE8(cpu30_state, pit2c_w))
-// MCFG_PIT68230_OUT_INT_CB(DEVWRITELINE("fga002", fga002_device, lirq3_w)) // Interrupts not yet supported by 68230
+//  MCFG_PIT68230_TIMER_IRQ_CB(DEVWRITELINE("fga002", fga002_device, lirq3_w)) // The timer interrupt seems to silence the terminal interrupt, needs invectigation
 
 	/* FGA-002, Force Gate Array */
 	MCFG_FGA002_ADD("fga002", 0)
@@ -730,7 +752,7 @@ static MACHINE_CONFIG_DERIVED( cpu30x, cpu30 )
 	MCFG_DEVICE_MODIFY("maincpu")
 	MCFG_DEVICE_CLOCK(XTAL_16_777216MHz) /* 16.7 MHz  from description, crystal needs verification */
 
-//	MCFG_DEVICE_REMOVE("")
+//  MCFG_DEVICE_REMOVE("")
 
 	// dual ported ram
 	MCFG_RAM_MODIFY(RAM_TAG)
@@ -796,10 +818,10 @@ MACHINE_CONFIG_END
 /* SYS68K/CPU-30Lite/4 68030 CPU, 25 MHz, 4 Mbyte shared DRAM, 4 Mbyte Flash, 4 serial ports, 32-bit VMEbus interface, VMEPROM firmware. */
 static MACHINE_CONFIG_DERIVED( cpu30lite4, cpu30zbe )
 // Enable these when added to main config
-//	MCFG_DEVICE_REMOVE("fpu")
-//	MCFG_DEVICE_REMOVE("scsi")
-//	MCFG_DEVICE_REMOVE("eth")
-//	MCFG_DEVICE_REMOVE("fdc")
+//  MCFG_DEVICE_REMOVE("fpu")
+//  MCFG_DEVICE_REMOVE("scsi")
+//  MCFG_DEVICE_REMOVE("eth")
+//  MCFG_DEVICE_REMOVE("fdc")
 	// dual ported ram
 	MCFG_RAM_MODIFY(RAM_TAG)
 	MCFG_RAM_DEFAULT_SIZE("4M")
@@ -842,12 +864,12 @@ ROM_START (nodump)
 ROM_END
 
 /* These needs reality check as they has 1Mb of RAM which is not a suitable size for later CPU_30:s */
-#define rom_fccpu30x		rom_fccpu30
-#define rom_fccpu30xa 		rom_fccpu30
-#define rom_fccpu30za 		rom_fccpu30
+#define rom_fccpu30x        rom_fccpu30
+#define rom_fccpu30xa       rom_fccpu30
+#define rom_fccpu30za       rom_fccpu30
 
-#define rom_fccpu30zbe 		rom_fccpu30
-#define rom_fccpu30be8 		rom_fccpu30
+#define rom_fccpu30zbe      rom_fccpu30
+#define rom_fccpu30be8      rom_fccpu30
 #define rom_fccpu30be16     rom_fccpu30
 
 /* These needs dumps */
@@ -855,7 +877,7 @@ ROM_END
 #define rom_fccpu30lite8    rom_nodump
 
 /* These are most likelly wrong, needs dump */
-#define rom_fccpu30senr 	rom_nodump
+#define rom_fccpu30senr     rom_nodump
 #define rom_fccpu30senr501  rom_nodump
 
 /*

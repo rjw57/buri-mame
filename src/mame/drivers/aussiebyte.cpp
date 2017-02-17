@@ -17,7 +17,6 @@
     - Hard drive controllers and drives
     - Test Centronics printer
     - PIO connections
-    - RTC not working
 
     Note of MAME restrictions:
     - Votrax doesn't sound anything like the real thing
@@ -31,6 +30,7 @@
     Includes
 
 ************************************************************/
+#include "emu.h"
 #include "includes/aussiebyte.h"
 
 
@@ -76,7 +76,7 @@ static ADDRESS_MAP_START( aussiebyte_io, AS_IO, 8, aussiebyte_state )
 	AM_RANGE(0x35, 0x35) AM_WRITE(port35_w) // data to vram and aram
 	AM_RANGE(0x36, 0x36) AM_READ(port36_r) // data from vram and aram
 	AM_RANGE(0x37, 0x37) AM_READ(port37_r) // read dispen flag
-	AM_RANGE(0x40, 0x4f) AM_DEVREADWRITE("rtc", msm5832_device, data_r, data_w)
+	AM_RANGE(0x40, 0x4f) AM_READWRITE(rtc_r, rtc_w)
 ADDRESS_MAP_END
 
 /***********************************************************
@@ -220,6 +220,32 @@ WRITE8_MEMBER( aussiebyte_state::port20_w )
 READ8_MEMBER( aussiebyte_state::port28_r )
 {
 	return m_port28;
+}
+
+/***********************************************************
+
+    RTC
+
+************************************************************/
+READ8_MEMBER( aussiebyte_state::rtc_r )
+{
+	m_rtc->cs_w(1);
+	m_rtc->read_w(1);
+	m_rtc->address_w(offset);
+	uint8_t data = m_rtc->data_r(space,0);
+	m_rtc->read_w(0);
+	m_rtc->cs_w(0);
+	return data;
+}
+
+WRITE8_MEMBER( aussiebyte_state::rtc_w )
+{
+	m_rtc->cs_w(1);
+	m_rtc->address_w(offset);
+	m_rtc->data_w(space,0,data);
+	m_rtc->write_w(1);
+	m_rtc->write_w(0);
+	m_rtc->cs_w(0);
 }
 
 /***********************************************************
@@ -429,9 +455,6 @@ MACHINE_RESET_MEMBER( aussiebyte_state, aussiebyte )
 	m_port1a = 1;
 	m_alpha_address = 0;
 	m_graph_address = 0;
-	m_p_chargen = memregion("chargen")->base();
-	m_p_videoram = memregion("vram")->base();
-	m_p_attribram = memregion("aram")->base();
 	membank("bankr0")->set_entry(16); // point at rom
 	membank("bankw0")->set_entry(1); // always write to ram
 	membank("bank1")->set_entry(2);

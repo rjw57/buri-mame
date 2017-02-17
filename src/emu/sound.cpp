@@ -678,7 +678,7 @@ stream_sample_t *sound_stream::generate_resampled_data(stream_input &input, u32 
 	stream_sample_t *source = &output.m_buffer[basesample - input_stream.m_output_base_sampindex];
 
 	// determine the current fraction of a sample, expressed as a fraction of FRAC_ONE
-	// (Note: this formula is valid as long as input_stream.m_attoseconds_per_sample signficantly exceeds FRAC_ONE > attoseconds = 4.2E-12 s)
+	// (Note: this formula is valid as long as input_stream.m_attoseconds_per_sample significantly exceeds FRAC_ONE > attoseconds = 4.2E-12 s)
 	u32 basefrac = (basetime - basesample * input_stream.m_attoseconds_per_sample) / ((input_stream.m_attoseconds_per_sample + FRAC_ONE - 1) >> FRAC_BITS);
 	assert(basefrac < FRAC_ONE);
 
@@ -835,7 +835,7 @@ sound_manager::sound_manager(running_machine &machine)
 #endif
 
 	// register callbacks
-	machine.configuration().config_register("mixer", config_saveload_delegate(&sound_manager::config_load, this), config_saveload_delegate(&sound_manager::config_save, this));
+	machine.configuration().config_register("mixer", config_load_delegate(&sound_manager::config_load, this), config_save_delegate(&sound_manager::config_save, this));
 	machine.add_notifier(MACHINE_NOTIFY_PAUSE, machine_notify_delegate(&sound_manager::pause, this));
 	machine.add_notifier(MACHINE_NOTIFY_RESUME, machine_notify_delegate(&sound_manager::resume, this));
 	machine.add_notifier(MACHINE_NOTIFY_RESET, machine_notify_delegate(&sound_manager::reset, this));
@@ -988,10 +988,10 @@ void sound_manager::resume()
 //  configuration file
 //-------------------------------------------------
 
-void sound_manager::config_load(config_type cfg_type, xml_data_node *parentnode)
+void sound_manager::config_load(config_type cfg_type, util::xml::data_node const *parentnode)
 {
 	// we only care about game files
-	if (cfg_type != config_type::CONFIG_TYPE_GAME)
+	if (cfg_type != config_type::GAME)
 		return;
 
 	// might not have any data
@@ -999,7 +999,7 @@ void sound_manager::config_load(config_type cfg_type, xml_data_node *parentnode)
 		return;
 
 	// iterate over channel nodes
-	for (xml_data_node const *channelnode = parentnode->get_child("channel"); channelnode != nullptr; channelnode = channelnode->get_next_sibling("channel"))
+	for (util::xml::data_node const *channelnode = parentnode->get_child("channel"); channelnode != nullptr; channelnode = channelnode->get_next_sibling("channel"))
 	{
 		mixer_input info;
 		if (indexed_mixer_input(channelnode->get_attribute_int("index", -1), info))
@@ -1018,10 +1018,10 @@ void sound_manager::config_load(config_type cfg_type, xml_data_node *parentnode)
 //  file
 //-------------------------------------------------
 
-void sound_manager::config_save(config_type cfg_type, xml_data_node *parentnode)
+void sound_manager::config_save(config_type cfg_type, util::xml::data_node *parentnode)
 {
 	// we only care about game files
-	if (cfg_type != config_type::CONFIG_TYPE_GAME)
+	if (cfg_type != config_type::GAME)
 		return;
 
 	// iterate over mixer channels
@@ -1035,7 +1035,7 @@ void sound_manager::config_save(config_type cfg_type, xml_data_node *parentnode)
 
 			if (newvol != 1.0f)
 			{
-				xml_data_node *const channelnode = parentnode->add_child("channel", nullptr);
+				util::xml::data_node *const channelnode = parentnode->add_child("channel", nullptr);
 				if (channelnode != nullptr)
 				{
 					channelnode->set_attribute_int("index", mixernum);

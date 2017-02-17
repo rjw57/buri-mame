@@ -3,13 +3,15 @@
 #ifndef NLD_TTL74XX_H_
 #define NLD_TTL74XX_H_
 
-#include "nl_setup.h"
+#include "../nl_setup.h"
 
 #ifndef __PLIB_PREPROCESSOR__
 
 /* ----------------------------------------------------------------------------
  *  Netlist Macros
  * ---------------------------------------------------------------------------*/
+
+#ifndef NL_AUTO_DEVICES
 
 #define TTL_7400_GATE(name)                                                   \
 		NET_REGISTER_DEV(TTL_7400_GATE, name)
@@ -184,6 +186,23 @@
 
 #define TTL_7486_DIP(name)                                                    \
 		NET_REGISTER_DEV(TTL_7486_DIP, name)
+
+
+#define TTL_74260_GATE(name)                                                   \
+		NET_REGISTER_DEV(TTL_74260_GATE, name)
+
+#define TTL_74260_NOR(name, cA, cB, cC, cD, cE) \
+		NET_REGISTER_DEV(TTL_74260_NOR, name)   \
+		NET_CONNECT(name, A, cA)    \
+		NET_CONNECT(name, B, cB)    \
+		NET_CONNECT(name, C, cC)    \
+		NET_CONNECT(name, D, cD)    \
+		NET_CONNECT(name, E, cE)
+
+#define TTL_74260_DIP(name) \
+		NET_REGISTER_DEV(TTL_74260_DIP, name)
+
+#endif
 
 /* ----------------------------------------------------------------------------
  *  External declarations

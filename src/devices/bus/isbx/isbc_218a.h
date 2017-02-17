@@ -11,7 +11,6 @@
 #ifndef __ISBC_218A__
 #define __ISBC_218A__
 
-#include "emu.h"
 #include "isbx.h"
 #include "formats/pc_dsk.h"
 #include "machine/upd765.h"
@@ -56,7 +55,7 @@ private:
 	required_device<i8272a_device> m_fdc;
 	required_device<floppy_connector> m_floppy0;
 
-	bool m_reset, m_motor;
+	bool m_reset, m_motor, m_fd8;
 };
 
 

@@ -66,6 +66,7 @@ ToDo:
 *********************************************************************************************/
 
 
+#include "emu.h"
 #include "machine/genpin.h"
 #include "cpu/m6800/m6800.h"
 #include "machine/6821pia.h"
@@ -2306,7 +2307,7 @@ ROM_START(uboat65)
 	ROM_RELOAD(0x28000, 0x8000)
 	ROM_RELOAD(0x38000, 0x8000)
 	ROM_REGION(0x10000, "cpu2", 0)
-	ROM_COPY("sound1", 0x0000, 0x8000,0x8000)
+	ROM_LOAD("snd_u8.bin", 0x8000, 0x8000, CRC(d00fd4fd) SHA1(23f6b7c5d60821eb7fa2fdcfc85caeb536eef99a))
 ROM_END
 /*--------------------------------
 / Big Ball Bowling (Bowler)

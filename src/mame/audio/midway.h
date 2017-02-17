@@ -28,9 +28,8 @@
 //**************************************************************************
 
 extern const device_type MIDWAY_SSIO;
-extern const device_type MIDWAY_CHIP_SQUEAK_DELUXE;
 extern const device_type MIDWAY_SOUNDS_GOOD;
-extern const device_type MIDWAY_TURBO_CHIP_SQUEAK;
+extern const device_type MIDWAY_TURBO_CHEAP_SQUEAK;
 extern const device_type MIDWAY_SQUAWK_N_TALK;
 
 
@@ -108,46 +107,6 @@ private:
 };
 
 
-// ======================> midway_chip_squeak_deluxe_device
-
-class midway_chip_squeak_deluxe_device :    public device_t,
-											public device_mixer_interface
-{
-public:
-	// construction/destruction
-	midway_chip_squeak_deluxe_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
-
-	// read/write
-	DECLARE_READ8_MEMBER(read);
-	DECLARE_WRITE8_MEMBER(write);
-	DECLARE_WRITE_LINE_MEMBER(reset_write);
-
-	// internal communications
-	DECLARE_WRITE8_MEMBER(porta_w);
-	DECLARE_WRITE8_MEMBER(portb_w);
-	DECLARE_WRITE_LINE_MEMBER(irq_w);
-	DECLARE_READ16_MEMBER(pia_r);
-	DECLARE_WRITE16_MEMBER(pia_w);
-
-protected:
-	// device-level overrides
-	virtual machine_config_constructor device_mconfig_additions() const override;
-	virtual void device_start() override;
-	virtual void device_reset() override;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
-
-private:
-	// devices
-	required_device<m68000_device> m_cpu;
-	required_device<pia6821_device> m_pia;
-	required_device<dac_word_interface> m_dac;
-
-	// internal state
-	uint8_t m_status;
-	uint16_t m_dacval;
-};
-
-
 // ======================> midway_sounds_good_device
 
 class midway_sounds_good_device :   public device_t,
@@ -186,14 +145,14 @@ private:
 };
 
 
-// ======================> midway_turbo_chip_squeak_device
+// ======================> midway_turbo_cheap_squeak_device
 
-class midway_turbo_chip_squeak_device : public device_t,
+class midway_turbo_cheap_squeak_device : public device_t,
 										public device_mixer_interface
 {
 public:
 	// construction/destruction
-	midway_turbo_chip_squeak_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
+	midway_turbo_cheap_squeak_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
 
 	// read/write
 	DECLARE_READ8_MEMBER(read);

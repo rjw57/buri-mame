@@ -1380,10 +1380,6 @@ void segas16b_state::altbeas5_i8751_sim()
 	altbeast_common_i8751_sim(0x3098/2, 0x3096/2, 1);
 }
 
-void segas16b_state::altbeast_i8751_sim()
-{
-	altbeast_common_i8751_sim(0x30c4/2, 0x30c2/2, 0);
-}
 
 
 //-------------------------------------------------
@@ -1893,10 +1889,18 @@ ADDRESS_MAP_END
 //  I8751 MCU ADDRESS MAPS
 //**************************************************************************
 
+WRITE8_MEMBER(segas16b_state::spin_68k_w)
+{
+	// this is probably a hack but otherwise the 68k and i8751 end up fighting
+	// on 'goldnaxe' causing hangs in various places.  maybe the interrupts
+	// should happen at different times, or there's some way to steal the bus?
+	m_maincpu->spin_until_time(m_maincpu->cycles_to_attotime(20000));
+}
+
 static ADDRESS_MAP_START( mcu_io_map, AS_IO, 8, segas16b_state )
 	ADDRESS_MAP_UNMAP_HIGH
 	AM_RANGE(0x0000, 0x001f) AM_MIRROR(0xff00) AM_DEVREADWRITE("mapper", sega_315_5195_mapper_device, read, write)
-	AM_RANGE(MCS51_PORT_P1, MCS51_PORT_P1) AM_READ_PORT("SERVICE")
+	AM_RANGE(MCS51_PORT_P1, MCS51_PORT_P1) AM_READ_PORT("SERVICE") AM_WRITE(spin_68k_w)
 ADDRESS_MAP_END
 
 
@@ -2385,39 +2389,33 @@ static INPUT_PORTS_START( eswat )
 	PORT_DIPSETTING(    0x80, "4" )
 INPUT_PORTS_END
 
+static const ioport_value exctleag_table[6] =
+{
+	0x07, 0x06, 0x04, 0x05, 0x01, 0x03
+};
 
 static INPUT_PORTS_START( exctleag )
 	PORT_INCLUDE( system16b_generic )
 
 	PORT_MODIFY("P1")
-	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER(1)     // BANT0
-	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER(1)     // BANT1
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_PLAYER(1)     // BANT2
-	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_BUTTON4 ) PORT_PLAYER(1)     // SWING0
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_BUTTON5 ) PORT_PLAYER(1)     // SWING1
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_BUTTON6 ) PORT_PLAYER(1)     // LOW
-	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_BUTTON7 ) PORT_PLAYER(1)     // MID
-	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_BUTTON8 ) PORT_PLAYER(1)     // HI
+	PORT_BIT( 0x07, 0x00, IPT_POSITIONAL_V ) PORT_POSITIONS(6) PORT_REMAP_TABLE(exctleag_table) PORT_SENSITIVITY(5) PORT_KEYDELTA(10) PORT_CENTERDELTA(0) PORT_PLAYER(1) PORT_NAME("P1 Bant Position")
+	PORT_BIT( 0x18, 0x00, IPT_POSITIONAL_V ) PORT_POSITIONS(4) PORT_REMAP_TABLE(exctleag_table) PORT_SENSITIVITY(5) PORT_KEYDELTA(5) PORT_CENTERDELTA(5) PORT_PLAYER(1) PORT_NAME("P1 Swing Power")
+	PORT_BIT( 0xe0, 0x00, IPT_POSITIONAL_V ) PORT_POSITIONS(6) PORT_REMAP_TABLE(exctleag_table) PORT_SENSITIVITY(5) PORT_KEYDELTA(10) PORT_CENTERDELTA(0) PORT_PLAYER(1) PORT_NAME("P1 Swing Position")
 
 	PORT_MODIFY("UNUSED")
-	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_BUTTON9 ) PORT_PLAYER(1)     // CHASE
-	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_BUTTON10 ) PORT_PLAYER(1)    // CHANGE
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_BUTTON11 ) PORT_PLAYER(1)    // SELECT
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_NAME("P1 Chase Button") PORT_PLAYER(1)     // CHASE
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_NAME("P1 Change Button") PORT_PLAYER(1)    // CHANGE
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_NAME("P1 Select Button") PORT_PLAYER(1)    // SELECT
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_BUTTON9 ) PORT_PLAYER(2)     // CHASE
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_BUTTON10 ) PORT_PLAYER(2)    // CHANGE
-	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_BUTTON11 ) PORT_PLAYER(2)    // SELECT
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_NAME("P2 Chase Button") PORT_PLAYER(2)     // CHASE
+	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_NAME("P2 Change Button") PORT_PLAYER(2)    // CHANGE
+	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_NAME("P2 Select Button") PORT_PLAYER(2)    // SELECT
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_UNUSED )
 
 	PORT_MODIFY("P2")
-	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER(2)     // BANT0
-	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER(2)     // BANT1
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_PLAYER(2)     // BANT2
-	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_BUTTON4 ) PORT_PLAYER(2)     // SWING0
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_BUTTON5 ) PORT_PLAYER(2)     // SWING1
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_BUTTON6 ) PORT_PLAYER(2)     // LOW
-	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_BUTTON7 ) PORT_PLAYER(2)     // MID
-	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_BUTTON8 ) PORT_PLAYER(2)     // HI
+	PORT_BIT( 0x07, 0x00, IPT_POSITIONAL_V ) PORT_POSITIONS(6) PORT_REMAP_TABLE(exctleag_table) PORT_SENSITIVITY(5) PORT_KEYDELTA(10) PORT_CENTERDELTA(0) PORT_PLAYER(2) PORT_NAME("P2 Bant Position")
+	PORT_BIT( 0x18, 0x00, IPT_POSITIONAL_V ) PORT_POSITIONS(4) PORT_REMAP_TABLE(exctleag_table) PORT_SENSITIVITY(5) PORT_KEYDELTA(5) PORT_CENTERDELTA(5) PORT_PLAYER(2) PORT_NAME("P2 Swing Power")
+	PORT_BIT( 0xe0, 0x00, IPT_POSITIONAL_V ) PORT_POSITIONS(6) PORT_REMAP_TABLE(exctleag_table) PORT_SENSITIVITY(5) PORT_KEYDELTA(10) PORT_CENTERDELTA(0) PORT_PLAYER(2) PORT_NAME("P2 Swing Position")
 
 	PORT_MODIFY("DSW2")
 	PORT_DIPNAME( 0x01, 0x00, DEF_STR( Demo_Sounds ) ) PORT_DIPLOCATION("SW2:1")
@@ -3986,7 +3984,7 @@ ROM_START( aliensyn7 )
 	ROM_LOAD( "epr-10725.a9",  0x20000, 0x8000, CRC(6a50e08f) SHA1(d34b2ccadb8b07d5ad99cab5c5b5b79642c65574) )
 	ROM_LOAD( "epr-10726.a10", 0x30000, 0x8000, CRC(d50b7736) SHA1(b1f8e3b0cf2ffee5382098100cfabe21b383cd51) )
 
-	ROM_REGION( 0x2000, "mcu", 0 ) // MC8123 key
+	ROM_REGION( 0x2000, "mc8123", 0 ) // MC8123 key
 	ROM_LOAD( "317-00xx.key",  0x0000, 0x2000, CRC(76b370cd) SHA1(996a4a24dec085caf93cbe614d3b0888379c91dd) )
 ROM_END
 
@@ -4068,7 +4066,7 @@ ROM_START( altbeast )
 	ROM_LOAD( "opr-11673.a12", 0x30000, 0x20000, CRC(400c4a36) SHA1(de4bdfa91734410e0a7f6a16bf8336db172f458a) )
 
 	ROM_REGION( 0x1000, "mcu", 0 )  // Intel i8751 protection MCU
-	ROM_LOAD( "317-0078.c2", 0x00000, 0x1000, NO_DUMP )
+	ROM_LOAD( "317-0078.c2", 0x00000, 0x1000, CRC(8101925f) SHA1(a45d772ebe2fd1a577a6ccac8c6c76bb622258bb) )
 ROM_END
 
 //*************************************************************************************************************************
@@ -4278,7 +4276,7 @@ ROM_START( altbeast4 )
 	ROM_LOAD( "opr-11672.a11", 0x10000, 0x20000, CRC(bbd7f460) SHA1(bbc5c2219cb3a827d84062b19affd9780da2a3cf) )
 	ROM_LOAD( "opr-11673.a12", 0x30000, 0x20000, CRC(400c4a36) SHA1(de4bdfa91734410e0a7f6a16bf8336db172f458a) )
 
-	ROM_REGION( 0x2000, "mcu", 0 ) // MC8123 key
+	ROM_REGION( 0x2000, "mc8123", 0 ) // MC8123 key
 	ROM_LOAD( "317-0066.key",  0x0000, 0x2000, CRC(ed85a054) SHA1(dcc84ec077a8a489f45abfd2bf4a9ba377da28a5) )
 ROM_END
 
@@ -4394,7 +4392,7 @@ ROM_START( altbeast2 )
 	ROM_LOAD( "opr-11672.a11", 0x10000, 0x20000, CRC(bbd7f460) SHA1(bbc5c2219cb3a827d84062b19affd9780da2a3cf) )
 	ROM_LOAD( "opr-11673.a12", 0x30000, 0x20000, CRC(400c4a36) SHA1(de4bdfa91734410e0a7f6a16bf8336db172f458a) )
 
-	ROM_REGION( 0x2000, "mcu", 0 ) // MC8123 key
+	ROM_REGION( 0x2000, "mc8123", 0 ) // MC8123 key
 	ROM_LOAD( "317-0066.key",  0x0000, 0x2000, CRC(ed85a054) SHA1(dcc84ec077a8a489f45abfd2bf4a9ba377da28a5) )
 ROM_END
 
@@ -6197,7 +6195,7 @@ ROM_START( goldnaxe )
 	ROM_LOAD( "mpr-12384.ic6", 0x10000, 0x20000, CRC(6218d8e7) SHA1(5a745c750efb4a61716f99befb7ed14cc84e9973) )
 
 	ROM_REGION( 0x1000, "mcu", 0 )  // Intel i8751 protection MCU
-	ROM_LOAD( "317-0123a.c2", 0x00000, 0x1000, NO_DUMP )
+	ROM_LOAD( "317-0123a.c2", 0x00000, 0x1000, CRC(cf19e7d4) SHA1(51356ae7f278c04aed6dfe4572e8a32a82859d71) )
 ROM_END
 
 //*************************************************************************************************************************
@@ -6448,7 +6446,15 @@ ROM_START( goldnaxe2 )
 	ROM_LOAD( "mpr-12384.a11", 0x10000, 0x20000, CRC(6218d8e7) SHA1(5a745c750efb4a61716f99befb7ed14cc84e9973) )
 
 	ROM_REGION( 0x1000, "mcu", 0 )  // Intel i8751 protection MCU
-	ROM_LOAD( "317-0112.c2", 0x00000, 0x1000, NO_DUMP )
+	/* NOT CURRENTLY USED
+
+	   this chip was faulty, the internal checksum routine fails.  actual code looks like it should be 99.99% the
+	   same as the 'goldnaxe' set but unused areas have different garbage fill data, so finding the bad bits is
+	   difficult.
+
+	   Calculated checksum: 5F8F
+      File checksum:       5E8F */
+	ROM_LOAD( "317-0112.c2", 0x00000, 0x1000, BAD_DUMP CRC(d8f2f1c0) SHA1(04594ed5558af63cde62de6cc4020b35b8a5889e) )
 ROM_END
 
 //*************************************************************************************************************************
@@ -7046,7 +7052,7 @@ ROM_START( cencourt )
 	ROM_LOAD( "epr-a-10.a10", 0x30000, 0x08000, CRC(10263746) SHA1(1f981fb185c6a9795208ecdcfba36cf892a99ed5) ) // == epr-11860.a10
 	ROM_LOAD( "epr-a-11.a11", 0x40000, 0x08000, CRC(38b54a71) SHA1(68ec4ef5b115844214ff2213be1ce6678904fbd2) ) // == epr-11861.a11
 
-	ROM_REGION( 0x2000, "mcu", 0 ) // MC8123 key
+	ROM_REGION( 0x2000, "mc8123", 0 ) // MC8123 key
 	ROM_LOAD( "mc-8123b_center_court.key",  0x0000, 0x2000, CRC(2be5c90b) SHA1(e98d989237f2b001950b876efdb21c1507162830) ) // No official 317-xxxx number
 ROM_END
 
@@ -7478,7 +7484,7 @@ ROM_START( shinobi4 )
 	ROM_LOAD( "epr-11377.a10", 0x00000, 0x08000, CRC(0fb6af34) SHA1(ae9da18bd2db317ed96c5f642f90cc1eba60ba99) ) // MC8123B (317-0054) encrypted version of epr-11361.a10 above
 	ROM_LOAD( "epr-11362.a11", 0x10000, 0x20000, CRC(256af749) SHA1(041bd007ea7708c6d69f07865828b9bd17a139f5) )
 
-	ROM_REGION( 0x2000, "mcu", 0 ) // MC8123 key
+	ROM_REGION( 0x2000, "mc8123", 0 ) // MC8123 key
 	ROM_LOAD( "317-0054.key",  0x0000, 0x2000, CRC(39fd4535) SHA1(93bbb139d2d5acc6a1e338d92077e79a5e880b2e) )
 ROM_END
 
@@ -7516,7 +7522,7 @@ ROM_START( shinobi3 )
 	ROM_LOAD( "epr-11288.a8", 0x10000, 0x8000, CRC(c8df8460) SHA1(0aeb41a493df155edb5f600f53ec43b798927dff) )
 	ROM_LOAD( "epr-11289.a9", 0x20000, 0x8000, CRC(e5a4cf30) SHA1(d1982da7a550c11ab2253f5d64ac6ab847da0a04) )
 
-	ROM_REGION( 0x2000, "mcu", 0 ) // MC8123 key
+	ROM_REGION( 0x2000, "mc8123", 0 ) // MC8123 key
 	ROM_LOAD( "317-0054.key",  0x0000, 0x2000, CRC(39fd4535) SHA1(93bbb139d2d5acc6a1e338d92077e79a5e880b2e) )
 ROM_END
 
@@ -8622,14 +8628,9 @@ DRIVER_INIT_MEMBER(segas16b_state,aceattac_5358)
 DRIVER_INIT_MEMBER(segas16b_state,aliensyn7_5358_small)
 {
 	DRIVER_INIT_CALL(generic_5358_small);
-	mc8123_decode(memregion("soundcpu")->base(), m_sound_decrypted_opcodes, memregion("mcu")->base(), 0x8000);
+	mc8123_decode(memregion("soundcpu")->base(), m_sound_decrypted_opcodes, memregion("mc8123")->base(), 0x8000);
 }
 
-DRIVER_INIT_MEMBER(segas16b_state,altbeast_5521)
-{
-	DRIVER_INIT_CALL(generic_5521);
-	m_i8751_vblank_hook = i8751_sim_delegate(&segas16b_state::altbeast_i8751_sim, this);
-}
 
 DRIVER_INIT_MEMBER(segas16b_state,altbeasj_5521)
 {
@@ -8646,7 +8647,7 @@ DRIVER_INIT_MEMBER(segas16b_state,altbeas5_5521)
 DRIVER_INIT_MEMBER(segas16b_state,altbeas4_5521)
 {
 	DRIVER_INIT_CALL(generic_5521);
-	mc8123_decode(memregion("soundcpu")->base(), m_sound_decrypted_opcodes, memregion("mcu")->base(), 0x8000);
+	mc8123_decode(memregion("soundcpu")->base(), m_sound_decrypted_opcodes, memregion("mc8123")->base(), 0x8000);
 }
 
 DRIVER_INIT_MEMBER(segas16b_state,ddux_5704)
@@ -8678,15 +8679,6 @@ DRIVER_INIT_MEMBER(segas16b_state,goldnaxe_5704)
 	m_i8751_initial_config = memory_control_5704;
 }
 
-DRIVER_INIT_MEMBER(segas16b_state,goldnaxe_5797)
-{
-	DRIVER_INIT_CALL(generic_5797);
-	m_i8751_vblank_hook = i8751_sim_delegate(&segas16b_state::goldnaxe_i8751_sim, this);
-
-	static const uint8_t memory_control_5797[0x10] =
-		{ 0x02,0x00, 0x00,0x1f, 0x00,0x1e, 0x00,0xff, 0x00,0x20, 0x01,0x10, 0x00,0x14, 0x00,0xc4 };
-	m_i8751_initial_config = memory_control_5797;
-}
 
 DRIVER_INIT_MEMBER(segas16b_state,hwchamp_5521)
 {
@@ -8704,7 +8696,7 @@ DRIVER_INIT_MEMBER(segas16b_state,passshtj_5358)
 DRIVER_INIT_MEMBER(segas16b_state,cencourt_5358)
 {
 	DRIVER_INIT_CALL(passshtj_5358);
-	mc8123_decode(memregion("soundcpu")->base(), m_sound_decrypted_opcodes, memregion("mcu")->base(), 0x8000);
+	mc8123_decode(memregion("soundcpu")->base(), m_sound_decrypted_opcodes, memregion("mc8123")->base(), 0x8000);
 }
 
 DRIVER_INIT_MEMBER(segas16b_state,sdi_5358_small)
@@ -8729,13 +8721,13 @@ DRIVER_INIT_MEMBER(segas16b_state,defense_5358_small)
 DRIVER_INIT_MEMBER(segas16b_state,shinobi4_5521)
 {
 	DRIVER_INIT_CALL(generic_5521);
-	mc8123_decode(memregion("soundcpu")->base(), m_sound_decrypted_opcodes, memregion("mcu")->base(), 0x8000);
+	mc8123_decode(memregion("soundcpu")->base(), m_sound_decrypted_opcodes, memregion("mc8123")->base(), 0x8000);
 }
 
 DRIVER_INIT_MEMBER(segas16b_state,shinobi3_5358)
 {
 	DRIVER_INIT_CALL(generic_5358);
-	mc8123_decode(memregion("soundcpu")->base(), m_sound_decrypted_opcodes, memregion("mcu")->base(), 0x8000);
+	mc8123_decode(memregion("soundcpu")->base(), m_sound_decrypted_opcodes, memregion("mc8123")->base(), 0x8000);
 }
 
 DRIVER_INIT_MEMBER(segas16b_state,sjryuko_5358_small)
@@ -8784,7 +8776,7 @@ GAME( 1987, aliensyn7,  aliensyn, system16b_mc8123,    aliensyn, segas16b_state,
 GAME( 1987, aliensyn3,  aliensyn, system16b_fd1089a,   aliensyn, segas16b_state,generic_5358_small, ROT0,   "Sega", "Alien Syndrome (set 3, System 16B, FD1089A 317-0033)", 0 )
 GAME( 1987, aliensynj,  aliensyn, system16b_fd1089a,   aliensynj,segas16b_state,generic_5358_small, ROT0,   "Sega", "Alien Syndrome (set 6, Japan, new, System 16B, FD1089A 317-0033)", 0 )
 
-GAME( 1988, altbeast,   0,        system16b_i8751,     altbeast, segas16b_state,altbeast_5521,      ROT0,   "Sega", "Altered Beast (set 8) (8751 317-0078)", 0 )
+GAME( 1988, altbeast,   0,        system16b_i8751,     altbeast, segas16b_state,generic_5521,       ROT0,   "Sega", "Altered Beast (set 8) (8751 317-0078)", 0 )
 GAME( 1988, altbeastj,  altbeast, system16b_i8751,     altbeast, segas16b_state,altbeasj_5521,      ROT0,   "Sega", "Juuouki (set 7, Japan) (8751 317-0077)", 0 )
 GAME( 1988, altbeast6,  altbeast, system16b_i8751,     altbeast, segas16b_state,altbeas5_5521,      ROT0,   "Sega", "Altered Beast (set 6) (8751 317-0076)", 0 )
 GAME( 1988, altbeast5,  altbeast, system16b_fd1094,    altbeast, segas16b_state,generic_5521,       ROT0,   "Sega", "Altered Beast (set 5) (FD1094 317-0069)", 0 )
@@ -8828,7 +8820,7 @@ GAME( 1988, exctleag,   0,        system16b_fd1094,    exctleag, segas16b_state,
 GAME( 1989, fpoint,     0,        system16b_fd1094,    fpoint,   segas16b_state,generic_5358,       ROT0,   "Sega", "Flash Point (set 2, Japan) (FD1094 317-0127A)", 0 )
 GAME( 1989, fpoint1,    fpoint,   system16b_fd1094,    fpoint,   segas16b_state,generic_5704,       ROT0,   "Sega", "Flash Point (set 1, Japan) (FD1094 317-0127A)", 0 )
 
-GAME( 1989, goldnaxe,   0,        system16b_i8751_5797,goldnaxe, segas16b_state,goldnaxe_5797,      ROT0,   "Sega", "Golden Axe (set 6, US) (8751 317-123A)", 0 )
+GAME( 1989, goldnaxe,   0,        system16b_i8751_5797,goldnaxe, segas16b_state,generic_5797,       ROT0,   "Sega", "Golden Axe (set 6, US) (8751 317-123A)", 0 )
 GAME( 1989, goldnaxeu,  goldnaxe, system16b_fd1094_5797,goldnaxe,segas16b_state,generic_5797,       ROT0,   "Sega", "Golden Axe (set 5, US) (FD1094 317-0122)", 0 )
 GAME( 1989, goldnaxej,  goldnaxe, system16b_fd1094,    goldnaxe, segas16b_state,generic_5704,       ROT0,   "Sega", "Golden Axe (set 4, Japan) (FD1094 317-0121)", 0 )
 GAME( 1989, goldnaxe3,  goldnaxe, system16b_fd1094,    goldnaxe, segas16b_state,generic_5704,       ROT0,   "Sega", "Golden Axe (set 3, World) (FD1094 317-0120)", 0)

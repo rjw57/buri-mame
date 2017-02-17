@@ -428,6 +428,8 @@ if (BUSES["C64"]~=null) then
 		MAME_DIR .. "src/devices/bus/c64/silverrock.h",
 		MAME_DIR .. "src/devices/bus/c64/simons_basic.cpp",
 		MAME_DIR .. "src/devices/bus/c64/simons_basic.h",
+		MAME_DIR .. "src/devices/bus/c64/speakeasy.cpp",
+		MAME_DIR .. "src/devices/bus/c64/speakeasy.h",
 		MAME_DIR .. "src/devices/bus/c64/stardos.cpp",
 		MAME_DIR .. "src/devices/bus/c64/stardos.h",
 		MAME_DIR .. "src/devices/bus/c64/std.cpp",
@@ -761,6 +763,8 @@ if (BUSES["IEEE488"]~=null) then
 		MAME_DIR .. "src/devices/bus/ieee488/hardbox.h",
 		MAME_DIR .. "src/devices/bus/ieee488/shark.cpp",
 		MAME_DIR .. "src/devices/bus/ieee488/shark.h",
+		MAME_DIR .. "src/devices/bus/ieee488/hp9895.cpp",
+		MAME_DIR .. "src/devices/bus/ieee488/hp9895.h",
 	}
 end
 
@@ -1435,6 +1439,10 @@ if (BUSES["VIC20"]~=null) then
 		MAME_DIR .. "src/devices/bus/vic20/vic1112.h",
 		MAME_DIR .. "src/devices/bus/vic20/vic1210.cpp",
 		MAME_DIR .. "src/devices/bus/vic20/vic1210.h",
+		MAME_DIR .. "src/devices/bus/vic20/videopak.cpp",
+		MAME_DIR .. "src/devices/bus/vic20/videopak.h",
+		MAME_DIR .. "src/devices/bus/vic20/speakeasy.cpp",
+		MAME_DIR .. "src/devices/bus/vic20/speakeasy.h",
 		MAME_DIR .. "src/devices/bus/vic20/user.cpp",
 		MAME_DIR .. "src/devices/bus/vic20/user.h",
 		MAME_DIR .. "src/devices/bus/vic20/4cga.cpp",
@@ -1498,6 +1506,29 @@ end
 
 ---------------------------------------------------
 --
+--@src/devices/bus/vme/vme.h,BUSES["VME"] = true
+---------------------------------------------------
+
+if (BUSES["VME"]~=null) then
+	files {
+		MAME_DIR .. "src/devices/bus/vme/vme.cpp",
+		MAME_DIR .. "src/devices/bus/vme/vme.h",
+		MAME_DIR .. "src/devices/bus/vme/vme_mzr8300.cpp",
+		MAME_DIR .. "src/devices/bus/vme/vme_mzr8300.h",
+		MAME_DIR .. "src/devices/bus/vme/vme_mvme350.cpp",
+		MAME_DIR .. "src/devices/bus/vme/vme_mvme350.h",
+		MAME_DIR .. "src/devices/bus/vme/vme_fccpu20.cpp",
+		MAME_DIR .. "src/devices/bus/vme/vme_fccpu20.h",
+		MAME_DIR .. "src/devices/bus/vme/vme_fcisio.cpp",
+		MAME_DIR .. "src/devices/bus/vme/vme_fcisio.h",
+		MAME_DIR .. "src/devices/bus/vme/vme_fcscsi.cpp",
+		MAME_DIR .. "src/devices/bus/vme/vme_fcscsi.h",
+	}
+end
+
+
+---------------------------------------------------
+--
 --@src/devices/bus/wangpc/wangpc.h,BUSES["WANGPC"] = true
 ---------------------------------------------------
 
@@ -1552,8 +1583,6 @@ if (BUSES["A2BUS"]~=null) then
 	files {
 		MAME_DIR .. "src/devices/bus/a2bus/a2bus.cpp",
 		MAME_DIR .. "src/devices/bus/a2bus/a2bus.h",
-		MAME_DIR .. "src/devices/bus/a2bus/a2lang.cpp",
-		MAME_DIR .. "src/devices/bus/a2bus/a2lang.h",
 		MAME_DIR .. "src/devices/bus/a2bus/a2diskii.cpp",
 		MAME_DIR .. "src/devices/bus/a2bus/a2diskii.h",
 		MAME_DIR .. "src/devices/bus/a2bus/a2mockingboard.cpp",
@@ -2428,6 +2457,7 @@ if (BUSES["COCO"]~=null) then
 		MAME_DIR .. "src/devices/bus/coco/coco_dwsock.cpp",
 		MAME_DIR .. "src/devices/bus/coco/coco_dwsock.h",
 		MAME_DIR .. "src/devices/bus/coco/dragon_fdc.cpp",
+		MAME_DIR .. "src/devices/bus/coco/coco_t4426.cpp",
 	}
 end
 
@@ -2628,6 +2658,24 @@ if (BUSES["A1BUS"]~=null) then
 		MAME_DIR .. "src/devices/bus/a1bus/a1cassette.h",
 		MAME_DIR .. "src/devices/bus/a1bus/a1cffa.cpp",
 		MAME_DIR .. "src/devices/bus/a1bus/a1cffa.h",
+	}
+end
+
+---------------------------------------------------
+--
+--@src/devices/bus/amiga/keyboard/keyboard.h,BUSES["AMIGA_KEYBOARD"] = true
+---------------------------------------------------
+
+if (BUSES["AMIGA_KEYBOARD"]~=null) then
+	files {
+		MAME_DIR .. "src/devices/bus/amiga/keyboard/keyboard.cpp",
+		MAME_DIR .. "src/devices/bus/amiga/keyboard/keyboard.h",
+		MAME_DIR .. "src/devices/bus/amiga/keyboard/matrix.cpp",
+		MAME_DIR .. "src/devices/bus/amiga/keyboard/matrix.h",
+		MAME_DIR .. "src/devices/bus/amiga/keyboard/a1200.cpp",
+		MAME_DIR .. "src/devices/bus/amiga/keyboard/a1200.h",
+		MAME_DIR .. "src/devices/bus/amiga/keyboard/a500.cpp",
+		MAME_DIR .. "src/devices/bus/amiga/keyboard/a500.h",
 	}
 end
 

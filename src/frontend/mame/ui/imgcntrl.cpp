@@ -168,7 +168,7 @@ void menu_control_device_image::hook_load(const std::string &name)
 //  populate
 //-------------------------------------------------
 
-void menu_control_device_image::populate()
+void menu_control_device_image::populate(float &customtop, float &custombottom)
 {
 }
 
@@ -223,7 +223,7 @@ void menu_control_device_image::handle()
 		}
 		else
 		{
-			m_swp = &m_swi->parts().front();
+			m_swp = m_swi->find_part("", m_image.image_interface());
 			load_software_part();
 		}
 		break;

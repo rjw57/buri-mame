@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2016 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2017 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
  */
 
@@ -7,7 +7,7 @@
 
 #if ENTRY_CONFIG_USE_NATIVE && BX_PLATFORM_WINDOWS
 
-#include <bgfx/bgfxplatform.h>
+#include <bgfx/platform.h>
 
 #include <bx/uint32_t.h>
 #include <bx/thread.h>
@@ -143,12 +143,13 @@ namespace entry
 			}
 
 			WindowHandle defaultWindow = { 0 };
-			GamepadHandle handle = { 0 };
 
-			for (uint32_t ii = 0; ii < BX_COUNTOF(m_state); ++ii)
+			for (uint16_t ii = 0; ii < BX_COUNTOF(m_state); ++ii)
 			{
 				XINPUT_STATE state;
 				DWORD result = XInputGetState(ii, &state);
+
+				GamepadHandle handle = { ii };
 
 				bool connected = ERROR_SUCCESS == result;
 				if (connected != m_connected[ii])
@@ -560,10 +561,15 @@ namespace entry
 				case WM_USER_WINDOW_DESTROY:
 					{
 						WindowHandle handle = { (uint16_t)_wparam };
-						PostMessageA(m_hwnd[_wparam], WM_CLOSE, 0, 0);
 						m_eventQueue.postWindowEvent(handle);
 						DestroyWindow(m_hwnd[_wparam]);
 						m_hwnd[_wparam] = 0;
+
+						if (0 == handle.idx)
+						{
+							m_exit = true;
+							m_eventQueue.postExitEvent();
+						}
 					}
 					break;
 
@@ -615,15 +621,7 @@ namespace entry
 
 				case WM_QUIT:
 				case WM_CLOSE:
-					if (_hwnd == m_hwnd[0])
-					{
-						m_exit = true;
-						m_eventQueue.postExitEvent();
-					}
-					else
-					{
-						destroyWindow(findHandle(_hwnd) );
-					}
+					destroyWindow(findHandle(_hwnd) );
 					// Don't process message. Window will be destroyed later.
 					return 0;
 

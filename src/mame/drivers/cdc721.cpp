@@ -18,20 +18,19 @@ class cdc721_state : public driver_device
 public:
 	cdc721_state(const machine_config &mconfig, device_type type, const char *tag)
 		: driver_device(mconfig, type, tag)
-	, m_p_videoram(*this, "videoram")
-	, m_maincpu(*this, "maincpu")
-	{ }
+		, m_p_videoram(*this, "videoram")
+		, m_maincpu(*this, "maincpu")
+		, m_p_chargen(*this, "chargen")
+		{ }
 
-public:
-	virtual void machine_reset() override;
-	DECLARE_PALETTE_INIT(cdc721);
-	const uint8_t *m_p_chargen;
 	uint32_t screen_update(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
-	required_shared_ptr<uint8_t> m_p_videoram;
+	DECLARE_PALETTE_INIT(cdc721);
+
 private:
+	virtual void machine_reset() override;
+	required_shared_ptr<uint8_t> m_p_videoram;
 	required_device<cpu_device> m_maincpu;
-
-
+	required_region_ptr<u8> m_p_chargen;
 };
 
 static ADDRESS_MAP_START( cdc721_mem, AS_PROGRAM, 8, cdc721_state )
@@ -49,7 +48,6 @@ INPUT_PORTS_END
 
 void cdc721_state::machine_reset()
 {
-	m_p_chargen = memregion("chargen")->base();
 }
 
 /* F4 Character Displayer */

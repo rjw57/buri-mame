@@ -28,7 +28,7 @@ a A
 
 0 0 0 H V Z IE C
 
-TM 9bit polynominal?
+TM 9bit polynomial?
 
 pu pv disp flipflops
 
@@ -61,7 +61,7 @@ enum
 
 
 #define MCFG_LH5801_IN(_devcb) \
-	lh5801_cpu_device::set_in_func(*device, DEVCB_##_devcb);
+	devcb = &lh5801_cpu_device::set_in_func(*device, DEVCB_##_devcb);
 
 
 class lh5801_cpu_device :  public cpu_device

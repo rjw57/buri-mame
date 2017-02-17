@@ -29,7 +29,9 @@ public:
 		m_spr(*this, "vsystem_spr"),
 		m_spr_old(*this, "vsystem_spr_old"),
 		m_spr_old2(*this, "vsystem_spr_ol2"),
-		m_soundlatch(*this, "soundlatch") { }
+		m_soundlatch(*this, "soundlatch"),
+		m_soundbank(*this, "soundbank"),
+		m_okibank(*this, "okibank") { }
 
 	/* memory pointers */
 	required_shared_ptr<uint16_t> m_bg1videoram;
@@ -53,7 +55,8 @@ public:
 	optional_device<vsystem_spr2_device> m_spr_old2; //  or a pair of them..
 	optional_device<generic_latch_8_device> m_soundlatch;
 
-
+	optional_memory_bank m_soundbank;
+	optional_memory_bank m_okibank;
 
 	/* video-related */
 	tilemap_t   *m_bg1_tilemap;
@@ -78,27 +81,26 @@ public:
 	int       m_pending_command;
 
 	/* handlers */
-	DECLARE_WRITE16_MEMBER(sound_command_w);
-	DECLARE_WRITE16_MEMBER(turbofrc_sound_command_w);
-	DECLARE_WRITE16_MEMBER(aerfboot_soundlatch_w);
-	DECLARE_READ16_MEMBER(pending_command_r);
+	DECLARE_WRITE8_MEMBER(sound_command_w);
+	DECLARE_WRITE8_MEMBER(aerfboot_soundlatch_w);
+	DECLARE_READ8_MEMBER(pending_command_r);
 	DECLARE_WRITE8_MEMBER(pending_command_clear_w);
 	DECLARE_WRITE8_MEMBER(aerofgt_sh_bankswitch_w);
 	DECLARE_WRITE8_MEMBER(aerfboot_okim6295_banking_w);
 	DECLARE_WRITE16_MEMBER(aerofgt_bg1videoram_w);
 	DECLARE_WRITE16_MEMBER(aerofgt_bg2videoram_w);
-	DECLARE_WRITE16_MEMBER(pspikes_gfxbank_w);
+	DECLARE_WRITE8_MEMBER(pspikes_gfxbank_w);
 	DECLARE_WRITE16_MEMBER(pspikesb_gfxbank_w);
 	DECLARE_WRITE16_MEMBER(spikes91_lookup_w);
-	DECLARE_WRITE16_MEMBER(karatblz_gfxbank_w);
-	DECLARE_WRITE16_MEMBER(spinlbrk_gfxbank_w);
+	DECLARE_WRITE8_MEMBER(karatblz_gfxbank_w);
+	DECLARE_WRITE8_MEMBER(spinlbrk_gfxbank_w);
 	DECLARE_WRITE16_MEMBER(turbofrc_gfxbank_w);
 	DECLARE_WRITE16_MEMBER(aerofgt_gfxbank_w);
 	DECLARE_WRITE16_MEMBER(aerofgt_bg1scrollx_w);
 	DECLARE_WRITE16_MEMBER(aerofgt_bg1scrolly_w);
 	DECLARE_WRITE16_MEMBER(aerofgt_bg2scrollx_w);
 	DECLARE_WRITE16_MEMBER(aerofgt_bg2scrolly_w);
-	DECLARE_WRITE16_MEMBER(pspikes_palette_bank_w);
+	DECLARE_WRITE8_MEMBER(pspikes_palette_bank_w);
 	DECLARE_WRITE16_MEMBER(wbbc97_bitmap_enable_w);
 	DECLARE_WRITE16_MEMBER(pspikesb_oki_banking_w);
 	DECLARE_WRITE16_MEMBER(aerfboo2_okim6295_banking_w);
