@@ -1277,19 +1277,6 @@ end
 
 ---------------------------------------------------
 --
---@src/devices/bus/spi/slave.h,BUSES["SPI"] = true
----------------------------------------------------
-if (BUSES["SPI"]~=null) then
-	files {
-		MAME_DIR .. "src/devices/bus/spi/slave.cpp",
-		MAME_DIR .. "src/devices/bus/spi/slave.h",
-		MAME_DIR .. "src/devices/bus/spi/burikbd.cpp",
-		MAME_DIR .. "src/devices/bus/spi/burikbd.h",
-	}
-end
-
----------------------------------------------------
---
 --@src/devices/bus/tiki100/exp.h,BUSES["TIKI100"] = true
 ---------------------------------------------------
 

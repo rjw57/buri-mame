@@ -8786,8 +8786,8 @@ buggychlt                       // A22 (c) 1984 Taito Corporation + Tefri licens
 wmbullet                        //
 wmbulletf                       //
 
-@source:buri.cpp
-buri                            // Buri version 3
+@source:borr.cpp
+borr                            // Borr version 3
 
 @source:busicom.cpp
 busicom                         //

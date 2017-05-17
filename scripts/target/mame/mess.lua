@@ -1996,7 +1996,7 @@ createMESSProjects(_target, _subtarget, "homebrew")
 files {
 	MAME_DIR .. "src/mame/drivers/4004clk.cpp",
 	MAME_DIR .. "src/mame/drivers/68ksbc.cpp",
-	MAME_DIR .. "src/mame/drivers/buri.cpp",
+	MAME_DIR .. "src/mame/drivers/borr.cpp",
 	MAME_DIR .. "src/mame/drivers/craft.cpp",
 	MAME_DIR .. "src/mame/drivers/homez80.cpp",
 	MAME_DIR .. "src/mame/drivers/p112.cpp",
