@@ -12,16 +12,16 @@
  *  * http://www.bitsavers.org/pdf/sms/pc/OMTI_AT_Controller_Series_Jan87.pdf
  */
 
-#define VERBOSE 0
-
-static int verbose = VERBOSE;
-
 #include "emu.h"
 #include "omti8621.h"
 #include "image.h"
 #include "formats/pc_dsk.h"
 #include "formats/naslite_dsk.h"
 #include "formats/apollo_dsk.h"
+
+#define VERBOSE 0
+
+static int verbose = VERBOSE;
 
 #define LOG(x)  { logerror ("%s: ", cpu_context(this)); logerror x; logerror ("\n"); }
 #define LOG1(x) { if (verbose > 0) LOG(x)}
@@ -45,7 +45,7 @@ static int verbose = VERBOSE;
 #define OMTI_BIOS_REGION "omti_bios"
 
 // forward declaration of image class
-extern const device_type OMTI_DISK;
+DECLARE_DEVICE_TYPE(OMTI_DISK, omti_disk_image_device)
 
 class omti_disk_image_device :  public device_t,
 								public device_image_interface
@@ -64,11 +64,12 @@ public:
 	virtual bool is_reset_on_load() const override { return 0; }
 	virtual bool support_command_line_image_creation() const override { return 1; }
 	virtual const char *file_extensions() const override { return "awd"; }
+	virtual const char *custom_instance_name() const override { return "disk"; }
+	virtual const char *custom_brief_instance_name() const override { return "disk"; }
 
 	virtual image_init_result call_create(int format_type, util::option_resolution *format_options) override;
 protected:
 	// device-level overrides
-	virtual void device_config_complete() override;
 	virtual void device_start() override;
 	virtual void device_reset() override;
 
@@ -375,37 +376,33 @@ void omti8621_device::device_reset()
 	alternate_track_address[1] = 0;
 }
 
-const device_type ISA16_OMTI8621 = &device_creator<omti8621_pc_device>;
+DEFINE_DEVICE_TYPE(ISA16_OMTI8621, omti8621_pc_device, "omti8621isa", "OMTI 8621 ESDI/floppy controller (ISA)")
 
 omti8621_pc_device::omti8621_pc_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 	: omti8621_device(mconfig, ISA16_OMTI8621, tag, owner, clock)
 {
 }
 
-const device_type ISA16_OMTI8621_APOLLO = &device_creator<omti8621_apollo_device>;
+DEFINE_DEVICE_TYPE(ISA16_OMTI8621_APOLLO, omti8621_apollo_device, "omti8621ap", "OMTI 8621 ESDI/floppy controller (Apollo)")
 
 omti8621_apollo_device::omti8621_apollo_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 	: omti8621_device(mconfig, ISA16_OMTI8621_APOLLO, tag, owner, clock)
 {
 }
 
-omti8621_device::omti8621_device(const machine_config &mconfig, device_type type,const char *tag, device_t *owner, uint32_t clock)
-	: device_t(mconfig, type, "OMTI 8621 ESDI/floppy controller", tag, owner, clock, "omti8621", __FILE__),
-	device_isa16_card_interface(mconfig, *this),
-	m_fdc(*this, OMTI_FDC_TAG),
-	m_iobase(*this, "IO_BASE"),
-	m_biosopts(*this, "BIOS_OPTS"), jumper(0), omti_state(0), status_port(0), config_port(0), mask_port(0), command_length(0), command_index(0), command_status(0), data_buffer(nullptr),
-	data_length(0), data_index(0), diskaddr_ecc_error(0), diskaddr_format_bad_track(0), m_timer(nullptr), m_installed(false)
-{
-}
-
-//-------------------------------------------------
-//  device_config_complete - perform any
-//  operations now that the configuration is
-//  complete
-//-------------------------------------------------
-
-void omti8621_device::device_config_complete()
+omti8621_device::omti8621_device(
+		const machine_config &mconfig,
+		device_type type,
+		const char *tag,
+		device_t *owner,
+		uint32_t clock)
+	: device_t(mconfig, type, tag, owner, clock)
+	, device_isa16_card_interface(mconfig, *this)
+	, m_fdc(*this, OMTI_FDC_TAG)
+	, m_iobase(*this, "IO_BASE")
+	, m_biosopts(*this, "BIOS_OPTS")
+	, jumper(0), omti_state(0), status_port(0), config_port(0), mask_port(0), command_length(0), command_index(0), command_status(0), data_buffer(nullptr)
+	, data_length(0), data_index(0), diskaddr_ecc_error(0), diskaddr_format_bad_track(0), m_timer(nullptr), m_installed(false)
 {
 }
 
@@ -1309,17 +1306,13 @@ void omti8621_device::eop_w(int state)
 //##########################################################################
 
 // device type definition
-const device_type OMTI_DISK = &device_creator<omti_disk_image_device>;
+DEFINE_DEVICE_TYPE(OMTI_DISK, omti_disk_image_device, "omti_disk_image", "OMTI 8621 ESDI disk")
 
 omti_disk_image_device::omti_disk_image_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
-	: device_t(mconfig, OMTI_DISK, "OMTI8621 ESDI disk", tag, owner, clock, "omti_disk_image", __FILE__),
-		device_image_interface(mconfig, *this), m_type(0), m_cylinders(0), m_heads(0), m_sectors(0), m_sectorbytes(0), m_sector_count(0), m_image(nullptr)
+	: device_t(mconfig, OMTI_DISK, tag, owner, clock)
+	, device_image_interface(mconfig, *this)
+	, m_type(0), m_cylinders(0), m_heads(0), m_sectors(0), m_sectorbytes(0), m_sector_count(0), m_image(nullptr)
 {
-}
-
-void omti_disk_image_device::device_config_complete()
-{
-	update_names(OMTI_DISK, "disk", "disk");
 }
 
 

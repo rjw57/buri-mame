@@ -17,11 +17,15 @@
 *******************************************************************************/
 
 #include "emu.h"
+#include "includes/liberate.h"
+
 #include "cpu/m6502/deco16.h"
 #include "cpu/m6502/m6502.h"
 #include "sound/ay8910.h"
-#include "includes/liberate.h"
 #include "machine/deco222.h"
+#include "screen.h"
+#include "speaker.h"
+
 
 /*************************************
  *
@@ -724,7 +728,7 @@ MACHINE_RESET_MEMBER(liberate_state,liberate)
 	m_bank = 0;
 }
 
-static MACHINE_CONFIG_START( liberate_base, liberate_state )
+static MACHINE_CONFIG_START( liberate_base )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu",DECO16, 2000000)
@@ -811,7 +815,7 @@ static MACHINE_CONFIG_DERIVED( prosoccr, liberate_base )
 	MCFG_VIDEO_START_OVERRIDE(liberate_state,prosoccr)
 MACHINE_CONFIG_END
 
-static MACHINE_CONFIG_START( prosport, liberate_state )
+static MACHINE_CONFIG_START( prosport )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", DECO16, 2000000)

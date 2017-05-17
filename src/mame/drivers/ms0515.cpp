@@ -2,23 +2,23 @@
 // copyright-holders:Miodrag Milanovic, Sergey Svishchev
 /***************************************************************************
 
-	Elektronika MS 0515
+    Elektronika MS 0515
 
-	To do:
-	- softlist
-	- sound
-	- 512K memory expansion
-	- ?? refresh rate change
-	- ?? parallel printer
-	- ?? cassette (only with Version A firmware)
-	- ?? port 177770
+    To do:
+    - softlist
+    - sound
+    - 512K memory expansion
+    - ?? refresh rate change
+    - ?? parallel printer
+    - ?? cassette (only with Version A firmware)
+    - ?? port 177770
 
-	Docs:
-	- http://www.tis.kz/docs/MC-0515/mc0515-ed.rar schematics etc.
-	- http://www.tis.kz/docs/MC-0515/mc0515-to.rar user manual
-	- http://www.tis.kz/docs/MC-0515/hc4-to.rar technical manual
-	- http://www.tis.kz/docs/MC-0515/mc0515-po.rar diag manual
-	- http://www.tis.kz/docs/MC-0515/mc0515-osa.rar OS manual
+    Docs:
+    - http://www.tis.kz/docs/MC-0515/mc0515-ed.rar schematics etc.
+    - http://www.tis.kz/docs/MC-0515/mc0515-to.rar user manual
+    - http://www.tis.kz/docs/MC-0515/hc4-to.rar technical manual
+    - http://www.tis.kz/docs/MC-0515/mc0515-po.rar diag manual
+    - http://www.tis.kz/docs/MC-0515/mc0515-osa.rar OS manual
 
 ****************************************************************************/
 
@@ -26,7 +26,6 @@
 
 #include "bus/rs232/rs232.h"
 #include "cpu/t11/t11.h"
-#include "formats/ms0515_dsk.h"
 #include "machine/clock.h"
 #include "machine/i8251.h"
 #include "machine/i8255.h"
@@ -34,8 +33,12 @@
 #include "machine/pit8253.h"
 #include "machine/ram.h"
 #include "machine/wd_fdc.h"
-#include "sound/speaker.h"
+#include "sound/spkrdev.h"
 #include "sound/wave.h"
+
+#include "screen.h"
+
+#include "formats/ms0515_dsk.h"
 
 #include "ms0515.lh"
 
@@ -68,21 +71,9 @@ public:
 		, m_ms7004(*this, "ms7004")
 	{ }
 
-	required_device<cpu_device> m_maincpu;
-	required_device<ram_device> m_ram;
-	required_device<kr1818vg93_t> m_fdc;
-	required_device<floppy_image_device> m_floppy0;
-	required_device<floppy_image_device> m_floppy1;
-	required_device<i8251_device> m_i8251line;
-	required_device<rs232_port_device> m_rs232;
-	required_device<i8251_device> m_i8251kbd;
-	required_device<ms7004_device> m_ms7004;
-
-	virtual void machine_reset() override;
-
 	DECLARE_PALETTE_INIT(ms0515);
 	uint32_t screen_update_ms0515(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
-	void screen_eof(screen_device &screen, bool state);
+	DECLARE_WRITE_LINE_MEMBER(screen_vblank);
 
 	DECLARE_WRITE16_MEMBER(ms0515_bank_w);
 
@@ -98,12 +89,26 @@ public:
 
 	DECLARE_FLOPPY_FORMATS(floppy_formats);
 
-	void irq_encoder(int irq, int state);
 	DECLARE_WRITE_LINE_MEMBER(irq2_w);
 	DECLARE_WRITE_LINE_MEMBER(irq5_w);
 	DECLARE_WRITE_LINE_MEMBER(irq8_w);
 	DECLARE_WRITE_LINE_MEMBER(irq9_w);
 	DECLARE_WRITE_LINE_MEMBER(irq11_w);
+
+protected:
+	virtual void machine_reset() override;
+
+	void irq_encoder(int irq, int state);
+
+	required_device<cpu_device> m_maincpu;
+	required_device<ram_device> m_ram;
+	required_device<kr1818vg93_device> m_fdc;
+	required_device<floppy_image_device> m_floppy0;
+	required_device<floppy_image_device> m_floppy1;
+	required_device<i8251_device> m_i8251line;
+	required_device<rs232_port_device> m_rs232;
+	required_device<i8251_device> m_i8251kbd;
+	required_device<ms7004_device> m_ms7004;
 
 private:
 	uint8_t *m_video_ram;
@@ -137,17 +142,17 @@ static ADDRESS_MAP_START(ms0515_mem, AS_PROGRAM, 16, ms0515_state)
 	AM_RANGE(0177520, 0177527) AM_DEVWRITE8("pit8253", pit8253_device, write, 0x00ff)
 
 	AM_RANGE(0177540, 0177547) AM_NOP
-//	AM_RANGE(0177540, 0177541)
-//	AM_RANGE(0177542, 0177543)
-//	AM_RANGE(0177544, 0177545)  // i8255 for MS-7007 Keyboard
-//	AM_RANGE(0177546, 0177547)
+//  AM_RANGE(0177540, 0177541)
+//  AM_RANGE(0177542, 0177543)
+//  AM_RANGE(0177544, 0177545)  // i8255 for MS-7007 Keyboard
+//  AM_RANGE(0177546, 0177547)
 
 	AM_RANGE(0177600, 0177607) AM_DEVREADWRITE8("ppi8255_1", i8255_device, read, write, 0x00ff)
 
-	AM_RANGE(0177640, 0177641) AM_DEVREADWRITE8("vg93", kr1818vg93_t, status_r, cmd_w, 0x00ff)
-	AM_RANGE(0177642, 0177643) AM_DEVREADWRITE8("vg93", kr1818vg93_t, track_r, track_w, 0x00ff)
-	AM_RANGE(0177644, 0177645) AM_DEVREADWRITE8("vg93", kr1818vg93_t, sector_r, sector_w, 0x00ff)
-	AM_RANGE(0177646, 0177647) AM_DEVREADWRITE8("vg93", kr1818vg93_t, data_r, data_w, 0x00ff)
+	AM_RANGE(0177640, 0177641) AM_DEVREADWRITE8("vg93", kr1818vg93_device, status_r, cmd_w, 0x00ff)
+	AM_RANGE(0177642, 0177643) AM_DEVREADWRITE8("vg93", kr1818vg93_device, track_r, track_w, 0x00ff)
+	AM_RANGE(0177644, 0177645) AM_DEVREADWRITE8("vg93", kr1818vg93_device, sector_r, sector_w, 0x00ff)
+	AM_RANGE(0177646, 0177647) AM_DEVREADWRITE8("vg93", kr1818vg93_device, data_r, data_w, 0x00ff)
 
 	AM_RANGE(0177700, 0177701) AM_DEVREAD8("i8251line", i8251_device, data_r, 0x00ff)
 	AM_RANGE(0177702, 0177703) AM_DEVREADWRITE8("i8251line", i8251_device, status_r, control_w, 0x00ff)
@@ -160,13 +165,13 @@ ADDRESS_MAP_END
 /*
  * (page 15-16)
  *
- * 6-0	RAM banking
- * 7	VRAM access enable
- * 8	vblank IRQ line (1 -- assert)
- * 9	timer IRQ enable (1 -- enable)
+ * 6-0  RAM banking
+ * 7    VRAM access enable
+ * 8    vblank IRQ line (1 -- assert)
+ * 9    timer IRQ enable (1 -- enable)
  * 11-10 VRAM banking
- * 12	parallel port STROBE signal
- * 13	parallel port ... signal
+ * 12   parallel port STROBE signal
+ * 13   parallel port ... signal
  * 14-15 unused
  */
 WRITE16_MEMBER(ms0515_state::ms0515_bank_w)
@@ -410,9 +415,9 @@ uint32_t ms0515_state::screen_update_ms0515(screen_device &screen, bitmap_ind16 
 	return 0;
 }
 
-void ms0515_state::screen_eof(screen_device &screen, bool state)
+WRITE_LINE_MEMBER(ms0515_state::screen_vblank)
 {
-//	irq2_w(state ? ASSERT_LINE : CLEAR_LINE);
+//  irq2_w(state ? ASSERT_LINE : CLEAR_LINE);
 	if (BIT(m_bankreg, 9))
 		irq11_w(state ? ASSERT_LINE : CLEAR_LINE);
 }
@@ -495,9 +500,9 @@ WRITE_LINE_MEMBER(ms0515_state::irq11_w)
 	irq_encoder(11, state);
 }
 
-static MACHINE_CONFIG_START( ms0515, ms0515_state )
+static MACHINE_CONFIG_START( ms0515 )
 	/* basic machine hardware */
-	MCFG_CPU_ADD("maincpu", T11, XTAL_4MHz)	// actual CPU is T11 clone, KR1807VM1
+	MCFG_CPU_ADD("maincpu", T11, XTAL_4MHz) // actual CPU is T11 clone, KR1807VM1
 	MCFG_T11_INITIAL_MODE(0xf2ff)
 	MCFG_CPU_PROGRAM_MAP(ms0515_mem)
 
@@ -505,7 +510,7 @@ static MACHINE_CONFIG_START( ms0515, ms0515_state )
 	MCFG_SCREEN_ADD("screen", RASTER)
 	MCFG_SCREEN_RAW_PARAMS( XTAL_15MHz, 958,0,640, 313,0,200 )
 	MCFG_SCREEN_UPDATE_DRIVER(ms0515_state, screen_update_ms0515)
-	MCFG_SCREEN_VBLANK_DRIVER(ms0515_state, screen_eof)
+	MCFG_SCREEN_VBLANK_CALLBACK(WRITELINE(ms0515_state, screen_vblank))
 	MCFG_SCREEN_PALETTE("palette")
 	MCFG_DEFAULT_LAYOUT(layout_ms0515)
 
@@ -534,8 +539,8 @@ static MACHINE_CONFIG_START( ms0515, ms0515_state )
 	MCFG_RS232_CTS_HANDLER(DEVWRITELINE("i8251line", i8251_device, write_cts))
 	MCFG_RS232_DSR_HANDLER(DEVWRITELINE("i8251line", i8251_device, write_dsr))
 
-//	MCFG_DEVICE_ADD("line_clock", CLOCK, 4800*16) // 8251 is set to /16 on the clock input
-//	MCFG_CLOCK_SIGNAL_HANDLER(WRITELINE(ms0515_state, write_line_clock))
+//  MCFG_DEVICE_ADD("line_clock", CLOCK, 4800*16) // 8251 is set to /16 on the clock input
+//  MCFG_CLOCK_SIGNAL_HANDLER(WRITELINE(ms0515_state, write_line_clock))
 
 	// serial connection to MS7004 keyboard
 	MCFG_DEVICE_ADD("i8251kbd", I8251, 0)
@@ -552,11 +557,11 @@ static MACHINE_CONFIG_START( ms0515, ms0515_state )
 
 	MCFG_DEVICE_ADD("pit8253", PIT8253, 0)
 	MCFG_PIT8253_CLK0(XTAL_2MHz)
-//	MCFG_PIT8253_OUT0_HANDLER(WRITELINE(ms0515_state, write_keyboard_clock))
+//  MCFG_PIT8253_OUT0_HANDLER(WRITELINE(ms0515_state, write_keyboard_clock))
 	MCFG_PIT8253_CLK1(XTAL_2MHz)
 	MCFG_PIT8253_OUT0_HANDLER(WRITELINE(ms0515_state, write_line_clock))
 	MCFG_PIT8253_CLK2(XTAL_2MHz)
-//	MCFG_PIT8253_OUT2_HANDLER(WRITELINE())
+//  MCFG_PIT8253_OUT2_HANDLER(WRITELINE())
 
 	/* internal ram */
 	MCFG_RAM_ADD(RAM_TAG)
@@ -577,5 +582,5 @@ ROM_END
 
 /* Driver */
 
-/*    YEAR  NAME    PARENT  COMPAT   MACHINE    INPUT    INIT               COMPANY   FULLNAME       FLAGS */
-COMP( 1990, ms0515, 0,      0,       ms0515,    ms0515,  driver_device, 0,  "Elektronika",   "MS 0515",     MACHINE_NO_SOUND)
+//    YEAR  NAME    PARENT  COMPAT   MACHINE    INPUT    STATE         INIT  COMPANY        FULLNAME   FLAGS
+COMP( 1990, ms0515, 0,      0,       ms0515,    ms0515,  ms0515_state, 0,    "Elektronika", "MS 0515", MACHINE_NO_SOUND )

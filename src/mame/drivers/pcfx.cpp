@@ -15,6 +15,7 @@
 #include "video/huc6270.h"
 #include "video/huc6271.h"
 #include "video/huc6272.h"
+#include "screen.h"
 
 struct pcfx_pad_t
 {
@@ -216,7 +217,7 @@ static INPUT_PORTS_START( pcfx )
 	PORT_BIT( 0x00000800, IP_ACTIVE_LOW, IPT_JOYSTICK_LEFT ) PORT_PLAYER(1) PORT_NAME("P1 Left")
 	PORT_BIT( 0x00001000, IP_ACTIVE_LOW, IPT_BUTTON7 ) PORT_PLAYER(1) PORT_NAME("P1 Switch 1")
 	PORT_BIT( 0x00004000, IP_ACTIVE_LOW, IPT_BUTTON8 ) PORT_PLAYER(1) PORT_NAME("P1 Switch 2")
-	PORT_BIT( 0x0fffa000, IP_ACTIVE_LOW, IPT_UNKNOWN ) 
+	PORT_BIT( 0x0fffa000, IP_ACTIVE_LOW, IPT_UNKNOWN )
 
 	PORT_START("P2")
 	PORT_BIT( 0xf0000000, IP_ACTIVE_HIGH, IPT_UNKNOWN ) // ID unconnect
@@ -407,14 +408,14 @@ uint32_t pcfx_state::screen_update(screen_device &screen, bitmap_rgb32 &bitmap, 
 }
 
 
-static MACHINE_CONFIG_START( pcfx, pcfx_state )
+static MACHINE_CONFIG_START( pcfx )
 	MCFG_CPU_ADD( "maincpu", V810, XTAL_21_4772MHz )
 	MCFG_CPU_PROGRAM_MAP( pcfx_mem)
 	MCFG_CPU_IO_MAP( pcfx_io)
 
 	MCFG_SCREEN_ADD( "screen", RASTER )
 	MCFG_SCREEN_UPDATE_DRIVER(pcfx_state, screen_update)
-	MCFG_SCREEN_RAW_PARAMS(XTAL_21_4772MHz, HUC6261_WPF, 64, 64 + 1024 + 64, HUC6261_LPF, 18, 18 + 242)
+	MCFG_SCREEN_RAW_PARAMS(XTAL_21_4772MHz, huc6261_device::WPF, 64, 64 + 1024 + 64, huc6261_device::LPF, 18, 18 + 242)
 
 	MCFG_DEVICE_ADD( "huc6270_a", HUC6270, 0 )
 	MCFG_HUC6270_VRAM_SIZE(0x20000)
@@ -463,6 +464,6 @@ ROM_END
 
 ***************************************************************************/
 
-/*    YEAR  NAME        PARENT  COMPAT  MACHINE     INPUT      INIT    COMPANY                       FULLNAME                  FLAGS */
-CONS( 1994, pcfx,       0,      0,      pcfx,       pcfx, driver_device,      0,      "Nippon Electronic Company",  "PC-FX",                  MACHINE_NOT_WORKING | MACHINE_NO_SOUND )
-CONS( 199?, pcfxga,     pcfx,   0,      pcfx,       pcfx, driver_device,      0,      "Nippon Electronic Company",  "PC-FX/GA (PC ISA Card)", MACHINE_NOT_WORKING | MACHINE_NO_SOUND )
+//    YEAR  NAME        PARENT  COMPAT  MACHINE     INPUT  STATE            INIT    COMPANY  FULLNAME                  FLAGS
+CONS( 1994, pcfx,       0,      0,      pcfx,       pcfx,  pcfx_state,      0,      "NEC",   "PC-FX",                  MACHINE_NOT_WORKING | MACHINE_NO_SOUND )
+CONS( 199?, pcfxga,     pcfx,   0,      pcfx,       pcfx,  pcfx_state,      0,      "NEC",   "PC-FX/GA (PC ISA Card)", MACHINE_NOT_WORKING | MACHINE_NO_SOUND )

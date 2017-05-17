@@ -14,7 +14,10 @@
 
 #include "emu.h"
 #include "coco_orch90.h"
+
 #include "sound/volt_reg.h"
+#include "speaker.h"
+
 
 static MACHINE_CONFIG_FRAGMENT(coco_orch90)
 	MCFG_SPEAKER_STANDARD_STEREO("lspeaker", "rspeaker")
@@ -29,7 +32,7 @@ MACHINE_CONFIG_END
 //  GLOBAL VARIABLES
 //**************************************************************************
 
-const device_type COCO_ORCH90 = &device_creator<coco_orch90_device>;
+DEFINE_DEVICE_TYPE(COCO_ORCH90, coco_orch90_device, "coco_orch90", "CoCo Orch-90 PAK")
 
 //**************************************************************************
 //  LIVE DEVICE
@@ -40,10 +43,10 @@ const device_type COCO_ORCH90 = &device_creator<coco_orch90_device>;
 //-------------------------------------------------
 
 coco_orch90_device::coco_orch90_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
-		: device_t(mconfig, COCO_ORCH90, "CoCo Orch-90 PAK", tag, owner, clock, "coco_orch90", __FILE__),
-		device_cococart_interface(mconfig, *this ),
-		m_ldac(*this, "ldac"),
-		m_rdac(*this, "rdac")
+	: device_t(mconfig, COCO_ORCH90, tag, owner, clock)
+	, device_cococart_interface(mconfig, *this )
+	, m_ldac(*this, "ldac")
+	, m_rdac(*this, "rdac")
 {
 }
 

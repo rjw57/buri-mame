@@ -13,11 +13,14 @@
 */
 
 #include "emu.h"
+#include "cpu/cop400/cop400.h"
 #include "cpu/z80/z80.h"
 #include "machine/ldstub.h"
 #include "machine/ldv1000.h"
-#include "cpu/cop400/cop400.h"
+#include "speaker.h"
+
 #include "thayers.lh"
+
 
 #define LOG 0
 
@@ -702,7 +705,7 @@ static INPUT_PORTS_START( thayers )
 	PORT_BIT( 0x02, IP_ACTIVE_HIGH, IPT_KEYBOARD ) PORT_NAME("W AMULET") PORT_CODE(KEYCODE_W)
 	PORT_BIT( 0x04, IP_ACTIVE_HIGH, IPT_KEYBOARD ) PORT_CODE(KEYCODE_A)
 	PORT_BIT( 0x08, IP_ACTIVE_HIGH, IPT_KEYBOARD ) PORT_NAME("Z SPELL OF RELEASE") PORT_CODE(KEYCODE_Z)
-	
+
 	PORT_START("ROW.2")
 	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_KEYBOARD ) PORT_NAME("3 DROP ITEM") PORT_CODE(KEYCODE_3)
 	PORT_BIT( 0x02, IP_ACTIVE_HIGH, IPT_KEYBOARD ) PORT_NAME("E BLACK MACE") PORT_CODE(KEYCODE_E)
@@ -783,7 +786,7 @@ void thayers_state::machine_reset()
 
 /* Machine Driver */
 
-static MACHINE_CONFIG_START( thayers, thayers_state )
+static MACHINE_CONFIG_START( thayers )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", Z80, XTAL_4MHz)
@@ -844,6 +847,6 @@ ROM_END
 
 /* Game Drivers */
 
-/*     YEAR  NAME      PARENT   MACHINE  INPUT    INIT  MONITOR  COMPANY               FULLNAME                   FLAGS                             LAYOUT */
-GAMEL( 1984, thayers,  0,       thayers, thayers, driver_device, 0, ROT0,    "RDI Video Systems",  "Thayer's Quest (set 1)",  MACHINE_NOT_WORKING | MACHINE_NO_SOUND, layout_thayers)
-GAMEL( 1984, thayersa, thayers, thayers, thayers, driver_device, 0, ROT0,    "RDI Video Systems",  "Thayer's Quest (set 2)",  MACHINE_NOT_WORKING | MACHINE_NO_SOUND, layout_thayers)
+//     YEAR  NAME      PARENT   MACHINE  INPUT    STATE          INIT  MONITOR  COMPANY               FULLNAME                   FLAGS                                   LAYOUT
+GAMEL( 1984, thayers,  0,       thayers, thayers, thayers_state, 0,    ROT0,    "RDI Video Systems",  "Thayer's Quest (set 1)",  MACHINE_NOT_WORKING | MACHINE_NO_SOUND, layout_thayers)
+GAMEL( 1984, thayersa, thayers, thayers, thayers, thayers_state, 0,    ROT0,    "RDI Video Systems",  "Thayer's Quest (set 2)",  MACHINE_NOT_WORKING | MACHINE_NO_SOUND, layout_thayers)

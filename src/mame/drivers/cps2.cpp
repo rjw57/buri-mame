@@ -632,6 +632,7 @@ Stephh's inputs notes (based on some tests on the "parent" set) :
 #include "cpu/m68000/m68000.h"
 #include "sound/qsound.h"
 #include "sound/okim6295.h"
+#include "speaker.h"
 
 
 /*************************************
@@ -1300,7 +1301,7 @@ MACHINE_START_MEMBER(cps_state,cps2)
 }
 
 
-static MACHINE_CONFIG_START( cps2, cps_state )
+static MACHINE_CONFIG_START( cps2 )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", M68000, XTAL_16MHz)
@@ -1321,7 +1322,7 @@ static MACHINE_CONFIG_START( cps2, cps_state )
 	MCFG_SCREEN_VIDEO_ATTRIBUTES(VIDEO_UPDATE_BEFORE_VBLANK)
 	MCFG_SCREEN_RAW_PARAMS(CPS_PIXEL_CLOCK, CPS_HTOTAL, CPS_HBEND, CPS_HBSTART, CPS_VTOTAL, CPS_VBEND, CPS_VBSTART)
 	MCFG_SCREEN_UPDATE_DRIVER(cps_state, screen_update_cps1)
-	MCFG_SCREEN_VBLANK_DRIVER(cps_state, screen_eof_cps1)
+	MCFG_SCREEN_VBLANK_CALLBACK(WRITELINE(cps_state, screen_vblank_cps1))
 	MCFG_SCREEN_PALETTE("palette")
 
 	MCFG_GFXDECODE_ADD("gfxdecode", "palette", cps1)
@@ -1352,7 +1353,7 @@ static MACHINE_CONFIG_DERIVED( gigaman2, cps2 )
 
 	MCFG_CPU_MODIFY("maincpu")
 
-	MCFG_OKIM6295_ADD("oki", XTAL_32MHz/32, OKIM6295_PIN7_HIGH) // clock frequency & pin 7 not verified
+	MCFG_OKIM6295_ADD("oki", XTAL_32MHz/32, PIN7_HIGH) // clock frequency & pin 7 not verified
 	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "lspeaker", 0.47)
 	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "rspeaker", 0.47)
 MACHINE_CONFIG_END
@@ -11611,7 +11612,7 @@ ROM_END
 
 
 GAME( 1993, ddtodd,   ddtod,    dead_cps2, cps2_4p4b, cps_state, cps2,    ROT0,   "bootleg", "Dungeons & Dragons: Tower of Doom (Euro 940412 Phoenix Edition) (bootleg)", MACHINE_SUPPORTS_SAVE )
-GAME( 1993, ecofghtrd,ecofghtr, dead_cps2, ecofghtr, cps_state, ecofghtr, ROT0,   "bootleg", "Eco Fighters (World 931203 Phoenix Edition) (bootleg)", MACHINE_SUPPORTS_SAVE )
+GAME( 1993, ecofghtrd,ecofghtr, dead_cps2, ecofghtr,  cps_state, ecofghtr,ROT0,   "bootleg", "Eco Fighters (World 931203 Phoenix Edition) (bootleg)", MACHINE_SUPPORTS_SAVE )
 GAME( 1993, ssf2ud,   ssf2,     dead_cps2, cps2_2p6b, cps_state, cps2,    ROT0,   "bootleg", "Super Street Fighter II: The New Challengers (USA 930911 Phoenix Edition) (bootleg)", MACHINE_SUPPORTS_SAVE )
 GAME( 1993, ssf2tbd,  ssf2,     dead_cps2, cps2_2p6b, cps_state, ssf2tb,  ROT0,   "bootleg", "Super Street Fighter II: The Tournament Battle (World 931119 Phoenix Edition) (bootleg)", MACHINE_SUPPORTS_SAVE )
 GAME( 1994, armwar1d, armwar,   dead_cps2, cps2_3p3b, cps_state, cps2,    ROT0,   "bootleg", "Armored Warriors (Euro 941011 Phoenix Edition) (bootleg)", MACHINE_SUPPORTS_SAVE )

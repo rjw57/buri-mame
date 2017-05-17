@@ -6,14 +6,16 @@
  *
  ****************************************************************************/
 
-#ifndef INTV_H_
-#define INTV_H_
+#ifndef MAME_INCLUDES_INTV_H
+#define MAME_INCLUDES_INTV_H
 
 #include "sound/ay8910.h"
 #include "video/stic.h"
+#include "video/tms9927.h"
+
+#include "bus/intv/ecs.h"
 #include "bus/intv/slot.h"
 #include "bus/intv/voice.h"
-#include "bus/intv/ecs.h"
 //#include "bus/intv/keycomp.h"
 
 #include "bus/intv_ctrl/ctrl.h"
@@ -90,16 +92,16 @@ public:
 	DECLARE_READ8_MEMBER(intvkbd_periph_r);
 	DECLARE_WRITE8_MEMBER(intvkbd_periph_w);
 
-	bool m_printer_not_busy;		// printer state
-	bool m_printer_no_paper;		// printer state
-	bool m_printer_not_busy_enable;	// printer interface state
+	bool m_printer_not_busy;        // printer state
+	bool m_printer_no_paper;        // printer state
+	bool m_printer_not_busy_enable; // printer interface state
 
 	int m_intvkbd_text_blanked;
 	int m_intvkbd_keyboard_col;
 	int m_tape_int_pending;
 	int m_tape_interrupts_enabled;
 	int m_tape_motor_mode;
-	
+
 	DECLARE_DRIVER_INIT(intvecs);
 	DECLARE_DRIVER_INIT(intvkbd);
 	DECLARE_DRIVER_INIT(intv);
@@ -133,4 +135,4 @@ protected:
 	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
 };
 
-#endif /* INTV_H_ */
+#endif // MAME_INCLUDES_INTV_H

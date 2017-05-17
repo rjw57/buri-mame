@@ -397,12 +397,16 @@ Stephh's notes (based on the game M68000 code and some tests) :
 ***************************************************************************/
 
 #include "emu.h"
-#include "cpu/z80/z80.h"
-#include "includes/taitoipt.h"
-#include "cpu/m68000/m68000.h"
-#include "audio/taitosnd.h"
-#include "sound/2610intf.h"
 #include "includes/wgp.h"
+#include "includes/taitoipt.h"
+#include "audio/taitosnd.h"
+
+#include "cpu/z80/z80.h"
+#include "cpu/m68000/m68000.h"
+#include "sound/2610intf.h"
+#include "screen.h"
+#include "speaker.h"
+
 
 void wgp_state::parse_control()
 {
@@ -906,7 +910,7 @@ void wgp_state::machine_start()
 	machine().save().register_postload(save_prepost_delegate(FUNC(wgp_state::wgp_postload), this));
 }
 
-static MACHINE_CONFIG_START( wgp, wgp_state )
+static MACHINE_CONFIG_START( wgp )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", M68000, 12000000)   /* 12 MHz ??? */
@@ -1198,8 +1202,8 @@ DRIVER_INIT_MEMBER(wgp_state,wgp2)
 
 /* Working Games with some graphics problems - e.g. missing rotation */
 
-GAME( 1989, wgp,      0,      wgp,    wgp, wgp_state,    wgp,    ROT0, "Taito America Corporation", "World Grand Prix (US)", MACHINE_IMPERFECT_GRAPHICS | MACHINE_NOT_WORKING )
-GAME( 1989, wgpj,     wgp,    wgp,    wgpj, wgp_state,   wgp,    ROT0, "Taito Corporation", "World Grand Prix (Japan)", MACHINE_IMPERFECT_GRAPHICS | MACHINE_NOT_WORKING )
-GAME( 1989, wgpjoy,   wgp,    wgp,    wgpjoy, wgp_state, wgp,    ROT0, "Taito Corporation", "World Grand Prix (joystick version) (Japan, set 1)", MACHINE_IMPERFECT_GRAPHICS | MACHINE_NOT_WORKING )
-GAME( 1989, wgpjoya,  wgp,    wgp,    wgpjoy, wgp_state, wgp,    ROT0, "Taito Corporation", "World Grand Prix (joystick version) (Japan, set 2)", MACHINE_IMPERFECT_GRAPHICS | MACHINE_NOT_WORKING )
-GAME( 1990, wgp2,     wgp,    wgp2,   wgp2, wgp_state,   wgp2,   ROT0, "Taito Corporation", "World Grand Prix 2 (Japan)", MACHINE_IMPERFECT_GRAPHICS | MACHINE_NOT_WORKING )
+GAME( 1989, wgp,      0,      wgp,    wgp,    wgp_state, wgp,    ROT0, "Taito America Corporation", "World Grand Prix (US)", MACHINE_IMPERFECT_GRAPHICS | MACHINE_NOT_WORKING )
+GAME( 1989, wgpj,     wgp,    wgp,    wgpj,   wgp_state, wgp,    ROT0, "Taito Corporation",         "World Grand Prix (Japan)", MACHINE_IMPERFECT_GRAPHICS | MACHINE_NOT_WORKING )
+GAME( 1989, wgpjoy,   wgp,    wgp,    wgpjoy, wgp_state, wgp,    ROT0, "Taito Corporation",         "World Grand Prix (joystick version) (Japan, set 1)", MACHINE_IMPERFECT_GRAPHICS | MACHINE_NOT_WORKING )
+GAME( 1989, wgpjoya,  wgp,    wgp,    wgpjoy, wgp_state, wgp,    ROT0, "Taito Corporation",         "World Grand Prix (joystick version) (Japan, set 2)", MACHINE_IMPERFECT_GRAPHICS | MACHINE_NOT_WORKING )
+GAME( 1990, wgp2,     wgp,    wgp2,   wgp2,   wgp_state, wgp2,   ROT0, "Taito Corporation",         "World Grand Prix 2 (Japan)", MACHINE_IMPERFECT_GRAPHICS | MACHINE_NOT_WORKING )

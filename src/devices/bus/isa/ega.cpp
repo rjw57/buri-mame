@@ -446,6 +446,9 @@ located at I/O port 0x3CE, and a data register located at I/O port 0x3CF.
 #include "emu.h"
 #include "ega.h"
 
+#include "screen.h"
+
+
 #define VERBOSE_EGA     1
 
 #define EGA_SCREEN_NAME "ega_screen"
@@ -535,7 +538,7 @@ INPUT_PORTS_END
 //  GLOBAL VARIABLES
 //**************************************************************************
 
-const device_type ISA8_EGA = &device_creator<isa8_ega_device>;
+DEFINE_DEVICE_TYPE(ISA8_EGA, isa8_ega_device, "ega", "IBM Enhanced Graphics Adapter")
 
 
 //-------------------------------------------------
@@ -571,18 +574,16 @@ ioport_constructor isa8_ega_device::device_input_ports() const
 //-------------------------------------------------
 
 isa8_ega_device::isa8_ega_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
-		device_t(mconfig, ISA8_EGA, "IBM Enhanced Graphics Adapter", tag, owner, clock, "ega", __FILE__),
-		device_isa8_card_interface(mconfig, *this), m_crtc_ega(nullptr), m_vram(nullptr), m_videoram(nullptr), m_charA(nullptr), m_charB(nullptr),
-		m_misc_output(0), m_feature_control(0), m_frame_cnt(0), m_hsync(0), m_vsync(0), m_vblank(0), m_display_enable(0), m_video_mode(0),
-		m_palette(*this, "palette")
+	isa8_ega_device(mconfig, ISA8_EGA, tag, owner, clock)
 {
 }
 
-isa8_ega_device::isa8_ega_device(const machine_config &mconfig, device_type type, const char *name, const char *tag, device_t *owner, uint32_t clock, const char *shortname, const char *source) :
-		device_t(mconfig, type, name, tag, owner, clock, shortname, source),
-		device_isa8_card_interface(mconfig, *this), m_crtc_ega(nullptr), m_vram(nullptr), m_videoram(nullptr), m_charA(nullptr), m_charB(nullptr),
-		m_misc_output(0), m_feature_control(0), m_frame_cnt(0), m_hsync(0), m_vsync(0), m_vblank(0), m_display_enable(0), m_video_mode(0),
-		m_palette(*this, "palette")
+isa8_ega_device::isa8_ega_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock) :
+	device_t(mconfig, type, tag, owner, clock),
+	device_isa8_card_interface(mconfig, *this),
+	m_crtc_ega(nullptr), m_vram(nullptr), m_videoram(nullptr), m_charA(nullptr), m_charB(nullptr),
+	m_misc_output(0), m_feature_control(0), m_frame_cnt(0), m_hsync(0), m_vsync(0), m_vblank(0), m_display_enable(0), m_video_mode(0),
+	m_palette(*this, "palette")
 {
 }
 
@@ -963,7 +964,7 @@ READ8_MEMBER( isa8_ega_device::read )
 {
 	uint8_t data = 0xFF;
 
-	if ( !space.debugger_access() && ! ( m_sequencer.data[4] & 0x04 ) )
+	if ( !machine().side_effect_disabled() && ! ( m_sequencer.data[4] & 0x04 ) )
 	{
 		/* Fill read latches */
 		m_read_latch[0] = m_plane[0][offset & 0xffff];

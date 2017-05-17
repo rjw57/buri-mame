@@ -22,15 +22,18 @@
 ****************************************************************************/
 
 #include "emu.h"
+
 #include "cpu/m6800/m6800.h"
 #include "machine/6522via.h"
+#include "machine/6850acia.h"
 #include "machine/i8279.h"
+#include "machine/wd_fdc.h"
 #include "video/ef9364.h"
 #include "video/mc6845.h"
-#include "machine/6850acia.h"
-#include "machine/wd_fdc.h"
 
+#include "screen.h"
 #include "softlist.h"
+
 
 #define MAIN_CLOCK           XTAL_4MHz
 #define VIDEO_CLOCK          MAIN_CLOCK / 8     /* 1.75 Mhz */
@@ -87,7 +90,7 @@ private:
 	required_device<via6522_device> m_via_video;
 	required_device<via6522_device> m_via_keyb;
 	required_device<via6522_device> m_via_modem;
-	required_device<fd1791_t> m_fdc;
+	required_device<fd1791_device> m_fdc;
 	required_device<floppy_connector> m_floppy0;
 	required_device<floppy_connector> m_floppy1;
 	floppy_image_device *m_floppy;
@@ -124,7 +127,7 @@ static ADDRESS_MAP_START(goupil_mem, AS_PROGRAM, 8, goupil_g1_state)
 
 	AM_RANGE(0xE860,0xE86F) AM_DEVREADWRITE("m_via_modem", via6522_device, read, write)
 
-	AM_RANGE(0xe8f0,0xe8ff) AM_DEVREADWRITE("fd1791", fd1791_t, read, write)
+	AM_RANGE(0xe8f0,0xe8ff) AM_DEVREADWRITE("fd1791", fd1791_device, read, write)
 	//AM_RANGE(0xf08a,0xf08a) AM_READWRITE( fdc_sel0_r, fdc_sel0_w )
 	//AM_RANGE(0xf08b,0xf08b) AM_READWRITE( fdc_sel1_r, fdc_sel1_w )
 
@@ -421,7 +424,7 @@ WRITE_LINE_MEMBER( goupil_g1_state::via_video_ca2_w )
 	old_state_ca2 = state;
 }
 
-static MACHINE_CONFIG_START( goupil_g1, goupil_g1_state )
+static MACHINE_CONFIG_START( goupil_g1 )
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu",M6808, CPU_CLOCK)
 	MCFG_CPU_PROGRAM_MAP(goupil_mem)
@@ -504,5 +507,5 @@ ROM_END
 
 /* Driver */
 
-/*    YEAR   NAME   PARENT  COMPAT   MACHINE    INPUT  CLASS           INIT    COMPANY   FULLNAME       FLAGS */
-COMP( 1979, goupilg1,   0,   0,      goupil_g1,  goupil_g1,driver_device,   0,     "SMT", "Goupil G1",    MACHINE_IS_SKELETON )
+//    YEAR  NAME      PARENT  COMPAT  MACHINE    INPUT      CLASS            INIT  COMPANY  FULLNAME       FLAGS
+COMP( 1979, goupilg1, 0,      0,      goupil_g1, goupil_g1, goupil_g1_state, 0,    "SMT",   "Goupil G1",   MACHINE_IS_SKELETON )

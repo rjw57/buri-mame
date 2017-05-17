@@ -32,11 +32,13 @@
 ***************************************************************************/
 
 #include "emu.h"
-#include "machine/nvram.h"
 #include "includes/segas18.h"
+#include "includes/segaipt.h"
+
+#include "machine/nvram.h"
 #include "sound/2612intf.h"
 #include "sound/rf5c68.h"
-#include "includes/segaipt.h"
+#include "speaker.h"
 
 /*************************************
  *
@@ -1354,7 +1356,7 @@ WRITE_LINE_MEMBER(segas18_state::ym3438_irq_handler)
 }
 
 
-static MACHINE_CONFIG_START( system18, segas18_state )
+static MACHINE_CONFIG_START( system18 )
 
 	// basic machine hardware
 	MCFG_CPU_ADD("maincpu", M68000, 10000000)

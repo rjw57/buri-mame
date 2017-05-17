@@ -1,7 +1,7 @@
 // license:GPL-2.0+
 // copyright-holders:Couriersud
 /*
- * nld_7493.c
+ * nld_7493.cpp
  *
  */
 
@@ -34,6 +34,7 @@ namespace netlist
 		{
 		}
 
+	private:
 		NETLIB_RESETI();
 		NETLIB_UPDATEI();
 
@@ -50,14 +51,13 @@ namespace netlist
 		{
 			if (m_reset)
 			{
-				m_bcd = (m_bcd + 1) & 0x07;
-				m_QB.push(m_bcd & 1, out_delay);
-				m_QC.push((m_bcd >> 1) & 1, out_delay2);
+				++m_bcd &= static_cast<std::uint8_t>(0x07);
 				m_QD.push((m_bcd >> 2) & 1, out_delay3);
+				m_QC.push((m_bcd >> 1) & 1, out_delay2);
+				m_QB.push(m_bcd & 1, out_delay);
 			}
 		}
 
-	private:
 		logic_input_t m_R1;
 		logic_input_t m_R2;
 
@@ -69,9 +69,9 @@ namespace netlist
 		logic_output_t m_QC;
 		logic_output_t m_QD;
 
-		state_var_u8 m_reset;
-		state_var_u8 m_a;
-		state_var_u8 m_bcd;
+		state_var_sig m_reset;
+		state_var_sig m_a;
+		state_var_sig m_bcd;
 	};
 
 	NETLIB_OBJECT_DERIVED(7493_dip, 7493)
@@ -118,10 +118,10 @@ namespace netlist
 		{
 			m_CLKA.inactivate();
 			m_CLKB.inactivate();
-			m_QA.push(0, NLTIME_FROM_NS(40));
-			m_QB.push(0, NLTIME_FROM_NS(40));
-			m_QC.push(0, NLTIME_FROM_NS(40));
-			m_QD.push(0, NLTIME_FROM_NS(40));
+			m_QA.push_force(0, NLTIME_FROM_NS(40));
+			m_QB.push_force(0, NLTIME_FROM_NS(40));
+			m_QC.push_force(0, NLTIME_FROM_NS(40));
+			m_QD.push_force(0, NLTIME_FROM_NS(40));
 			m_a = m_bcd = 0;
 		}
 	}

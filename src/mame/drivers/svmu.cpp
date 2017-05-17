@@ -16,9 +16,13 @@
 #include "cpu/lc8670/lc8670.h"
 #include "imagedev/snapquik.h"
 #include "machine/intelfsh.h"
-#include "sound/speaker.h"
+#include "sound/spkrdev.h"
+#include "screen.h"
 #include "softlist.h"
+#include "speaker.h"
+
 #include "svmu.lh"
+
 
 #define     PIXEL_SIZE          7
 #define     PIXEL_DISTANCE      1
@@ -296,7 +300,7 @@ QUICKLOAD_LOAD_MEMBER( svmu_state, svmu )
 }
 
 
-static MACHINE_CONFIG_START( svmu, svmu_state )
+static MACHINE_CONFIG_START( svmu )
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", LC8670, XTAL_32_768kHz)
 	MCFG_CPU_PROGRAM_MAP(svmu_mem)
@@ -355,5 +359,5 @@ ROM_END
 
 /* Driver */
 
-/*  YEAR  NAME  PARENT  COMPAT   MACHINE    INPUT   INIT    COMPANY   FULLNAME     FLAGS */
-COMP( 1998, svmu,   0,  0,  svmu ,  svmu , driver_device,   0, "Sega",   "Visual Memory Unit",  MACHINE_NOT_WORKING | MACHINE_NO_SOUND)
+/*    YEAR  NAME  PARENT  COMPAT  MACHINE  INPUT  STATE       INIT  COMPANY   FULLNAME               FLAGS */
+COMP( 1998, svmu, 0,      0,      svmu,    svmu,  svmu_state, 0,    "Sega",   "Visual Memory Unit",  MACHINE_NOT_WORKING | MACHINE_NO_SOUND)

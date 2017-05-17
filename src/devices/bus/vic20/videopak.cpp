@@ -10,6 +10,8 @@
 #include "emu.h"
 #include "videopak.h"
 
+#include "screen.h"
+
 
 
 //**************************************************************************
@@ -19,7 +21,7 @@
 #define VIDEORAM_SIZE       0x800
 #define RAM_SIZE            0x10000
 
-#define MC6845_TAG       	"mc6845"
+#define MC6845_TAG          "mc6845"
 #define MC6845_SCREEN_TAG   "screen80"
 
 
@@ -28,7 +30,7 @@
 //  DEVICE DEFINITIONS
 //**************************************************************************
 
-const device_type VIC20_VIDEO_PAK = &device_creator<vic20_video_pak_t>;
+DEFINE_DEVICE_TYPE(VIC20_VIDEO_PAK, vic20_video_pak_device, "vic20_videopak", "Data 20 Video Pak")
 
 
 //-------------------------------------------------
@@ -46,7 +48,7 @@ ROM_END
 //  rom_region - device-specific ROM region
 //-------------------------------------------------
 
-const tiny_rom_entry *vic20_video_pak_t::device_rom_region() const
+const tiny_rom_entry *vic20_video_pak_device::device_rom_region() const
 {
 	return ROM_NAME( videopak );
 }
@@ -55,7 +57,7 @@ const tiny_rom_entry *vic20_video_pak_t::device_rom_region() const
 //  mc6845
 //-------------------------------------------------
 
-MC6845_UPDATE_ROW( vic20_video_pak_t::crtc_update_row )
+MC6845_UPDATE_ROW( vic20_video_pak_device::crtc_update_row )
 {
 	const pen_t *pen = m_palette->pens();
 
@@ -108,7 +110,7 @@ static MACHINE_CONFIG_FRAGMENT( vic20_video_pak )
 	MCFG_MC6845_ADD(MC6845_TAG, H46505, MC6845_SCREEN_TAG, XTAL_14_31818MHz / 8)
 	MCFG_MC6845_SHOW_BORDER_AREA(true)
 	MCFG_MC6845_CHAR_WIDTH(8)
-	MCFG_MC6845_UPDATE_ROW_CB(vic20_video_pak_t, crtc_update_row)
+	MCFG_MC6845_UPDATE_ROW_CB(vic20_video_pak_device, crtc_update_row)
 MACHINE_CONFIG_END
 
 
@@ -117,7 +119,7 @@ MACHINE_CONFIG_END
 //  machine configurations
 //-------------------------------------------------
 
-machine_config_constructor vic20_video_pak_t::device_mconfig_additions() const
+machine_config_constructor vic20_video_pak_device::device_mconfig_additions() const
 {
 	return MACHINE_CONFIG_NAME( vic20_video_pak );
 }
@@ -129,11 +131,11 @@ machine_config_constructor vic20_video_pak_t::device_mconfig_additions() const
 //**************************************************************************
 
 //-------------------------------------------------
-//  vic20_video_pak_t - constructor
+//  vic20_video_pak_device - constructor
 //-------------------------------------------------
 
-vic20_video_pak_t::vic20_video_pak_t(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
-	device_t(mconfig, VIC20_VIDEO_PAK, "Data 20 Video Pak", tag, owner, clock, "videopak", __FILE__),
+vic20_video_pak_device::vic20_video_pak_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
+	device_t(mconfig, VIC20_VIDEO_PAK, tag, owner, clock),
 	device_vic20_expansion_card_interface(mconfig, *this),
 	m_crtc(*this, MC6845_TAG),
 	m_palette(*this, "palette"),
@@ -148,7 +150,7 @@ vic20_video_pak_t::vic20_video_pak_t(const machine_config &mconfig, const char *
 //  device_start - device-specific startup
 //-------------------------------------------------
 
-void vic20_video_pak_t::device_start()
+void vic20_video_pak_device::device_start()
 {
 	// allocate memory
 	m_videoram.allocate(VIDEORAM_SIZE);
@@ -160,7 +162,7 @@ void vic20_video_pak_t::device_start()
 //  device_reset - device-specific reset
 //-------------------------------------------------
 
-void vic20_video_pak_t::device_reset()
+void vic20_video_pak_device::device_reset()
 {
 }
 
@@ -169,7 +171,7 @@ void vic20_video_pak_t::device_reset()
 //  vic20_cd_r - cartridge data read
 //-------------------------------------------------
 
-uint8_t vic20_video_pak_t::vic20_cd_r(address_space &space, offs_t offset, uint8_t data, int ram1, int ram2, int ram3, int blk1, int blk2, int blk3, int blk5, int io2, int io3)
+uint8_t vic20_video_pak_device::vic20_cd_r(address_space &space, offs_t offset, uint8_t data, int ram1, int ram2, int ram3, int blk1, int blk2, int blk3, int blk5, int io2, int io3)
 {
 	if (!m_ram_enable)
 	{
@@ -244,7 +246,7 @@ uint8_t vic20_video_pak_t::vic20_cd_r(address_space &space, offs_t offset, uint8
 //  vic20_cd_w - cartridge data write
 //-------------------------------------------------
 
-void vic20_video_pak_t::vic20_cd_w(address_space &space, offs_t offset, uint8_t data, int ram1, int ram2, int ram3, int blk1, int blk2, int blk3, int blk5, int io2, int io3)
+void vic20_video_pak_device::vic20_cd_w(address_space &space, offs_t offset, uint8_t data, int ram1, int ram2, int ram3, int blk1, int blk2, int blk3, int blk5, int io2, int io3)
 {
 	if (!m_ram_enable)
 	{
@@ -314,14 +316,14 @@ void vic20_video_pak_t::vic20_cd_w(address_space &space, offs_t offset, uint8_t 
 		case 0x1bfc:
 			/*
 
-				bit 	description
+			    bit     description
 
-				0		0 = upper case, 1 = lower case
-				1		bank size: 0 = 2x24KB, 1 = 4x16KB
-				2		16KB mode address LSB
-				3		memory address MSB
-				4		0 = enable RAM, 1 = disable RAM
-				5		0 = 40 columns, 1 = 80 columns (Data 20 Video Manager)
+			    0       0 = upper case, 1 = lower case
+			    1       bank size: 0 = 2x24KB, 1 = 4x16KB
+			    2       16KB mode address LSB
+			    3       memory address MSB
+			    4       0 = enable RAM, 1 = disable RAM
+			    5       0 = 40 columns, 1 = 80 columns (Data 20 Video Manager)
 
 			*/
 

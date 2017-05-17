@@ -30,10 +30,10 @@
  *
  *  Benchmarks for ./nltool -c run -f src/mame/machine/nl_pong.cpp -t 10 -n pong_fast
  *
- *  NL_PMF_TYPE_INTERNAL:       215%	215%
- *  NL_PMF_TYPE_GNUC_PMF:       163%	196%
- *  NL_PMF_TYPE_GNUC_PMF_CONV:  215%	215%
- *  NL_PMF_TYPE_VIRTUAL:        213%	209%
+ *  NL_PMF_TYPE_INTERNAL:       215%    215%
+ *  NL_PMF_TYPE_GNUC_PMF:       163%    196%
+ *  NL_PMF_TYPE_GNUC_PMF_CONV:  215%    215%
+ *  NL_PMF_TYPE_VIRTUAL:        213%    209%
  *
  *  The whole exercise was done to avoid virtual calls. In prior versions of
  *  netlist, the INTERNAL and GNUC_PMF_CONV approach provided significant improvement.
@@ -44,6 +44,10 @@
 
 #if (PPMF_TYPE == PPMF_TYPE_GNUC_PMF_CONV)
 #pragma GCC diagnostic ignored "-Wpmf-conversions"
+#endif
+
+#if defined(__GNUC__) && (__GNUC__ > 6)
+#pragma GCC diagnostic ignored "-Wnoexcept-type"
 #endif
 
 namespace plib {
@@ -136,9 +140,9 @@ namespace plib {
 													//    if odd, it's the byte offset into the vtable
 		int                     m_this_delta;       // delta to apply to the 'this' pointer
 
-		int                     m_dummy1;			// only used for visual studio x64
+		int                     m_dummy1;           // only used for visual studio x64
 		int                     m_dummy2;
-		int						m_size;
+		int                     m_size;
 	};
 #endif
 
@@ -177,10 +181,11 @@ namespace plib {
 			function_ptr t = *reinterpret_cast<function_ptr *>(&m_func);
 			return (obj->*t)(std::forward<Targs>(args)...);
 		}
+		bool is_set() { return m_func != nullptr; }
 	private:
 		generic_function m_func;
 #if 0 && defined(_MSC_VER)
-		int dummy[4]; 
+		int dummy[4];
 #endif
 	};
 
@@ -207,13 +212,13 @@ namespace plib {
 	#endif
 		}
 		template<typename O>
-		inline R call(O *obj, Targs... args) const
+		R call(O *obj, Targs... args) const
 		{
 			using function_ptr = MEMBER_ABI R (*)(O *obj, Targs... args);
 			return (reinterpret_cast<function_ptr>(m_func))(obj, std::forward<Targs>(args)...);
 		}
-		bool is_set() { return m_func != nullptr; }
-		generic_function get_function() const { return m_func; }
+		bool is_set() noexcept { return m_func != nullptr; }
+		generic_function get_function() const noexcept { return m_func; }
 	private:
 		generic_function m_func;
 	};
@@ -245,8 +250,8 @@ namespace plib {
 			return this->call(m_obj, std::forward<Targs>(args)...);
 		}
 
-		generic_class *object() const { return m_obj; }
-		bool has_object() const { return m_obj != nullptr; }
+		generic_class *object() const noexcept { return m_obj; }
+		bool has_object() const noexcept { return m_obj != nullptr; }
 	private:
 		generic_class *m_obj;
 	};

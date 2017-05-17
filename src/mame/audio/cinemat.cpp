@@ -19,11 +19,12 @@
 ***************************************************************************/
 
 #include "emu.h"
+#include "includes/cinemat.h"
+
 #include "cpu/z80/z80.h"
-#include "cpu/ccpu/ccpu.h"
 #include "cpu/z80/z80daisy.h"
 #include "machine/z80ctc.h"
-#include "includes/cinemat.h"
+#include "speaker.h"
 
 
 /*************************************
@@ -1349,7 +1350,7 @@ MACHINE_CONFIG_END
 
 WRITE8_MEMBER(cinemat_state::qb3_sound_w)
 {
-	uint16_t rega = m_maincpu->state_int(CCPU_A);
+	uint16_t rega = m_maincpu->state_int(ccpu_cpu_device::CCPU_A);
 	demon_sound_w(0x00 | (~rega & 0x0f), 0x10);
 }
 

@@ -4,11 +4,15 @@
 #include "emu.h"
 #include "i82371sb.h"
 #include "cpu/i386/i386.h"
+
 #include "bus/pc_kbd/keyboards.h"
 // VGA-HACK
 #include "video/pc_vga.h"
 // end-VGA-HACK
-const device_type I82371SB_ISA = &device_creator<i82371sb_isa_device>;
+#include "speaker.h"
+
+
+DEFINE_DEVICE_TYPE(I82371SB_ISA, i82371sb_isa_device, "i82371sb_isa", "Intel 82371 southbridge ISA bridge")
 
 DEVICE_ADDRESS_MAP_START(config_map, 32, i82371sb_isa_device)
 	AM_RANGE(0x4c, 0x4f) AM_READWRITE8 (iort_r,    iort_w,    0x000000ff)
@@ -164,7 +168,7 @@ machine_config_constructor i82371sb_isa_device::device_mconfig_additions() const
 
 
 i82371sb_isa_device::i82371sb_isa_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
-	: pci_device(mconfig, I82371SB_ISA, "i82371sb southbridge ISA bridge", tag, owner, clock, "i82371sb_isa", __FILE__),
+	: pci_device(mconfig, I82371SB_ISA, tag, owner, clock),
 	  m_boot_state_hook(*this),
 	m_maincpu(*this, ":maincpu"),
 	m_pic8259_master(*this, "pic8259_master"),

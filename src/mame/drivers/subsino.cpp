@@ -224,6 +224,8 @@ To Do:
 #include "sound/okim6295.h"
 #include "sound/ym2413.h"
 #include "sound/3812intf.h"
+#include "screen.h"
+#include "speaker.h"
 
 #include "victor5.lh"
 #include "victor21.lh"
@@ -2796,7 +2798,7 @@ GFXDECODE_END
 *                             Machine Drivers                              *
 ***************************************************************************/
 
-static MACHINE_CONFIG_START( victor21, subsino_state )
+static MACHINE_CONFIG_START( victor21 )
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", Z180, XTAL_12MHz / 8)   /* Unknown clock */
 	MCFG_CPU_PROGRAM_MAP(victor21_map)
@@ -2826,7 +2828,7 @@ static MACHINE_CONFIG_START( victor21, subsino_state )
 	MCFG_SOUND_ADD("ymsnd", YM2413, XTAL_3_579545MHz)
 	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "mono", 1.0)
 
-	MCFG_OKIM6295_ADD("oki", XTAL_4_433619MHz / 4, OKIM6295_PIN7_HIGH)  /* Clock frequency & pin 7 not verified */
+	MCFG_OKIM6295_ADD("oki", XTAL_4_433619MHz / 4, PIN7_HIGH)  /* Clock frequency & pin 7 not verified */
 	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "mono", 1.0)
 MACHINE_CONFIG_END
 
@@ -2839,7 +2841,7 @@ static MACHINE_CONFIG_DERIVED( victor5, victor21 )
 MACHINE_CONFIG_END
 
 
-static MACHINE_CONFIG_START( crsbingo, subsino_state )
+static MACHINE_CONFIG_START( crsbingo )
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", Z180, XTAL_12MHz / 8)   /* Unknown CPU and clock */
 	MCFG_CPU_PROGRAM_MAP(crsbingo_map)
@@ -2871,7 +2873,7 @@ static MACHINE_CONFIG_START( crsbingo, subsino_state )
 MACHINE_CONFIG_END
 
 
-static MACHINE_CONFIG_START( srider, subsino_state )
+static MACHINE_CONFIG_START( srider )
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", Z180, XTAL_12MHz / 8)   /* Unknown clock */
 	MCFG_CPU_PROGRAM_MAP(srider_map)
@@ -2901,7 +2903,7 @@ static MACHINE_CONFIG_START( srider, subsino_state )
 	MCFG_SOUND_ADD("ymsnd", YM3812, XTAL_3_579545MHz)
 	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "mono", 1.0)
 
-	MCFG_OKIM6295_ADD("oki", XTAL_4_433619MHz / 4, OKIM6295_PIN7_HIGH)  /* Clock frequency & pin 7 not verified */
+	MCFG_OKIM6295_ADD("oki", XTAL_4_433619MHz / 4, PIN7_HIGH)  /* Clock frequency & pin 7 not verified */
 	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "mono", 1.0)
 MACHINE_CONFIG_END
 
@@ -2913,7 +2915,7 @@ static MACHINE_CONFIG_DERIVED( sharkpy, srider )
 	MCFG_CPU_PROGRAM_MAP(sharkpy_map)
 MACHINE_CONFIG_END
 
-static MACHINE_CONFIG_START( tisub, subsino_state )
+static MACHINE_CONFIG_START( tisub )
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", Z180, XTAL_12MHz / 8)   /* Unknown CPU and clock */
 	MCFG_CPU_PROGRAM_MAP(tisub_map)
@@ -2944,7 +2946,7 @@ static MACHINE_CONFIG_START( tisub, subsino_state )
 	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "mono", 1.0)
 MACHINE_CONFIG_END
 
-static MACHINE_CONFIG_START( stbsub, subsino_state )
+static MACHINE_CONFIG_START( stbsub )
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", Z180, XTAL_12MHz / 8)   /* Unknown clock */
 	MCFG_CPU_PROGRAM_MAP(stbsub_map)

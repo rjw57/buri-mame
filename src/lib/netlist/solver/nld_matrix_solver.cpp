@@ -148,7 +148,8 @@ void matrix_solver_t::setup_base(analog_net_t::list_t &nets)
 
 						if (net_proxy_output == nullptr)
 						{
-							auto net_proxy_output_u = plib::make_unique<proxied_analog_output_t>(*this, this->name() + "." + plib::pfmt("m{1}")(m_inps.size()));
+							pstring nname = this->name() + "." + pstring(plib::pfmt("m{1}")(m_inps.size()));
+							auto net_proxy_output_u = plib::make_unique<proxied_analog_output_t>(*this, nname);
 							net_proxy_output = net_proxy_output_u.get();
 							m_inps.push_back(std::move(net_proxy_output_u));
 							nl_assert(p->net().is_analog());
@@ -327,9 +328,9 @@ void matrix_solver_t::setup_matrix()
 	if ((0))
 		for (unsigned k = 0; k < iN; k++)
 		{
-			pstring line = plib::pfmt("{1}")(k, "3");
+			pstring line = plib::pfmt("{1:3}")(k);
 			for (unsigned j = 0; j < m_terms[k]->m_nzrd.size(); j++)
-				line += plib::pfmt(" {1}")(m_terms[k]->m_nzrd[j], "3");
+				line += plib::pfmt(" {1:3}")(m_terms[k]->m_nzrd[j]);
 			log().verbose("{1}", line);
 		}
 
@@ -380,8 +381,7 @@ void matrix_solver_t::update() NL_NOEXCEPT
 
 	if (m_params.m_dynamic_ts && has_timestep_devices() && new_timestep > netlist_time::zero())
 	{
-		m_Q_sync.net().force_queue_execution();
-		m_Q_sync.net().reschedule_in_queue(new_timestep);
+		m_Q_sync.net().toggle_and_push_to_queue(new_timestep);
 	}
 }
 
@@ -392,8 +392,7 @@ void matrix_solver_t::update_forced()
 
 	if (m_params.m_dynamic_ts && has_timestep_devices())
 	{
-		m_Q_sync.net().force_queue_execution();
-		m_Q_sync.net().reschedule_in_queue(netlist_time::from_double(m_params.m_min_timestep));
+		m_Q_sync.net().toggle_and_push_to_queue(netlist_time::from_double(m_params.m_min_timestep));
 	}
 }
 
@@ -406,7 +405,7 @@ void matrix_solver_t::step(const netlist_time &delta)
 
 void matrix_solver_t::solve_base()
 {
-	m_stat_vsolver_calls++;
+	++m_stat_vsolver_calls;
 	if (has_dynamic_devices())
 	{
 		unsigned this_resched;
@@ -424,8 +423,7 @@ void matrix_solver_t::solve_base()
 		if (this_resched > 1 && !m_Q_sync.net().is_queued())
 		{
 			log().warning(MW_1_NEWTON_LOOPS_EXCEEDED_ON_NET_1, this->name());
-			m_Q_sync.net().toggle_new_Q();
-			m_Q_sync.net().reschedule_in_queue(m_params.m_nr_recalc_delay);
+			m_Q_sync.net().toggle_and_push_to_queue(m_params.m_nr_recalc_delay);
 		}
 	}
 	else

@@ -3,7 +3,7 @@
 /*
 
   Hughes HLCD 0515/0569 LCD Driver
-  
+
   0515: 25 columns(also size of buffer/ram)
   0569: 24 columns, no DATA OUT pin, display blank has no effect
 
@@ -17,26 +17,27 @@
 #include "video/hlcd0515.h"
 
 
-const device_type HLCD0515 = &device_creator<hlcd0515_device>;
-const device_type HLCD0569 = &device_creator<hlcd0569_device>;
+DEFINE_DEVICE_TYPE(HLCD0515, hlcd0515_device, "hlcd0515", "Hughes HLCD 0515 LCD Driver")
+DEFINE_DEVICE_TYPE(HLCD0569, hlcd0569_device, "hlcd0569", "Hughes HLCD 0569 LCD Driver")
 
 //-------------------------------------------------
 //  constructor
 //-------------------------------------------------
 
-hlcd0515_device::hlcd0515_device(const machine_config &mconfig, device_type type, const char *name, const char *tag, device_t *owner, u32 clock, u8 colmax, const char *shortname, const char *source)
-	: device_t(mconfig, type, name, tag, owner, clock, shortname, source),
-	m_colmax(colmax), m_write_cols(*this), m_write_data(*this)
+hlcd0515_device::hlcd0515_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, u32 clock, u8 colmax)
+	: device_t(mconfig, type, tag, owner, clock)
+	, m_colmax(colmax)
+	, m_write_cols(*this), m_write_data(*this)
 {
 }
 
 hlcd0515_device::hlcd0515_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock)
-	: hlcd0515_device(mconfig, HLCD0515, "HLCD 0515 LCD Driver", tag, owner, clock, 25, "hlcd0515", __FILE__)
+	: hlcd0515_device(mconfig, HLCD0515, tag, owner, clock, 25)
 {
 }
 
 hlcd0569_device::hlcd0569_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock)
-	: hlcd0515_device(mconfig, HLCD0569, "HLCD 0569 LCD Driver", tag, owner, clock, 24, "hlcd0569", __FILE__)
+	: hlcd0515_device(mconfig, HLCD0569, tag, owner, clock, 24)
 {
 }
 
@@ -86,16 +87,6 @@ void hlcd0515_device::device_start()
 
 
 //-------------------------------------------------
-//  device_reset - device-specific reset
-//-------------------------------------------------
-
-void hlcd0515_device::device_reset()
-{
-}
-
-
-
-//-------------------------------------------------
 //  device_timer - handler timer events
 //-------------------------------------------------
 
@@ -105,7 +96,7 @@ void hlcd0515_device::device_timer(emu_timer &timer, device_timer_id id, int par
 		m_rowout = 0;
 
 	// write to COL/ROW pins
-	m_write_cols(m_rowout, m_blank ? 0 : m_ram[m_rowout], 0xffffffff);
+	m_write_cols(m_rowout, m_blank ? 0 : m_ram[m_rowout], ~0);
 	m_rowout++;
 }
 
@@ -176,7 +167,7 @@ WRITE_LINE_MEMBER(hlcd0515_device::write_clock)
 
 		else
 			clock_data(m_count - 5);
-		
+
 		if (m_count < (m_colmax + 5))
 			m_count++;
 	}
@@ -195,7 +186,7 @@ WRITE_LINE_MEMBER(hlcd0515_device::write_cs)
 		// transfer to ram
 		if (~m_control & 1)
 			m_ram[m_rowsel] = m_buffer;
-		
+
 		m_count = 0;
 		m_control = 0;
 	}

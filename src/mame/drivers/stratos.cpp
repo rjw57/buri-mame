@@ -9,6 +9,7 @@
 #include "emu.h"
 #include "cpu/m6502/m65c02.h"
 #include "machine/nvram.h"
+#include "screen.h"
 
 class stratos_state : public driver_device
 {
@@ -341,7 +342,7 @@ ADDRESS_MAP_END
 static INPUT_PORTS_START( stratos )
 INPUT_PORTS_END
 
-static MACHINE_CONFIG_START( stratos, stratos_state )
+static MACHINE_CONFIG_START( stratos )
 	MCFG_CPU_ADD("maincpu", M65C02, 5670000)
 	MCFG_CPU_PROGRAM_MAP(stratos_mem)
 

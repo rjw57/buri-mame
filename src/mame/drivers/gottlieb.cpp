@@ -198,8 +198,10 @@ VBlank duration: 1/VSYNC * (16/256) = 1017.6 us
 
 #include "emu.h"
 #include "includes/gottlieb.h"
+
 #include "machine/nvram.h"
 #include "machine/watchdog.h"
+#include "speaker.h"
 
 
 #define LOG_AUDIO_DECODE    (0)
@@ -1762,7 +1764,7 @@ GFXDECODE_END
  *
  *************************************/
 
-static MACHINE_CONFIG_START( gottlieb_core, gottlieb_state )
+static MACHINE_CONFIG_START( gottlieb_core )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", I8088, CPU_CLOCK/3)
@@ -1804,7 +1806,7 @@ static MACHINE_CONFIG_DERIVED( g2laser, gottlieb_core )
 	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "speaker", 1.0)
 
 	MCFG_LASERDISC_PR8210_ADD("laserdisc")
-	MCFG_LASERDISC_AUDIO(laserdisc_audio_delegate(&gottlieb_state::laserdisc_audio_process, (gottlieb_state*)owner))
+	MCFG_LASERDISC_AUDIO(laserdisc_device::audio_delegate(&gottlieb_state::laserdisc_audio_process, downcast<gottlieb_state*>(owner)))
 	MCFG_LASERDISC_OVERLAY_DRIVER(GOTTLIEB_VIDEO_HCOUNT, GOTTLIEB_VIDEO_VCOUNT, gottlieb_state, screen_update_gottlieb)
 	MCFG_LASERDISC_OVERLAY_CLIP(0, GOTTLIEB_VIDEO_HBLANK-1, 0, GOTTLIEB_VIDEO_VBLANK-8)
 	MCFG_LASERDISC_OVERLAY_PALETTE("palette")
@@ -1825,7 +1827,7 @@ MACHINE_CONFIG_END
 
 
 static MACHINE_CONFIG_DERIVED( gottlieb1_votrax, gottlieb_core )
-	MCFG_SOUND_ADD("r1sound", GOTTLIEB_SOUND_REV1_WITH_VOTRAX, 0)
+	MCFG_SOUND_ADD("r1sound", GOTTLIEB_SOUND_REV1_VOTRAX, 0)
 	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "speaker", 1.0)
 MACHINE_CONFIG_END
 
@@ -1862,7 +1864,7 @@ static MACHINE_CONFIG_DERIVED( cobram3, gottlieb_core )
 	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "speaker", 1.0)
 
 	MCFG_LASERDISC_PR8210_ADD("laserdisc")
-	MCFG_LASERDISC_AUDIO(laserdisc_audio_delegate(&gottlieb_state::laserdisc_audio_process, (gottlieb_state*)owner))
+	MCFG_LASERDISC_AUDIO(laserdisc_device::audio_delegate(&gottlieb_state::laserdisc_audio_process, downcast<gottlieb_state*>(owner)))
 	MCFG_LASERDISC_OVERLAY_DRIVER(GOTTLIEB_VIDEO_HCOUNT, GOTTLIEB_VIDEO_VCOUNT, gottlieb_state, screen_update_gottlieb)
 	MCFG_LASERDISC_OVERLAY_CLIP(0, GOTTLIEB_VIDEO_HBLANK-1, 0, GOTTLIEB_VIDEO_VBLANK-8)
 	MCFG_LASERDISC_OVERLAY_PALETTE("palette")

@@ -8,9 +8,6 @@ David Haywood
 */
 
 
-#define littlerb_printf logerror
-#define littlerb_alt_printf logerror
-
 /*
 
 Notes:
@@ -71,6 +68,10 @@ Dip sw.2
 #include "machine/inder_vid.h"
 #include "sound/dac.h"
 #include "sound/volt_reg.h"
+#include "speaker.h"
+
+#define littlerb_printf logerror
+#define littlerb_alt_printf logerror
 
 class littlerb_state : public driver_device
 {
@@ -247,7 +248,7 @@ TIMER_DEVICE_CALLBACK_MEMBER(littlerb_state::littlerb_sound_step_cb)
 	m_soundframe++;
 }
 
-static MACHINE_CONFIG_START( littlerb, littlerb_state )
+static MACHINE_CONFIG_START( littlerb )
 	MCFG_CPU_ADD("maincpu", M68000, 12000000)
 	MCFG_CPU_PROGRAM_MAP(littlerb_main)
 
@@ -277,4 +278,4 @@ ROM_START( littlerb )
 ROM_END
 
 
-GAME( 1994, littlerb, 0, littlerb, littlerb, driver_device, 0, ROT0, "TCH", "Little Robin", MACHINE_IMPERFECT_GRAPHICS|MACHINE_IMPERFECT_SOUND )
+GAME( 1994, littlerb, 0, littlerb, littlerb, littlerb_state, 0, ROT0, "TCH", "Little Robin", MACHINE_IMPERFECT_GRAPHICS|MACHINE_IMPERFECT_SOUND )

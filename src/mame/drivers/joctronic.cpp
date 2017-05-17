@@ -11,6 +11,8 @@
 #include "sound/ay8910.h"
 #include "sound/dac.h"
 #include "sound/msm5205.h"
+#include "speaker.h"
+
 
 class joctronic_state : public driver_device
 {
@@ -22,7 +24,7 @@ public:
 		, m_oki(*this, "oki")
 		, m_adpcm_select(*this, "adpcm_select")
 		, m_soundbank(*this, "soundbank")
-		{ }
+	{ }
 
 	DECLARE_READ8_MEMBER(csin_r);
 	DECLARE_WRITE8_MEMBER(control_port_w);
@@ -308,7 +310,7 @@ void joctronic_state::machine_reset()
 static INPUT_PORTS_START( joctronic )
 INPUT_PORTS_END
 
-static MACHINE_CONFIG_START( joctronic, joctronic_state )
+static MACHINE_CONFIG_START( joctronic )
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", Z80, XTAL_12MHz/4) // 3 MHz - uses WAIT
 	MCFG_CPU_PROGRAM_MAP(maincpu_map) // 139
@@ -344,7 +346,7 @@ static MACHINE_CONFIG_START( joctronic, joctronic_state )
 	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "mono", 0.30)
 MACHINE_CONFIG_END
 
-static MACHINE_CONFIG_START( slalom03, joctronic_state )
+static MACHINE_CONFIG_START( slalom03 )
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", Z80, XTAL_12MHz/2) // 6 MHz - uses WAIT
 	MCFG_CPU_PROGRAM_MAP(slalom03_maincpu_map) // 138, 368, 32
@@ -380,7 +382,7 @@ static MACHINE_CONFIG_START( slalom03, joctronic_state )
 	MCFG_74157_OUT_CB(DEVWRITE8("oki", msm5205_device, data_w))
 
 	MCFG_SOUND_ADD("oki", MSM5205, XTAL_12MHz/2/16) // 375 kHz
-	MCFG_MSM5205_PRESCALER_SELECTOR(MSM5205_S96_4B) // frequency modifiable during operation
+	MCFG_MSM5205_PRESCALER_SELECTOR(S96_4B) // frequency modifiable during operation
 	MCFG_MSM5205_VCLK_CB(WRITELINE(joctronic_state, vclk_w))
 	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "mono", 0.30)
 MACHINE_CONFIG_END
@@ -439,7 +441,7 @@ ROM_START(slalom03)
 ROM_END
 
 
-GAME( 1986, punkywil, 0, joctronic, joctronic, driver_device, 0, ROT0, "Joctronic", "Punky Willy", MACHINE_IS_SKELETON_MECHANICAL )
-GAME( 1986, walkyria, 0, joctronic, joctronic, driver_device, 0, ROT0, "Joctronic", "Walkyria", MACHINE_IS_SKELETON_MECHANICAL )
-GAME( 1987, bldyrolr, 0, bldyrolr,  joctronic, driver_device, 0, ROT0, "Playbar", "Bloody Roller", MACHINE_IS_SKELETON_MECHANICAL )
-GAME( 1988, slalom03, 0, slalom03,  joctronic, driver_device, 0, ROT0, "Stargame", "Slalom Code 0.3", MACHINE_IS_SKELETON_MECHANICAL )
+GAME( 1986, punkywil, 0, joctronic, joctronic, joctronic_state, 0, ROT0, "Joctronic", "Punky Willy",     MACHINE_IS_SKELETON_MECHANICAL )
+GAME( 1986, walkyria, 0, joctronic, joctronic, joctronic_state, 0, ROT0, "Joctronic", "Walkyria",        MACHINE_IS_SKELETON_MECHANICAL )
+GAME( 1987, bldyrolr, 0, bldyrolr,  joctronic, joctronic_state, 0, ROT0, "Playbar",   "Bloody Roller",   MACHINE_IS_SKELETON_MECHANICAL )
+GAME( 1988, slalom03, 0, slalom03,  joctronic, joctronic_state, 0, ROT0, "Stargame",  "Slalom Code 0.3", MACHINE_IS_SKELETON_MECHANICAL )

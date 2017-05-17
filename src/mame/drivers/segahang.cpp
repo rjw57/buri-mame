@@ -17,12 +17,14 @@
 
 #include "emu.h"
 #include "includes/segahang.h"
+#include "includes/segaipt.h"
+
 #include "machine/fd1089.h"
 #include "machine/fd1094.h"
 #include "sound/2203intf.h"
 #include "sound/ym2151.h"
 #include "sound/segapcm.h"
-#include "includes/segaipt.h"
+#include "speaker.h"
 
 
 
@@ -744,7 +746,7 @@ GFXDECODE_END
 //  GENERIC MACHINE DRIVERS
 //**************************************************************************
 
-static MACHINE_CONFIG_START( shared_base, segahang_state )
+static MACHINE_CONFIG_START( shared_base )
 
 	// basic machine hardware
 	MCFG_CPU_ADD("maincpu", M68000, MASTER_CLOCK_25MHz/4)

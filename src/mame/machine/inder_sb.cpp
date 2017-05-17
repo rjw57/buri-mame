@@ -5,17 +5,19 @@
 
 #include "emu.h"
 #include "machine/inder_sb.h"
+
 #include "sound/volt_reg.h"
+#include "speaker.h"
 
 
-extern const device_type INDER_AUDIO = &device_creator<inder_sb_device>;
+DEFINE_DEVICE_TYPE(INDER_AUDIO, inder_sb_device, "indersb", "Inder 4xDAC Sound Board")
 
 
 inder_sb_device::inder_sb_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
-	: device_t(mconfig, INDER_AUDIO, "Inder 4xDAC Sound Board", tag, owner, clock, "indersb", __FILE__),
-		device_mixer_interface(mconfig, *this, 2),
-		m_audiocpu(*this, "audiocpu"),
-		m_ctc(*this, "ctc")
+	: device_t(mconfig, INDER_AUDIO, tag, owner, clock)
+	, device_mixer_interface(mconfig, *this, 2)
+	, m_audiocpu(*this, "audiocpu")
+	, m_ctc(*this, "ctc")
 {
 }
 

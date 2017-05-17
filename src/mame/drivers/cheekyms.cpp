@@ -8,8 +8,10 @@
 
 #include "emu.h"
 #include "includes/cheekyms.h"
+
 #include "cpu/z80/z80.h"
 #include "sound/volt_reg.h"
+#include "speaker.h"
 
 
 INPUT_CHANGED_MEMBER(cheekyms_state::coin_inserted)
@@ -119,7 +121,7 @@ INTERRUPT_GEN_MEMBER(cheekyms_state::vblank_irq)
 }
 
 
-static MACHINE_CONFIG_START( cheekyms, cheekyms_state )
+static MACHINE_CONFIG_START( cheekyms )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", Z80,5000000/2)  /* 2.5 MHz */
@@ -195,4 +197,4 @@ ROM_END
 
 
 
-GAME( 1980, cheekyms, 0, cheekyms, cheekyms, driver_device, 0, ROT270, "Universal", "Cheeky Mouse", MACHINE_IMPERFECT_SOUND | MACHINE_SUPPORTS_SAVE )
+GAME( 1980, cheekyms, 0, cheekyms, cheekyms, cheekyms_state, 0, ROT270, "Universal", "Cheeky Mouse", MACHINE_IMPERFECT_SOUND | MACHINE_SUPPORTS_SAVE )

@@ -8,13 +8,14 @@
 #include "emu.h"
 #include "machine/inder_vid.h"
 
+#include "screen.h"
 
 
-extern const device_type INDER_VIDEO = &device_creator<inder_vid_device>;
+DEFINE_DEVICE_TYPE(INDER_VIDEO, inder_vid_device, "indervd", "Inder / Dinamic TMS Video")
 
 
 inder_vid_device::inder_vid_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
-	: device_t(mconfig, INDER_VIDEO, "Inder / Dinamic TMS Video", tag, owner, clock, "indervd", __FILE__),
+	: device_t(mconfig, INDER_VIDEO, tag, owner, clock),
 /*  device_video_interface(mconfig, *this, false), */
 		m_vram(*this, "vram"),
 		m_palette(*this, "palette"),

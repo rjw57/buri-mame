@@ -8,10 +8,10 @@
 
 *********************************************************************/
 
-#pragma once
+#ifndef MAME_BUS_IEEE488_HP9895_H
+#define MAME_BUS_IEEE488_HP9895_H
 
-#ifndef _HP9895_H_
-#define _HP9895_H_
+#pragma once
 
 #include "ieee488.h"
 #include "cpu/z80/z80.h"
@@ -28,9 +28,6 @@ public:
 
 	// device-level overrides
 	virtual ioport_constructor device_input_ports() const override;
-	virtual void device_start() override;
-	virtual void device_reset() override;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
 	virtual const tiny_rom_entry *device_rom_region() const override;
 	virtual machine_config_constructor device_mconfig_additions() const override;
 
@@ -82,6 +79,11 @@ public:
 	// Floppy drive interface
 	void floppy_ready_cb(floppy_image_device *floppy , int state);
 
+protected:
+	virtual void device_start() override;
+	virtual void device_reset() override;
+	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
+
 private:
 	required_device<z80_device> m_cpu;
 	required_device<phi_device> m_phi;
@@ -92,20 +94,20 @@ private:
 	floppy_image_device *m_current_drive;
 	unsigned m_current_drive_idx;
 	bool m_dskchg[ 2 ];
-	uint16_t m_crc;	// U77
+	uint16_t m_crc; // U77
 	bool m_crcerr_syn;
 	bool m_overrun;
 	bool m_accdata;
 	bool m_timeout;
-	uint8_t m_cntl_reg;	// U31
-	uint8_t m_clock_sr;	// U22 & U4
-	uint8_t m_clock_reg;	// U23 & U5
-	uint8_t m_data_sr;	// U24 & U6
+	uint8_t m_cntl_reg; // U31
+	uint8_t m_clock_sr; // U22 & U4
+	uint8_t m_clock_reg;    // U23 & U5
+	uint8_t m_data_sr;  // U24 & U6
 	uint8_t m_wr_context;
 	bool m_had_transition;
 	bool m_lckup;
 	bool m_amdt;
-	uint8_t m_sync_cnt;	// U28 & U73
+	uint8_t m_sync_cnt; // U28 & U73
 	bool m_hiden;
 	bool m_mgnena;
 
@@ -129,6 +131,6 @@ private:
 };
 
 // device type definition
-extern const device_type HP9895;
+DECLARE_DEVICE_TYPE(HP9895, hp9895_device)
 
-#endif /* _HP9895_H_ */
+#endif // MAME_BUS_IEEE488_HP9895_H

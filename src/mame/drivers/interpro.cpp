@@ -104,7 +104,7 @@ READ32_MEMBER(interpro_state::idprom_r)
 		(u8)speed1, (u8)speed2, (u8)speed3, (u8)speed,
 
 		// reserved bytes
-		0xff, 0xff, 
+		0xff, 0xff,
 
 		// family
 		// boot rom tests for family == 0x41 or 0x42
@@ -139,11 +139,11 @@ READ32_MEMBER(interpro_state::slot0_r)
 {
 	// a known graphics board idprom
 	static uint8_t slot0[] = {
-		0x00, 0x00, 0x00, 0x00, '9',  '6',  '3',  'A',	// board
+		0x00, 0x00, 0x00, 0x00, '9',  '6',  '3',  'A',  // board
 		0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // eco
 		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // features
-		0xff, 0xff,										// reserved
-		0x22, 0x00,										// family
+		0xff, 0xff,                                     // reserved
+		0x22, 0x00,                                     // family
 		0x55, 0xaa, 0x55, 0x00
 	};
 
@@ -217,7 +217,7 @@ ADDRESS_MAP_END
 // these maps represent the real main, i/o and boot spaces of the system
 static ADDRESS_MAP_START(interpro_main_map, AS_0, 32, interpro_state)
 	AM_RANGE(0x00000000, 0x00ffffff) AM_RAM // 16M RAM
-	
+
 	AM_RANGE(0x7f100000, 0x7f11ffff) AM_ROM AM_REGION(INTERPRO_ROM_TAG, 0)
 	AM_RANGE(0x7f180000, 0x7f1bffff) AM_ROM AM_REGION(INTERPRO_EEPROM_TAG, 0)
 ADDRESS_MAP_END
@@ -233,13 +233,13 @@ static ADDRESS_MAP_START(interpro_io_map, AS_1, 32, interpro_state)
 	// this is probably the srx arbiter ga
 	AM_RANGE(0x7f000200, 0x7f0002ff) AM_RAM
 	AM_RANGE(0x7f000300, 0x7f00030f) AM_READWRITE16(system_r, system_w, 0xffff)
-	AM_RANGE(0x7f000400, 0x7f00040f) AM_DEVREADWRITE8(INTERPRO_SCC1_TAG, scc85C30_device, ba_cd_inv_r, ba_cd_inv_w, 0xff)
+	AM_RANGE(0x7f000400, 0x7f00040f) AM_DEVREADWRITE8(INTERPRO_SCC1_TAG, scc85c30_device, ba_cd_inv_r, ba_cd_inv_w, 0xff)
 	AM_RANGE(0x7f000410, 0x7f00041f) AM_DEVREADWRITE8(INTERPRO_SCC2_TAG, scc85230_device, ba_cd_inv_r, ba_cd_inv_w, 0xff)
 	AM_RANGE(0x7f000500, 0x7f0006ff) AM_READWRITE8(rtc_r, rtc_w, 0xff)
 	AM_RANGE(0x7f000700, 0x7f00077f) AM_READ(idprom_r)
 	AM_RANGE(0x7f001000, 0x7f001fff) AM_READWRITE8(scsi_r, scsi_w, 0x0000ff00)
 
-	AM_RANGE(0x7f0fff00, 0x7f0fffff) AM_DEVICE(INTERPRO_IOGA_TAG, interpro_ioga_device, map) 
+	AM_RANGE(0x7f0fff00, 0x7f0fffff) AM_DEVICE(INTERPRO_IOGA_TAG, interpro_ioga_device, map)
 
 	AM_RANGE(0x08000000, 0x08000fff) AM_NOP // bogus
 	AM_RANGE(0x8f000000, 0x8f0fffff) AM_READ(slot0_r)
@@ -262,7 +262,7 @@ SLOT_INTERFACE_END
 static INPUT_PORTS_START(ip2800)
 INPUT_PORTS_END
 
-static MACHINE_CONFIG_START(ip2800, interpro_state)
+static MACHINE_CONFIG_START(ip2800)
 	MCFG_CPU_ADD(INTERPRO_CPU_TAG, CLIPPER_C400, XTAL_10MHz)
 	MCFG_CPU_PROGRAM_MAP(clipper_insn_map)
 	MCFG_CPU_DATA_MAP(clipper_data_map)
@@ -275,7 +275,7 @@ static MACHINE_CONFIG_START(ip2800, interpro_state)
 	MCFG_CAMMU_SSW_CB(DEVREADLINE(INTERPRO_CPU_TAG, clipper_device, ssw))
 
 	// serial controllers and rs232 bus
-	MCFG_SCC85C30_ADD(INTERPRO_SCC1_TAG, XTAL_4_9152MHz, 0, 0, 0, 0) 
+	MCFG_SCC85C30_ADD(INTERPRO_SCC1_TAG, XTAL_4_9152MHz, 0, 0, 0, 0)
 
 	MCFG_Z80SCC_OUT_TXDA_CB(DEVWRITELINE("rs232a", rs232_port_device, write_txd))
 	MCFG_Z80SCC_OUT_TXDB_CB(DEVWRITELINE("rs232b", rs232_port_device, write_txd))

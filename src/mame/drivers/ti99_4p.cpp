@@ -116,14 +116,14 @@
 *****************************************************************************/
 
 #include "emu.h"
+#include "bus/ti99/joyport/joyport.h"
+#include "bus/ti99/peb/peribox.h"
 #include "cpu/tms9900/tms9900.h"
-#include "sound/wave.h"
-
-#include "machine/tms9901.h"
 #include "imagedev/cassette.h"
-#include "bus/ti99x/joyport.h"
-#include "bus/ti99_peb/peribox.h"
 #include "machine/ram.h"
+#include "machine/tms9901.h"
+#include "sound/wave.h"
+#include "speaker.h"
 
 #define TMS9901_TAG "tms9901"
 #define SGCPU_TAG "sgcpu"
@@ -148,7 +148,7 @@ public:
 		m_joyport(*this, JOYPORT_TAG),
 		m_scratchpad(*this, PADRAM_TAG),
 		m_amsram(*this, AMSRAM_TAG)
-		{ }
+	{ }
 
 	DECLARE_WRITE_LINE_MEMBER( ready_line );
 	DECLARE_WRITE_LINE_MEMBER( extint );
@@ -192,7 +192,7 @@ private:
 	required_device<tms9901_device>        m_tms9901;
 	required_device<cassette_image_device> m_cassette;
 	required_device<peribox_device>        m_peribox;
-	required_device<joyport_device>        m_joyport;
+	required_device<ti99_joyport_device>   m_joyport;
 	required_device<ram_device> m_scratchpad;
 	required_device<ram_device> m_amsram;
 
@@ -455,7 +455,7 @@ READ16_MEMBER( ti99_4p_state::memread )
 	int addr_off8k = m_addr_buf & 0x1fff;
 
 	// If we use the debugger, decode the address now (normally done in setaddress)
-	if (space.debugger_access())
+	if (machine().side_effect_disabled())
 	{
 		m_addr_buf = offset << 1;
 		m_decode = decode_address(m_addr_buf);
@@ -498,7 +498,7 @@ READ16_MEMBER( ti99_4p_state::memread )
 		break;
 
 	case SGCPU_PEB:
-		if (space.debugger_access()) return debugger_read(space, offset);
+		if (machine().side_effect_disabled()) return debugger_read(space, offset);
 		// The byte from the odd address has already been read into the latch
 		// Reading the even address now
 		m_peribox->readz(space, m_addr_buf, &hbyte);
@@ -516,7 +516,7 @@ WRITE16_MEMBER( ti99_4p_state::memwrite )
 	int address = 0;
 
 	// If we use the debugger, decode the address now (normally done in setaddress)
-	if (space.debugger_access())
+	if (machine().side_effect_disabled())
 	{
 		m_addr_buf = offset << 1;
 		m_decode = decode_address(m_addr_buf);
@@ -560,7 +560,7 @@ WRITE16_MEMBER( ti99_4p_state::memwrite )
 		break;
 
 	case SGCPU_PEB:
-		if (space.debugger_access()) { debugger_write(space, offset, data); return; }
+		if (machine().side_effect_disabled()) { debugger_write(space, offset, data); return; }
 
 		// Writing the even address now (addr)
 		// The databus multiplexer puts the even value into the latch and outputs the odd value now.
@@ -728,7 +728,7 @@ READ8_MEMBER( ti99_4p_state::read_by_9901 )
 
 	switch (offset & 0x03)
 	{
-	case TMS9901_CB_INT7:
+	case tms9901_device::CB_INT7:
 		// Read pins INT3*-INT7* of TI99's 9901.
 		// bit 1: INT1 status
 		// bit 2: INT2 status
@@ -751,7 +751,7 @@ READ8_MEMBER( ti99_4p_state::read_by_9901 )
 		answer = (answer << 3) | m_9901_int;
 		break;
 
-	case TMS9901_INT8_INT15:
+	case tms9901_device::INT8_INT15:
 		// Read pins int8_t*-INT15* of TI99's 9901.
 		// bit 0-2: keyboard status bits 5 to 7
 		// bit 3: tape input mirror
@@ -763,10 +763,10 @@ READ8_MEMBER( ti99_4p_state::read_by_9901 )
 		answer |= 0xf0;
 		break;
 
-	case TMS9901_P0_P7:
+	case tms9901_device::P0_P7:
 		break;
 
-	case TMS9901_P8_P15:
+	case tms9901_device::P8_P15:
 		// Read pins P8-P15 of TI99's 9901.
 		// bit 26: high
 		// bit 27: tape input
@@ -989,7 +989,7 @@ MACHINE_RESET_MEMBER(ti99_4p_state,ti99_4p)
 /*
     Machine description.
 */
-static MACHINE_CONFIG_START( ti99_4p_60hz, ti99_4p_state )
+static MACHINE_CONFIG_START( ti99_4p_60hz )
 	/* basic machine hardware */
 	/* TMS9900 CPU @ 3.0 MHz */
 	MCFG_TMS99xx_ADD("maincpu", TMS9900, 3000000, memmap, cru_map)
@@ -1049,5 +1049,5 @@ ROM_START(ti99_4p)
 	ROM_LOAD16_BYTE("sgcpu_lb.bin", 0x0001, 0x8000, CRC(2a5dc818) SHA1(dec141fe2eea0b930859cbe1ebd715ac29fa8ecb) ) /* system ROMs */
 ROM_END
 
-/*    YEAR  NAME      PARENT   COMPAT   MACHINE      INPUT    INIT      COMPANY     FULLNAME */
-COMP( 1996, ti99_4p,  0,       0,       ti99_4p_60hz, ti99_4p, driver_device, 0, "System-99 User Group",       "SGCPU (aka TI-99/4P)" , MACHINE_SUPPORTS_SAVE )
+//    YEAR  NAME      PARENT   COMPAT   MACHINE       INPUT    STATE          INIT  COMPANY                 FULLNAME                 FLAGS
+COMP( 1996, ti99_4p,  0,       0,       ti99_4p_60hz, ti99_4p, ti99_4p_state, 0,    "System-99 User Group", "SGCPU (aka TI-99/4P)" , MACHINE_SUPPORTS_SAVE )

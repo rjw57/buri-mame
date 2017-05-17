@@ -9,12 +9,15 @@
 
 #include "emu.h"
 #include "machine/genpc.h"
+
+#include "imagedev/cassette.h"
 #include "machine/i8255.h"
 #include "machine/pic8259.h"
 #include "machine/pit8253.h"
-#include "sound/speaker.h"
 #include "machine/ram.h"
-#include "imagedev/cassette.h"
+#include "sound/spkrdev.h"
+#include "speaker.h"
+
 
 #define VERBOSE_PIO 0   /* PIO (keyboard controller) */
 
@@ -386,7 +389,7 @@ WRITE8_MEMBER( ibm5160_mb_device::nmi_enable_w )
 //  GLOBAL VARIABLES
 //**************************************************************************
 
-const device_type IBM5160_MOTHERBOARD = &device_creator<ibm5160_mb_device>;
+DEFINE_DEVICE_TYPE(IBM5160_MOTHERBOARD, ibm5160_mb_device, "ibm5160_mb", "IBM 5160 motherboard")
 
 //**************************************************************************
 //  DEVICE CONFIGURATION
@@ -508,16 +511,26 @@ void ibm5160_mb_device::static_set_cputag(device_t &device, const char *tag)
 //-------------------------------------------------
 
 ibm5160_mb_device::ibm5160_mb_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
-		: device_t(mconfig, IBM5160_MOTHERBOARD, "IBM5160_MOTHERBOARD", tag, owner, clock, "ibm5160_mb", __FILE__),
-		m_maincpu(*owner, "maincpu"),
-		m_pic8259(*this, "pic8259"),
-		m_dma8237(*this, "dma8237"),
-		m_pit8253(*this, "pit8253"),
-		m_ppi8255(*this, "ppi8255"),
-		m_speaker(*this, "speaker"),
-		m_isabus(*this, "isa"),
-		m_pc_kbdc(*this, "pc_kbdc"),
-		m_ram(*this, ":" RAM_TAG)
+	: ibm5160_mb_device(mconfig, IBM5160_MOTHERBOARD, tag, owner, clock)
+{
+}
+
+ibm5160_mb_device::ibm5160_mb_device(
+		const machine_config &mconfig,
+		device_type type,
+		const char *tag,
+		device_t *owner,
+		uint32_t clock)
+	: device_t(mconfig, type, tag, owner, clock)
+	, m_maincpu(*owner, "maincpu")
+	, m_pic8259(*this, "pic8259")
+	, m_dma8237(*this, "dma8237")
+	, m_pit8253(*this, "pit8253")
+	, m_ppi8255(*this, "ppi8255")
+	, m_speaker(*this, "speaker")
+	, m_isabus(*this, "isa")
+	, m_pc_kbdc(*this, "pc_kbdc")
+	, m_ram(*this, ":" RAM_TAG)
 {
 }
 
@@ -573,7 +586,7 @@ void ibm5160_mb_device::device_reset()
 //  GLOBAL VARIABLES
 //**************************************************************************
 
-const device_type IBM5150_MOTHERBOARD = &device_creator<ibm5150_mb_device>;
+DEFINE_DEVICE_TYPE(IBM5150_MOTHERBOARD, ibm5150_mb_device, "ibm5150_mb", "IBM 5150 motherboard")
 
 //**************************************************************************
 //  DEVICE CONFIGURATION
@@ -612,8 +625,13 @@ machine_config_constructor ibm5150_mb_device::device_mconfig_additions() const
 //-------------------------------------------------
 
 ibm5150_mb_device::ibm5150_mb_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
-	: ibm5160_mb_device(mconfig, tag, owner, clock),
-		m_cassette(*this, "cassette")
+	: ibm5150_mb_device(mconfig, IBM5150_MOTHERBOARD, tag, owner, clock)
+{
+}
+
+ibm5150_mb_device::ibm5150_mb_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock)
+	: ibm5160_mb_device(mconfig, type, tag, owner, clock)
+	, m_cassette(*this, "cassette")
 {
 }
 
@@ -755,7 +773,7 @@ WRITE8_MEMBER( ibm5150_mb_device::pc_ppi_portb_w )
 //  GLOBAL VARIABLES
 //**************************************************************************
 
-const device_type EC1841_MOTHERBOARD = &device_creator<ec1841_mb_device>;
+DEFINE_DEVICE_TYPE(EC1841_MOTHERBOARD, ec1841_mb_device, "ec1841_mb", "EC-1840 motherboard")
 
 static MACHINE_CONFIG_FRAGMENT( ec1841_mb_config )
 	MCFG_FRAGMENT_ADD(ibm5160_mb_config)
@@ -827,7 +845,7 @@ ioport_constructor ec1841_mb_device::device_input_ports() const
 //-------------------------------------------------
 
 ec1841_mb_device::ec1841_mb_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
-	: ibm5160_mb_device(mconfig, tag, owner, clock)
+	: ibm5160_mb_device(mconfig, EC1841_MOTHERBOARD, tag, owner, clock)
 {
 }
 
@@ -877,7 +895,12 @@ READ8_MEMBER ( ec1841_mb_device::pc_ppi_portc_r )
 }
 
 pc_noppi_mb_device::pc_noppi_mb_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
-		: ibm5160_mb_device(mconfig, tag, owner, clock)
+	: pc_noppi_mb_device(mconfig, PCNOPPI_MOTHERBOARD, tag, owner, clock)
+{
+}
+
+pc_noppi_mb_device::pc_noppi_mb_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock)
+	: ibm5160_mb_device(mconfig, type, tag, owner, clock)
 {
 }
 
@@ -918,4 +941,4 @@ DEVICE_ADDRESS_MAP_START( map, 8, pc_noppi_mb_device )
 	AM_RANGE(0x00a0, 0x00a1) AM_WRITE(nmi_enable_w)
 ADDRESS_MAP_END
 
-const device_type PCNOPPI_MOTHERBOARD = &device_creator<pc_noppi_mb_device>;
+DEFINE_DEVICE_TYPE(PCNOPPI_MOTHERBOARD, pc_noppi_mb_device, "pcnoppi_mb", "PCNOPPI_MOTHERBOARD")

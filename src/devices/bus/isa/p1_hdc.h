@@ -6,14 +6,14 @@
 
 **********************************************************************/
 
+#ifndef MAME_BUS_ISA_P1_HDC_H
+#define MAME_BUS_ISA_P1_HDC_H
+
 #pragma once
 
-#ifndef __P1_HDC__
-#define __P1_HDC__
 
-
-#include "imagedev/harddriv.h"
 #include "isa.h"
+#include "imagedev/harddriv.h"
 #include "machine/wd2010.h"
 
 //**************************************************************************
@@ -39,7 +39,7 @@ protected:
 private:
 	required_device<wd2010_device> m_hdc;
 
-	//uint8_t m_ram[0x800];
+	// uint8_t m_ram[0x800];
 
 public:
 	DECLARE_READ8_MEMBER(p1_HDC_r);
@@ -48,7 +48,7 @@ public:
 
 
 // device type definition
-extern const device_type P1_HDC;
+DECLARE_DEVICE_TYPE(P1_HDC, p1_hdc_device)
 
 
-#endif
+#endif // MAME_BUS_ISA_P1_HDC_H

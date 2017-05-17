@@ -6,10 +6,10 @@
 
 ***************************************************************************/
 
-#pragma once
+#ifndef MAME_VIDEO_CESBLIT_H
+#define MAME_VIDEO_CESBLIT_H
 
-#ifndef CESBLIT_H
-#define CESBLIT_H
+#pragma once
 
 /***************************************************************************
     INTERFACE CONFIGURATION MACROS
@@ -19,7 +19,7 @@
 	MCFG_DEVICE_ADD(_tag, CESBLIT, _clock) \
 	MCFG_VIDEO_SET_SCREEN(_screen)
 
-#define MCFG_CESBLIT_MAP	MCFG_DEVICE_PROGRAM_MAP
+#define MCFG_CESBLIT_MAP    MCFG_DEVICE_PROGRAM_MAP
 
 #define MCFG_CESBLIT_COMPUTE_ADDR(_compute_addr) \
 	cesblit_device::static_set_compute_addr(*device, _compute_addr);
@@ -33,7 +33,7 @@
 
 // ======================> cesblit_device
 
-class cesblit_device :	public device_t,
+class cesblit_device :  public device_t,
 						public device_video_interface,
 						public device_memory_interface
 {
@@ -44,9 +44,9 @@ public:
 	cesblit_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
 
 	// static configuration
-	void set_compute_addr(compute_addr_t compute_addr)	{ m_compute_addr = compute_addr; }
+	void set_compute_addr(compute_addr_t compute_addr)  { m_compute_addr = compute_addr; }
 	static void static_set_compute_addr(device_t &device, compute_addr_t compute_addr) { downcast<cesblit_device &>(device).set_compute_addr(compute_addr); }
-	template<class _Object> static devcb_base &static_set_irq_callback(device_t &device, _Object object) { return downcast<cesblit_device &>(device).m_blit_irq_cb.set_callback(object); }
+	template <class Object> static devcb_base &static_set_irq_callback(device_t &device, Object &&cb) { return downcast<cesblit_device &>(device).m_blit_irq_cb.set_callback(std::forward<Object>(cb)); }
 
 	DECLARE_WRITE16_MEMBER(color_w);
 	DECLARE_WRITE16_MEMBER(addr_hi_w);
@@ -58,14 +58,15 @@ public:
 protected:
 	// device-level overrides
 	virtual void device_start() override;
-	virtual const address_space_config *memory_space_config(address_spacenum spacenum = AS_PROGRAM) const override { return (spacenum == AS_PROGRAM) ? &m_space_config: nullptr; }
+	virtual void device_stop() override;
+	virtual const address_space_config *memory_space_config(address_spacenum spacenum) const override { return (spacenum == AS_PROGRAM) ? &m_space_config : nullptr; }
 
 	void do_blit();
 
 	address_space_config m_space_config;
 	address_space *m_space;
 
-	devcb_write_line m_blit_irq_cb;	// blit finished irq
+	devcb_write_line m_blit_irq_cb; // blit finished irq
 
 	bitmap_ind16 m_bitmap[2][2];
 	uint16_t m_regs[0x12/2];
@@ -79,6 +80,6 @@ protected:
 ***************************************************************************/
 
 // device type definition
-extern const device_type CESBLIT;
+DECLARE_DEVICE_TYPE(CESBLIT, cesblit_device)
 
-#endif
+#endif // MAME_VIDEO_CESBLIT_H

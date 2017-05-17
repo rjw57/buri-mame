@@ -404,11 +404,6 @@
 
 ************************************************************************************************/
 
-
-#define MASTER_CLOCK    XTAL_16MHz          /* unknown */
-#define CPU_CLOCK       MASTER_CLOCK/4      /* guess... seems accurate */
-#define CRTC_CLOCK      MASTER_CLOCK/24     /* it gives 63.371293 Hz. with current settings */
-
 #include "emu.h"
 #include "cpu/z80/z80.h"
 #include "machine/nvram.h"
@@ -416,6 +411,13 @@
 #include "video/mc6845.h"
 //#include "machine/z80ctc.h"
 //#include "machine/z80pio.h"
+#include "screen.h"
+#include "speaker.h"
+
+
+#define MASTER_CLOCK    XTAL_16MHz          /* unknown */
+#define CPU_CLOCK       MASTER_CLOCK/4      /* guess... seems accurate */
+#define CRTC_CLOCK      MASTER_CLOCK/24     /* it gives 63.371293 Hz. with current settings */
 
 
 class avt_state : public driver_device
@@ -633,7 +635,7 @@ ADDRESS_MAP_END
 static ADDRESS_MAP_START( avt_portmap, AS_IO, 8, avt_state )
 	ADDRESS_MAP_GLOBAL_MASK(0xff)
 //  AM_RANGE(0x00, 0x03) unk, maybe IO
-//	AM_RANGE(0x00, 0x00)  AM_READ_PORT("DSW1")
+//  AM_RANGE(0x00, 0x00)  AM_READ_PORT("DSW1")
 //  AM_RANGE(0x01, 0x01)  AM_READ_PORT("IN1")
 	AM_RANGE(0x02, 0x02)  AM_READ_PORT("IN0")
 //  AM_RANGE(0x08, 0x0b) unk, maybe IO
@@ -662,7 +664,7 @@ ADDRESS_MAP_END
   02D9: C9            ret
 
   0338: DB 02         in   a,($02) --> poll IN0
-  033A: E6 40         and  $40 ------> check for IN0-7 if active. 
+  033A: E6 40         and  $40 ------> check for IN0-7 if active.
   033C: 28 02         jr   z,$0340 --> to continue the program.
   033E: AF            xor  a
   033F: C9            ret
@@ -926,7 +928,7 @@ INTERRUPT_GEN_MEMBER(avt_state::avt_vblank_irq)
 	m_maincpu->set_input_line_and_vector(0, HOLD_LINE, 0x06);
 }
 
-static MACHINE_CONFIG_START( avt, avt_state )
+static MACHINE_CONFIG_START( avt )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", Z80, CPU_CLOCK) /* guess */
@@ -1029,8 +1031,8 @@ ROM_END
 *                Game Drivers                *
 *********************************************/
 
-/*    YEAR  NAME      PARENT    MACHINE   INPUT     STATE           INIT  ROT    COMPANY                      FULLNAME            FLAGS */
-GAME( 1985, avtsym14, 0,        avt,      symbols,  driver_device,  0,    ROT0, "Advanced Video Technology", "Symbols (ver 1.4)", MACHINE_NOT_WORKING )
-GAME( 1985, avtsym25, avtsym14, avt,      symbols,  driver_device,  0,    ROT0, "Advanced Video Technology", "Symbols (ver 2.5)", MACHINE_NOT_WORKING )
-GAME( 1985, avtbingo, 0,        avt,      avtbingo, driver_device,  0,    ROT0, "Advanced Video Technology", "Arrow Bingo",       MACHINE_NOT_WORKING )
-GAME( 1989, avtnfl,   0,        avt,      symbols,  driver_device,  0,    ROT0, "Advanced Video Technology", "NFL (ver 109)",     MACHINE_NOT_WORKING )
+/*    YEAR  NAME      PARENT    MACHINE   INPUT     STATE       INIT  ROT   COMPANY                      FULLNAME             FLAGS */
+GAME( 1985, avtsym14, 0,        avt,      symbols,  avt_state,  0,    ROT0, "Advanced Video Technology", "Symbols (ver 1.4)", MACHINE_NOT_WORKING )
+GAME( 1985, avtsym25, avtsym14, avt,      symbols,  avt_state,  0,    ROT0, "Advanced Video Technology", "Symbols (ver 2.5)", MACHINE_NOT_WORKING )
+GAME( 1985, avtbingo, 0,        avt,      avtbingo, avt_state,  0,    ROT0, "Advanced Video Technology", "Arrow Bingo",       MACHINE_NOT_WORKING )
+GAME( 1989, avtnfl,   0,        avt,      symbols,  avt_state,  0,    ROT0, "Advanced Video Technology", "NFL (ver 109)",     MACHINE_NOT_WORKING )

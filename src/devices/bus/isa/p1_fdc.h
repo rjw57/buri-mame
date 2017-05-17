@@ -6,14 +6,14 @@
 
 **********************************************************************/
 
+#ifndef MAME_BUS_ISA_P1_FDC_H
+#define MAME_BUS_ISA_P1_FDC_H
+
 #pragma once
 
-#ifndef __P1_FDC__
-#define __P1_FDC__
 
-
-#include "imagedev/flopdrv.h"
 #include "isa.h"
+#include "imagedev/flopdrv.h"
 #include "machine/wd_fdc.h"
 
 //**************************************************************************
@@ -31,17 +31,18 @@ public:
 	virtual machine_config_constructor device_mconfig_additions() const override;
 	virtual const tiny_rom_entry *device_rom_region() const override;
 
-	DECLARE_FLOPPY_FORMATS( floppy_formats );
+	DECLARE_FLOPPY_FORMATS(floppy_formats);
 	DECLARE_READ8_MEMBER(p1_fdc_r);
 	DECLARE_WRITE8_MEMBER(p1_fdc_w);
-	DECLARE_WRITE_LINE_MEMBER( p1_fdc_irq_drq );
+	DECLARE_WRITE_LINE_MEMBER(p1_fdc_irq_drq);
+
 protected:
 	// device-level overrides
 	virtual void device_start() override;
 	virtual void device_reset() override;
 
 private:
-	required_device<fd1793_t> m_fdc;
+	required_device<fd1793_device> m_fdc;
 
 public:
 	void p1_wd17xx_aux_w(int data);
@@ -51,7 +52,7 @@ public:
 
 
 // device type definition
-extern const device_type P1_FDC;
+DECLARE_DEVICE_TYPE(P1_FDC, p1_fdc_device)
 
 
-#endif
+#endif // MAME_BUS_ISA_P1_FDC_H

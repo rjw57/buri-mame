@@ -67,6 +67,8 @@ Notes:
 #include "emu.h"
 #include "cpu/h8/h83048.h"
 #include "machine/nvram.h"
+#include "screen.h"
+
 
 class lastfght_state : public driver_device
 {
@@ -559,7 +561,7 @@ void lastfght_state::machine_reset()
 	m_c00006 = 0;
 }
 
-static MACHINE_CONFIG_START( lastfght, lastfght_state )
+static MACHINE_CONFIG_START( lastfght )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", H83044, 32000000/2)

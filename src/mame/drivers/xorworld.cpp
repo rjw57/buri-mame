@@ -30,10 +30,14 @@ EEPROM chip: 93C46
 ***************************************************************************/
 
 #include "emu.h"
-#include "machine/eepromser.h"
-#include "cpu/m68000/m68000.h"
-#include "sound/saa1099.h"
 #include "includes/xorworld.h"
+
+#include "cpu/m68000/m68000.h"
+#include "machine/eepromser.h"
+#include "sound/saa1099.h"
+
+#include "screen.h"
+#include "speaker.h"
 
 
 /****************************************************************
@@ -167,7 +171,7 @@ static GFXDECODE_START( xorworld )
 GFXDECODE_END
 
 
-static MACHINE_CONFIG_START( xorworld, xorworld_state )
+static MACHINE_CONFIG_START( xorworld )
 	// basic machine hardware
 	MCFG_CPU_ADD("maincpu", M68000, 10000000)   // 10 MHz
 	MCFG_CPU_PROGRAM_MAP(xorworld_map)

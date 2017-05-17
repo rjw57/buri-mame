@@ -21,6 +21,9 @@ sound system appears to be the same as 'spartanxtec.cpp'
 #include "cpu/z80/z80.h"
 #include "machine/gen_latch.h"
 #include "sound/ay8910.h"
+#include "screen.h"
+#include "speaker.h"
+
 #include "spyhunttec.lh"
 
 class spyhuntertec_state : public driver_device
@@ -661,7 +664,7 @@ void spyhuntertec_state::machine_reset()
 
 
 
-static MACHINE_CONFIG_START( spyhuntertec, spyhuntertec_state )
+static MACHINE_CONFIG_START( spyhuntertec )
 
 // note: no ctc, no nvram
 // 2*z80, 3*ay8912

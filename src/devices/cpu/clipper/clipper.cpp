@@ -22,27 +22,51 @@
 #include "clipper.h"
 
 #define VERBOSE 0
-#if VERBOSE
-#define LOG_INTERRUPT(...) logerror(__VA_ARGS__)
-#else
-#define LOG_INTERRUPT(...)
-#endif
+#define LOG_INTERRUPT(...) do { if (VERBOSE) logerror(__VA_ARGS__); } while (false)
 
-const device_type CLIPPER_C100 = &device_creator<clipper_c100_device>;
-const device_type CLIPPER_C300 = &device_creator<clipper_c300_device>;
-const device_type CLIPPER_C400 = &device_creator<clipper_c400_device>;
+// convenience macros for frequently used instruction fields
+#define R1 (m_info.r1)
+#define R2 (m_info.r2)
+
+// convenience macros for dealing with the psw
+#define PSW(mask) (m_psw & PSW_##mask)
+#define SSW(mask) (m_ssw & SSW_##mask)
+
+// macros for setting psw condition codes
+#define FLAGS(C,V,Z,N) \
+	m_psw = (m_psw & ~(PSW_C | PSW_V | PSW_Z | PSW_N)) | (((C) << 3) | ((V) << 2) | ((Z) << 1) | ((N) << 0));
+#define FLAGS_CV(C,V) \
+	m_psw = (m_psw & ~(PSW_C | PSW_V)) | (((C) << 3) | ((V) << 2));
+#define FLAGS_ZN(Z,N) \
+	m_psw = (m_psw & ~(PSW_Z | PSW_N)) | (((Z) << 1) | ((N) << 0));
+
+// over/underflow for addition/subtraction from here: http://stackoverflow.com/questions/199333/how-to-detect-integer-overflow-in-c-c
+#define OF_ADD(a, b) ((b > 0) && (a > INT_MAX - b))
+#define UF_ADD(a, b) ((b < 0) && (a < INT_MIN - b))
+#define OF_SUB(a, b) ((b < 0) && (a > INT_MAX + b))
+#define UF_SUB(a, b) ((b > 0) && (a < INT_MIN + b))
+
+// CLIPPER logic for carry and overflow flags
+#define C_ADD(a, b) ((u32)a + (u32)b < (u32)a)
+#define V_ADD(a, b) (OF_ADD((s32)a, (s32)b) || UF_ADD((s32)a, (s32)b))
+#define C_SUB(a, b) ((u32)a < (u32)b)
+#define V_SUB(a, b) (OF_SUB((s32)a, (s32)b) || UF_SUB((s32)a, (s32)b))
+
+DEFINE_DEVICE_TYPE(CLIPPER_C100, clipper_c100_device, "clipper_c100", "C100 CLIPPER")
+DEFINE_DEVICE_TYPE(CLIPPER_C300, clipper_c300_device, "clipper_c300", "C300 CLIPPER")
+DEFINE_DEVICE_TYPE(CLIPPER_C400, clipper_c400_device, "clipper_c400", "C400 CLIPPER")
 
 clipper_c100_device::clipper_c100_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock)
-	: clipper_device(mconfig, CLIPPER_C100, "C100 CLIPPER", tag, owner, clock, "C100", __FILE__) { }
+	: clipper_device(mconfig, CLIPPER_C100, tag, owner, clock) { }
 
 clipper_c300_device::clipper_c300_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock)
-	: clipper_device(mconfig, CLIPPER_C300, "C300 CLIPPER", tag, owner, clock, "C300", __FILE__) { }
+	: clipper_device(mconfig, CLIPPER_C300, tag, owner, clock) { }
 
 clipper_c400_device::clipper_c400_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock)
-	: clipper_device(mconfig, CLIPPER_C400, "C400 CLIPPER", tag, owner, clock, "C400", __FILE__) { }
+	: clipper_device(mconfig, CLIPPER_C400, tag, owner, clock) { }
 
-clipper_device::clipper_device(const machine_config &mconfig, device_type type, const char *name, const char *tag, device_t *owner, u32 clock, const char *shortname, const char *source)
-	: cpu_device(mconfig, type, name, tag, owner, clock, shortname, source),
+clipper_device::clipper_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, u32 clock)
+	: cpu_device(mconfig, type, tag, owner, clock),
 	m_pc(0),
 	m_r(m_rs),
 	m_insn_config("insn", ENDIANNESS_LITTLE, 32, 32, 0),
@@ -140,7 +164,7 @@ void clipper_device::device_start()
 
 void clipper_device::device_reset()
 {
-	/* 
+	/*
 	 * From C300 documentation, on reset:
 	 *   psw: T cleared, BIG set from hardware, others undefined
 	 *   ssw: EI, TP, M, U, K, KU, UU, P cleared, ID set from hardware, others undefined
@@ -155,7 +179,7 @@ void clipper_device::device_reset()
 	memset(m_f, 0, sizeof(m_f));
 
 	// FIXME: figure out how to branch to the boot code properly
-	m_pc = 0x7f100000; 
+	m_pc = 0x7f100000;
 	m_irq = 0;
 	m_nmi = 0;
 }
@@ -165,7 +189,7 @@ void clipper_device::state_string_export(const device_state_entry &entry, std::s
 	switch (entry.index())
 	{
 	case STATE_GENFLAGS:
-		str = string_format("%c%c%c%c", 
+		str = string_format("%c%c%c%c",
 			PSW(C) ? 'C' : '.',
 			PSW(V) ? 'V' : '.',
 			PSW(Z) ? 'Z' : '.',
@@ -393,7 +417,7 @@ int clipper_device::execute_instruction ()
 	case 0x00: // noop
 		break;
 
-	case 0x10: 
+	case 0x10:
 		// movwp: move word to processor register
 		// treated as a noop if target ssw in user mode
 		// R1 == 3 means "fast" mode - avoids pipeline flush
@@ -406,7 +430,7 @@ int clipper_device::execute_instruction ()
 		}
 		// FLAGS: CVZN
 		break;
-	case 0x11: 
+	case 0x11:
 		// movpw: move processor register to word
 		switch (R1)
 		{
@@ -414,24 +438,24 @@ int clipper_device::execute_instruction ()
 		case 1: m_r[R2] = m_ssw; break;
 		}
 		break;
-	case 0x12: 
+	case 0x12:
 		// calls: call supervisor
 		next_pc = intrap(EXCEPTION_SUPERVISOR_CALL_BASE + (m_info.subopcode & 0x7f) * 8, next_pc);
 		break;
-	case 0x13: 
+	case 0x13:
 		// ret: return from subroutine
 		next_pc = m_data->read_dword(m_r[R2]);
 		m_r[R2] += 4;
 		// TRAPS: C,U,A,P,R
 		break;
-	case 0x14: 
+	case 0x14:
 		// pushw: push word
 		m_r[R1] -= 4;
 		m_data->write_dword(m_r[R1], m_r[R2]);
 		// TRAPS: A,P,W
 		break;
 
-	case 0x16: 
+	case 0x16:
 		// popw: pop word
 		m_r[R2] = m_data->read_dword(m_r[R1]);
 		m_r[R1] += 4;
@@ -445,22 +469,22 @@ int clipper_device::execute_instruction ()
 		break;
 	case 0x21:
 		// subs: subtract single floating
-		*((float *)&m_f[R2]) -= *((float *)&m_f[R1]); 
+		*((float *)&m_f[R2]) -= *((float *)&m_f[R1]);
 		// TRAPS: F_IVUX
 		break;
 	case 0x22:
 		// addd: add double floating
-		m_f[R2] += m_f[R1]; 
+		m_f[R2] += m_f[R1];
 		// TRAPS: F_IVUX
 		break;
 	case 0x23:
 		// subd: subtract double floating
-		m_f[R2] -= m_f[R1]; 
+		m_f[R2] -= m_f[R1];
 		// TRAPS: F_IVUX
 		break;
 	case 0x24:
 		// movs: move single floating
-		*((float *)&m_f[R2]) = *((float *)&m_f[R1]); 
+		*((float *)&m_f[R2]) = *((float *)&m_f[R1]);
 		break;
 	case 0x25:
 		// cmps: compare single floating
@@ -468,7 +492,7 @@ int clipper_device::execute_instruction ()
 		break;
 	case 0x26:
 		// movd: move double floating
-		m_f[R2] = m_f[R1]; 
+		m_f[R2] = m_f[R1];
 		break;
 	case 0x27:
 		// cmpd: compare double floating
@@ -487,7 +511,7 @@ int clipper_device::execute_instruction ()
 		break;
 	case 0x2a:
 		// muld: multiply double floating
-		m_f[R2] *= m_f[R1]; 
+		m_f[R2] *= m_f[R1];
 		// TRAPS: F_IVUX
 		break;
 	case 0x2b:
@@ -497,21 +521,21 @@ int clipper_device::execute_instruction ()
 		break;
 	case 0x2c:
 		// movsw: move single floating to word
-		m_r[R2] = *((s32 *)&m_f[R1]); 
+		m_r[R2] = *((s32 *)&m_f[R1]);
 		break;
 	case 0x2d:
 		// movws: move word to single floating
-		*((s32 *)&m_f[R2]) = m_r[R1]; 
+		*((s32 *)&m_f[R2]) = m_r[R1];
 		break;
 	case 0x2e:
 		// movdl: move double floating to longword
-		((double *)m_r)[R2 >> 1] = m_f[R1]; 
+		((double *)m_r)[R2 >> 1] = m_f[R1];
 		break;
 	case 0x2f:
 		// movld: move longword to double floating
-		m_f[R2] = ((double *)m_r)[R1 >> 1]; 
+		m_f[R2] = ((double *)m_r)[R1 >> 1];
 		break;
-	case 0x30: 
+	case 0x30:
 		// shaw: shift arithmetic word
 		if (m_r[R1] > 0)
 		{
@@ -530,7 +554,7 @@ int clipper_device::execute_instruction ()
 		}
 		// FLAGS: 0VZN
 		break;
-	case 0x31: 
+	case 0x31:
 		// shal: shift arithmetic longword
 		if (m_r[R1] > 0)
 		{
@@ -549,7 +573,7 @@ int clipper_device::execute_instruction ()
 		}
 		// FLAGS: 0VZN
 		break;
-	case 0x32: 
+	case 0x32:
 		// shlw: shift logical word
 		if (m_r[R1] > 0)
 			m_r[R2] <<= m_r[R1];
@@ -558,7 +582,7 @@ int clipper_device::execute_instruction ()
 		// FLAGS: 00ZN
 		FLAGS(0, 0, m_r[R2] == 0, m_r[R2] < 0);
 		break;
-	case 0x33: 
+	case 0x33:
 		// shll: shift logical longword
 		if (m_r[R1] > 0)
 			((u64 *)m_r)[R2 >> 1] <<= m_r[R1];
@@ -567,7 +591,7 @@ int clipper_device::execute_instruction ()
 		// FLAGS: 00ZN
 		FLAGS(0, 0, ((s64 *)m_r)[R2 >> 1] == 0, ((s64 *)m_r)[R2 >> 1] < 0);
 		break;
-	case 0x34: 
+	case 0x34:
 		// rotw: rotate word
 		if (m_r[R1] > 0)
 			m_r[R2] = rotl32(m_r[R2], m_r[R1]);
@@ -576,7 +600,7 @@ int clipper_device::execute_instruction ()
 		// FLAGS: 00ZN
 		FLAGS(0, 0, m_r[R2] == 0, m_r[R2] < 0);
 		break;
-	case 0x35: 
+	case 0x35:
 		// rotl: rotate longword
 		if (m_r[R1] > 0)
 			((u64 *)m_r)[R2 >> 1] = rotl64(((u64 *)m_r)[R2 >> 1], m_r[R1]);
@@ -586,7 +610,7 @@ int clipper_device::execute_instruction ()
 		FLAGS(0, 0, ((s64 *)m_r)[R2 >> 1] == 0, ((s64 *)m_r)[R2 >> 1] < 0);
 		break;
 
-	case 0x38: 
+	case 0x38:
 		// shai: shift arithmetic immediate
 		if (m_info.imm > 0)
 		{
@@ -606,7 +630,7 @@ int clipper_device::execute_instruction ()
 		// FLAGS: 0VZN
 		// TRAPS: I
 		break;
-	case 0x39: 
+	case 0x39:
 		// shali: shift arithmetic longword immediate
 		if (m_info.imm > 0)
 		{
@@ -626,7 +650,7 @@ int clipper_device::execute_instruction ()
 		// FLAGS: 0VZN
 		// TRAPS: I
 		break;
-	case 0x3a: 
+	case 0x3a:
 		// shli: shift logical immediate
 		if (m_info.imm > 0)
 			m_r[R2] <<= m_info.imm;
@@ -636,7 +660,7 @@ int clipper_device::execute_instruction ()
 		// FLAGS: 00ZN
 		// TRAPS: I
 		break;
-	case 0x3b: 
+	case 0x3b:
 		// shlli: shift logical longword immediate
 		if (m_info.imm > 0)
 			((u64 *)m_r)[R2 >> 1] <<= m_info.imm;
@@ -646,7 +670,7 @@ int clipper_device::execute_instruction ()
 		// FLAGS: 00ZN
 		// TRAPS: I
 		break;
-	case 0x3c: 
+	case 0x3c:
 		// roti: rotate immediate
 		if (m_info.imm > 0)
 			m_r[R2] = rotl32(m_r[R2], m_info.imm);
@@ -656,7 +680,7 @@ int clipper_device::execute_instruction ()
 		// FLAGS: 00ZN
 		// TRAPS: I
 		break;
-	case 0x3d: 
+	case 0x3d:
 		// rotli: rotate longword immediate
 		if (m_info.imm > 0)
 			((u64 *)m_r)[R2 >> 1] = rotl64(((u64 *)m_r)[R2 >> 1], m_info.imm);
@@ -667,8 +691,8 @@ int clipper_device::execute_instruction ()
 		// TRAPS: I
 		break;
 
-	case 0x44: 
-	case 0x45: 
+	case 0x44:
+	case 0x45:
 		// call: call subroutine
 		m_r[R2] -= 4;
 		m_data->write_dword(m_r[R2], next_pc);
@@ -713,8 +737,8 @@ int clipper_device::execute_instruction ()
 		break;
 #endif
 
-	case 0x60: 
-	case 0x61: 
+	case 0x60:
+	case 0x61:
 		// loadw: load word
 		m_r[R2] = m_data->read_dword(m_info.address);
 		// TRAPS: C,U,A,P,R,I
@@ -725,13 +749,13 @@ int clipper_device::execute_instruction ()
 		m_r[R2] = m_info.address;
 		// TRAPS: I
 		break;
-	case 0x64: 
+	case 0x64:
 	case 0x65:
 		// loads: load single floating
 		((u64 *)&m_f)[R2] = m_data->read_dword(m_info.address);
 		// TRAPS: C,U,A,P,R,I
 		break;
-	case 0x66: 
+	case 0x66:
 	case 0x67:
 		// loadd: load double floating
 		((u64 *)&m_f)[R2] = m_data->read_qword(m_info.address);
@@ -743,13 +767,13 @@ int clipper_device::execute_instruction ()
 		m_r[R2] = (s8)m_data->read_byte(m_info.address);
 		// TRAPS: C,U,A,P,R,I
 		break;
-	case 0x6a: 
+	case 0x6a:
 	case 0x6b:
 		// loadbu: load byte unsigned
 		m_r[R2] = m_data->read_byte(m_info.address);
 		// TRAPS: C,U,A,P,R,I
 		break;
-	case 0x6c: 
+	case 0x6c:
 	case 0x6d:
 		// loadh: load halfword
 		m_r[R2] = (s16)m_data->read_word(m_info.address);
@@ -761,7 +785,7 @@ int clipper_device::execute_instruction ()
 		m_r[R2] = m_data->read_word(m_info.address);
 		// TRAPS: C,U,A,P,R,I
 		break;
-	case 0x70: 
+	case 0x70:
 	case 0x71:
 		// storw: store word
 		m_data->write_dword(m_info.address, m_r[R2]);
@@ -800,7 +824,7 @@ int clipper_device::execute_instruction ()
 		// TRAPS: A,P,W,I
 		break;
 
-	case 0x80: 
+	case 0x80:
 		// addw: add word
 		FLAGS_CV(C_ADD(m_r[R2], m_r[R1]), V_ADD(m_r[R2], m_r[R1]))
 		m_r[R2] += m_r[R1];
@@ -864,7 +888,7 @@ int clipper_device::execute_instruction ()
 		// FLAGS: 00ZN
 		break;
 
-	case 0x8f: 
+	case 0x8f:
 		// ori: or immediate
 		m_r[R2] |= m_info.imm;
 		FLAGS(0, 0, m_r[R2] == 0, m_r[R2] < 0)
@@ -886,7 +910,7 @@ int clipper_device::execute_instruction ()
 		// FLAGS: CVZN
 		break;
 
-	case 0x93: 
+	case 0x93:
 		// negw: negate word
 		FLAGS_CV(m_r[R1] != 0, m_r[R1] == INT32_MIN)
 		m_r[R2] = -m_r[R1];
@@ -894,7 +918,7 @@ int clipper_device::execute_instruction ()
 		// FLAGS: CVZN
 		break;
 
-	case 0x98: 
+	case 0x98:
 		// mulw: multiply word
 		m_r[R2] = m_r[R2] * m_r[R1];
 		// FLAGS: 0V00
@@ -904,7 +928,7 @@ int clipper_device::execute_instruction ()
 		((s64 *)m_r)[R2 >> 1] = (s64)m_r[R2] * (s64)m_r[R1];
 		// FLAGS: 0V00
 		break;
-	case 0x9a: 
+	case 0x9a:
 		// mulwu: multiply word unsigned
 		m_r[R2] = (u32)m_r[R2] * (u32)m_r[R1];
 		// FLAGS: 0V00
@@ -914,7 +938,7 @@ int clipper_device::execute_instruction ()
 		((u64 *)m_r)[R2 >> 1] = (u64)m_r[R2] * (u64)m_r[R1];
 		// FLAGS: 0V00
 		break;
-	case 0x9c: 
+	case 0x9c:
 		// divw: divide word
 		if (m_r[R1] != 0)
 		{
@@ -926,7 +950,7 @@ int clipper_device::execute_instruction ()
 		// FLAGS: 0V00
 		// TRAPS: D
 		break;
-	case 0x9d: 
+	case 0x9d:
 		// modw: modulus word
 		if (m_r[R1] != 0)
 		{
@@ -938,7 +962,7 @@ int clipper_device::execute_instruction ()
 		// FLAGS: 0V00
 		// TRAPS: D
 		break;
-	case 0x9e: 
+	case 0x9e:
 		// divwu: divide word unsigned
 		if ((u32)m_r[R1] != 0)
 			m_r[R2] = (u32)m_r[R2] / (u32)m_r[R1];
@@ -948,7 +972,7 @@ int clipper_device::execute_instruction ()
 		// FLAGS: 0000
 		// TRAPS: D
 		break;
-	case 0x9f: 
+	case 0x9f:
 		// modwu: modulus word unsigned
 		if ((u32)m_r[R1] != 0)
 			m_r[R2] = (u32)m_r[R2] % (u32)m_r[R1];
@@ -958,7 +982,7 @@ int clipper_device::execute_instruction ()
 		// FLAGS: 0000
 		// TRAPS: D
 		break;
-	case 0xa0: 
+	case 0xa0:
 		// subw: subtract word
 		FLAGS_CV(C_SUB(m_r[R2], m_r[R1]), V_SUB(m_r[R2], m_r[R1]))
 		m_r[R2] -= m_r[R1];
@@ -987,39 +1011,39 @@ int clipper_device::execute_instruction ()
 		// FLAGS: CVZN
 		break;
 
-	case 0xa6: 
+	case 0xa6:
 		// cmpq: compare quick
 		FLAGS(C_SUB(m_r[R2], R1), V_SUB(m_r[R2], R1), m_r[R2] == (s32)R1, m_r[R2] < (s32)R1)
 		// FLAGS: CVZN
 		break;
-	case 0xa7: 
+	case 0xa7:
 		// cmpi: compare immediate
 		FLAGS(C_SUB(m_r[R2], m_info.imm), V_SUB(m_r[R2], m_info.imm), m_r[R2] == m_info.imm, m_r[R2] < m_info.imm)
 		// FLAGS: CVZN
 		// TRAPS: I
 		break;
-	case 0xa8: 
+	case 0xa8:
 		// xorw: exclusive or word
 		m_r[R2] ^= m_r[R1];
 		FLAGS(0, 0, m_r[R2] == 0, m_r[R2] < 0)
 		// FLAGS: 00ZN
 		break;
 
-	case 0xab: 
+	case 0xab:
 		// xori: exclusive or immediate
 		m_r[R2] ^= m_info.imm;
 		FLAGS(0, 0, m_r[R2] == 0, m_r[R2] < 0)
 		// FLAGS: 00ZN
 		// TRAPS: I
 		break;
-	case 0xac: 
+	case 0xac:
 		// notw: not word
 		m_r[R2] = ~m_r[R1];
 		FLAGS(0, 0, m_r[R2] == 0, m_r[R2] < 0)
 		// FLAGS: 00ZN
 		break;
 
-	case 0xae: 
+	case 0xae:
 		// notq: not quick
 		m_r[R2] = ~R1;
 		FLAGS(0, 0, 0, 1)
@@ -1121,7 +1145,7 @@ int clipper_device::execute_instruction ()
 			// TRAPS: C,U,A,P,R
 			break;
 
-		case 0x20: case 0x21: case 0x22: case 0x23: 
+		case 0x20: case 0x21: case 0x22: case 0x23:
 		case 0x24: case 0x25: case 0x26: case 0x27:
 			// saved0..saved7: push registers fN:f7
 
@@ -1212,14 +1236,14 @@ int clipper_device::execute_instruction ()
 		{
 			switch (m_info.subopcode)
 			{
-			case 0x00: 
+			case 0x00:
 				// movus: move user to supervisor
 				m_rs[m_info.macro & 0xf] = m_ru[(m_info.macro >> 4) & 0xf];
 				FLAGS(0, 0, m_rs[m_info.macro & 0xf] == 0, m_rs[m_info.macro & 0xf] < 0)
 				// FLAGS: 00ZN
 				// TRAPS: S
 				break;
-			case 0x01: 
+			case 0x01:
 				// movsu: move supervisor to user
 				m_ru[m_info.macro & 0xf] = m_rs[(m_info.macro >> 4) & 0xf];
 				FLAGS(0, 0, m_ru[m_info.macro & 0xf] == 0, m_ru[m_info.macro & 0xf] < 0)
@@ -1242,10 +1266,10 @@ int clipper_device::execute_instruction ()
 				m_rs[(m_info.macro >> 4) & 0xf] += 64;
 				// TRAPS: C,U,A,P,R,S
 				break;
-			case 0x04: 
+			case 0x04:
 				// reti: restore psw, ssw and pc from supervisor stack
 				LOG_INTERRUPT("reti r%d, ssp = %08x, pc = %08x, next_pc = %08x\n",
-					(macro >> 4) & 0xf, m_rs[(m_info.macro >> 4) & 0xf], m_pc, m_program->read_dword(m_rs[(m_info.macro >> 4) & 0xf] + 8));
+					(m_info.macro >> 4) & 0xf, m_rs[(m_info.macro >> 4) & 0xf], m_pc, m_insn->read_dword(m_rs[(m_info.macro >> 4) & 0xf] + 8));
 
 				m_psw = m_data->read_dword(m_rs[(m_info.macro >> 4) & 0xf] + 0);
 				m_ssw = m_data->read_dword(m_rs[(m_info.macro >> 4) & 0xf] + 4);
@@ -1303,7 +1327,7 @@ int clipper_device::execute_instruction ()
 */
 u32 clipper_device::intrap(u32 vector, u32 pc, u32 cts, u32 mts)
 {
-	LOG_INTERRUPT("intrap - vector %x, pc = 0x%08x, next_pc = 0x%08x, ssp = 0x%08x\n", vector, pc, m_program->read_dword(vector + 4), m_rs[15]);
+	LOG_INTERRUPT("intrap - vector %x, pc = 0x%08x, next_pc = 0x%08x, ssp = 0x%08x\n", vector, pc, m_insn->read_dword(vector + 4), m_rs[15]);
 
 	// set cts and mts to indicate source of exception
 	m_psw = (m_psw & ~(PSW_CTS | PSW_MTS)) | mts | cts;
@@ -1316,10 +1340,10 @@ u32 clipper_device::intrap(u32 vector, u32 pc, u32 cts, u32 mts)
 	// decrement supervisor stack pointer
 
 	// NOTE: while not explicitly stated anywhere, it seems the InterPro boot code has been
-	// developed with the assumption that the SSP is decremented by 24 bytes during an exception, 
+	// developed with the assumption that the SSP is decremented by 24 bytes during an exception,
 	// rather than the 12 bytes that might otherwise be expected. This means the exception handler
 	// code must explicitly increment the SSP by 12 prior to executing the RETI instruction,
-	// as otherwise the SSP will not be pointing at a valid return frame. It's possible this 
+	// as otherwise the SSP will not be pointing at a valid return frame. It's possible this
 	// behaviour might vary with some other version of the CPU, but this is all we know for now.
 	m_rs[15] -= 24;
 

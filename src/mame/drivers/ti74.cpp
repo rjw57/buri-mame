@@ -70,11 +70,12 @@
 ***************************************************************************/
 
 #include "emu.h"
-#include "cpu/tms7000/tms7000.h"
-#include "video/hd44780.h"
-#include "machine/nvram.h"
-#include "bus/generic/slot.h"
 #include "bus/generic/carts.h"
+#include "bus/generic/slot.h"
+#include "cpu/tms7000/tms7000.h"
+#include "machine/nvram.h"
+#include "video/hd44780.h"
+#include "screen.h"
 #include "softlist.h"
 
 #include "ti74.lh"
@@ -508,7 +509,7 @@ void ti74_state::machine_start()
 	save_item(NAME(m_power));
 }
 
-static MACHINE_CONFIG_START( ti74, ti74_state )
+static MACHINE_CONFIG_START( ti74 )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", TMS70C46, XTAL_4MHz)
@@ -542,7 +543,7 @@ static MACHINE_CONFIG_START( ti74, ti74_state )
 	MCFG_SOFTWARE_LIST_ADD("cart_list", "ti74_cart")
 MACHINE_CONFIG_END
 
-static MACHINE_CONFIG_START( ti95, ti74_state )
+static MACHINE_CONFIG_START( ti95 )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", TMS70C46, XTAL_4MHz)
@@ -602,5 +603,6 @@ ROM_START( ti95 )
 ROM_END
 
 
-COMP( 1985, ti74, 0, 0, ti74, ti74, driver_device, 0, "Texas Instruments", "TI-74 BASICALC", MACHINE_SUPPORTS_SAVE | MACHINE_NO_SOUND_HW )
-COMP( 1986, ti95, 0, 0, ti95, ti95, driver_device, 0, "Texas Instruments", "TI-95 PROCALC", MACHINE_SUPPORTS_SAVE | MACHINE_NO_SOUND_HW )
+//    YEAR  NAME  PARENT CMP MACHINE INPUT STATE    INIT  COMPANY, FULLNAME, FLAGS
+COMP( 1985, ti74, 0,      0, ti74,   ti74, ti74_state, 0, "Texas Instruments", "TI-74 BASICALC", MACHINE_SUPPORTS_SAVE | MACHINE_NO_SOUND_HW )
+COMP( 1986, ti95, 0,      0, ti95,   ti95, ti74_state, 0, "Texas Instruments", "TI-95 PROCALC", MACHINE_SUPPORTS_SAVE | MACHINE_NO_SOUND_HW )

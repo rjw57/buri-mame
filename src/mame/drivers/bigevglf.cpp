@@ -58,10 +58,12 @@ J1100072A
 ***************************************************************************/
 
 #include "emu.h"
+#include "includes/bigevglf.h"
+
+#include "cpu/m6805/m6805.h"
 #include "cpu/z80/z80.h"
 #include "sound/ay8910.h"
-#include "cpu/m6805/m6805.h"
-#include "includes/bigevglf.h"
+#include "speaker.h"
 
 
 WRITE8_MEMBER(bigevglf_state::beg_banking_w)
@@ -441,7 +443,7 @@ void bigevglf_state::machine_reset()
 }
 
 
-static MACHINE_CONFIG_START( bigevglf, bigevglf_state )
+static MACHINE_CONFIG_START( bigevglf )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", Z80,10000000/2)     /* 5 MHz ? */
@@ -572,5 +574,5 @@ DRIVER_INIT_MEMBER(bigevglf_state,bigevglf)
 	membank("bank1")->configure_entries(0, 0xff, &ROM[0x10000], 0x800);
 }
 
-GAME( 1986, bigevglf,  0,        bigevglf, bigevglf, bigevglf_state, bigevglf, ROT270, "Taito America Corporation", "Big Event Golf (US)", MACHINE_NO_COCKTAIL | MACHINE_SUPPORTS_SAVE )
-GAME( 1986, bigevglfj, bigevglf, bigevglf, bigevglfj, bigevglf_state,bigevglf, ROT270, "Taito Corporation", "Big Event Golf (Japan)", MACHINE_NO_COCKTAIL | MACHINE_SUPPORTS_SAVE )
+GAME( 1986, bigevglf,  0,        bigevglf, bigevglf,  bigevglf_state, bigevglf, ROT270, "Taito America Corporation", "Big Event Golf (US)",    MACHINE_NO_COCKTAIL | MACHINE_SUPPORTS_SAVE )
+GAME( 1986, bigevglfj, bigevglf, bigevglf, bigevglfj, bigevglf_state, bigevglf, ROT270, "Taito Corporation",         "Big Event Golf (Japan)", MACHINE_NO_COCKTAIL | MACHINE_SUPPORTS_SAVE )

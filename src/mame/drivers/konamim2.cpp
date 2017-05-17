@@ -194,6 +194,7 @@ Notes:
 #include "imagedev/chd_cd.h"
 #include "machine/terminal.h"
 #include "softlist.h"
+#include "screen.h"
 
 struct CDE_DMA
 {
@@ -222,7 +223,7 @@ public:
 	required_ioport m_in_country;
 	required_ioport m_in_card;
 	required_ioport m_in_monitor;
-	
+
 	uint32_t m_vdl0_address;
 	uint32_t m_vdl1_address;
 	uint32_t m_irq_enable;
@@ -301,11 +302,11 @@ uint32_t konamim2_state::screen_update_m2(screen_device &screen, bitmap_ind16 &b
 		fb_size = m_main_ram[((cur_vdl_address - 0x40000000) / 8) + 2] >> 32;
 		//config = m_main_ram[(cur_vdl_address - 0x40000000) / 8] >> 32;
 		//popmessage("%08x",config);
-		
+
 		height = fb_size & 0x1ff;
 		width = (fb_size >> 24) * 16;
 	}
-	
+
 	if (fb_start <= 0x800000)
 	{
 		uint16_t *frame = (uint16_t*)&m_main_ram[fb_start/8];
@@ -463,7 +464,7 @@ READ64_MEMBER(konamim2_state::unk4000280_r)
 	uint32_t sys_config = 0x03600000;
 
 	sys_config |= 0 << 0;  // Bit 0:       PAL/NTSC switch (default is selected by encoder)
-	sys_config |= 0 << 2;           			  // Bit 2-3:     Video Encoder (0 = MEIENC, 1 = VP536, 2 = BT9103, 3 = DENC)
+	sys_config |= 0 << 2;                         // Bit 2-3:     Video Encoder (0 = MEIENC, 1 = VP536, 2 = BT9103, 3 = DENC)
 	sys_config |= m_in_country->read() << 11;     // Bit 11-12:   Country
 									//              0 = ???
 									//              1 = UK
@@ -1177,13 +1178,13 @@ static ADDRESS_MAP_START( m2_main, AS_PROGRAM, 64, konamim2_state )
 	AM_RANGE(0x00030010, 0x00030017) AM_WRITE(video_w)
 	AM_RANGE(0x00030030, 0x00030037) AM_READ(unk30030_r)
 	AM_RANGE(0x00030400, 0x00030407) AM_WRITE32(video_irq_ack_w,0x00000000ffffffffU)
-	
+
 	AM_RANGE(0x01000000, 0x01000fff) AM_READWRITE(cde_r, cde_w)
-	
+
 	AM_RANGE(0x02000000, 0x02000fff) AM_READ(device2_r)
-	
+
 	AM_RANGE(0x03000000, 0x03000007) AM_READ8(id3_r, 0x00ff000000000000U)
-	
+
 	AM_RANGE(0x04000000, 0x04000007) AM_READ8(id4_r, 0x00ff000000000000U)
 	AM_RANGE(0x04000010, 0x04000017) AM_WRITE8(serial_w,0x00000000000000ffU)
 	AM_RANGE(0x04000018, 0x0400001f) AM_READ(unk1_r) // serial status
@@ -1191,16 +1192,16 @@ static ADDRESS_MAP_START( m2_main, AS_PROGRAM, 64, konamim2_state )
 	AM_RANGE(0x04000418, 0x0400041f) AM_WRITE(unk4000418_w) // serial status ack
 	AM_RANGE(0x04000208, 0x0400020f) AM_READ(unk3_r)
 	AM_RANGE(0x04000280, 0x04000287) AM_READ(unk4000280_r)
-	
+
 	AM_RANGE(0x05000000, 0x05000007) AM_READ8(id5_r, 0x00ff000000000000U)
-	
+
 	AM_RANGE(0x06000000, 0x06000007) AM_READ8(id6_r, 0x00ff000000000000U)
-	
+
 	AM_RANGE(0x07000000, 0x07000007) AM_READ8(id7_r, 0x00ff000000000000U)
 
 	AM_RANGE(0x10000000, 0x10000007) AM_READ(cpu_r)
 	AM_RANGE(0x10000008, 0x10001007) AM_NOP     // ???
-	
+
 	AM_RANGE(0x20000000, 0x201fffff) AM_ROM AM_SHARE("share2")
 	AM_RANGE(0x40000000, 0x407fffff) AM_RAM AM_SHARE("main_ram")
 	AM_RANGE(0xfff00000, 0xffffffff) AM_ROM AM_REGION("boot", 0) AM_SHARE("share2")
@@ -1210,7 +1211,7 @@ static ADDRESS_MAP_START( 3do_m2_main, AS_PROGRAM, 64, konamim2_state )
 //  ADDRESS_MAP_UNMAP_HIGH
 	AM_IMPORT_FROM( m2_main )
 
-//	AM_RANGE(0x00000000, 0x000cffff) devices?
+//  AM_RANGE(0x00000000, 0x000cffff) devices?
 ADDRESS_MAP_END
 
 static INPUT_PORTS_START( m2 )
@@ -1221,7 +1222,7 @@ static INPUT_PORTS_START( m2 )
 	PORT_CONFSETTING(    0x01, "UK" )
 	PORT_CONFSETTING(    0x02, "Japan" )
 	PORT_CONFSETTING(    0x03, "US" )
-	
+
 	PORT_START("CARD")
 	PORT_CONFNAME( 0x0f, 0x0b, "Card Type" )
 	PORT_CONFSETTING(    0x08, "AC-DevCard" )
@@ -1229,7 +1230,7 @@ static INPUT_PORTS_START( m2 )
 	PORT_CONFSETTING(    0x0c, "DevCard (not allowed)" )
 	PORT_CONFSETTING(    0x0e, "Upgrade (not allowed)" )
 	PORT_CONFSETTING(    0x0f, "Multiplayer (not allowed)" )
-	
+
 	PORT_START("MONITOR")
 	PORT_CONFNAME( 0x01, 0x00, "Monitor Type" )
 	PORT_CONFSETTING(    0x01, "15 KHz" )
@@ -1245,20 +1246,20 @@ INTERRUPT_GEN_MEMBER(konamim2_state::m2)
 	 0x200000
 	 0x800000 VBlank irq
 	 */
-	
+
 	if (m_irq_enable & 0x800000)
 	{
 		//m_irq_enable |= 0x800000;
 		m_irq_active |= 0x800000;
 		device.execute().set_input_line(PPC_IRQ, ASSERT_LINE);
 	}
-	
+
 	/*if (m_irq_enable & 0x8)
 	{
 	    m_irq_active |= 0x8;
 	}*/
 
-	
+
 }
 
 void konamim2_state::machine_reset()
@@ -1268,7 +1269,7 @@ void konamim2_state::machine_reset()
 	cde_init();
 }
 
-static MACHINE_CONFIG_START( m2, konamim2_state )
+static MACHINE_CONFIG_START( m2 )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", PPC602, 66000000)   /* actually PPC602, 66MHz */
@@ -1294,14 +1295,14 @@ static MACHINE_CONFIG_START( m2, konamim2_state )
 
 	MCFG_PALETTE_ADD_RRRRRGGGGGBBBBB("palette")
 
-	
+
 	/*cd-rom*/
 	MCFG_CDROM_ADD( "cdrom" )
 	MCFG_CDROM_INTERFACE("3do_m2_cdrom")
 
 MACHINE_CONFIG_END
 
-static MACHINE_CONFIG_DERIVED_CLASS ( 3do_m2, m2, konamim2_state )
+static MACHINE_CONFIG_DERIVED ( 3do_m2, m2 )
 
 	MCFG_CPU_MODIFY("maincpu")
 	MCFG_CPU_PROGRAM_MAP(3do_m2_main)
@@ -1457,4 +1458,4 @@ GAME( 1998, evilngt,  0,        m2, m2, konamim2_state, m2, ROT0, "Konami", "Evi
 GAME( 1998, evilngte, evilngt,  m2, m2, konamim2_state, m2, ROT0, "Konami", "Evil Night (ver EAA)", MACHINE_NOT_WORKING | MACHINE_NO_SOUND )
 GAME( 1998, hellngt,  evilngt,  m2, m2, konamim2_state, m2, ROT0, "Konami", "Hell Night (ver EAA)", MACHINE_NOT_WORKING | MACHINE_NO_SOUND )
 
-CONS( 199?, 3do_m2,     0,      0,    3do_m2,    m2,    driver_device, 0,      "3DO",  "3DO M2",    MACHINE_NOT_WORKING | MACHINE_NO_SOUND )
+CONS( 199?, 3do_m2,     0,      0,    3do_m2,    m2,    konamim2_state, 0,      "3DO",  "3DO M2",    MACHINE_NOT_WORKING | MACHINE_NO_SOUND )

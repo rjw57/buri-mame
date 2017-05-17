@@ -107,7 +107,6 @@ video_manager::video_manager(running_machine &machine)
 		m_avi_frame_period(attotime::zero),
 		m_avi_next_frame_time(attotime::zero),
 		m_avi_frame(0),
-		m_dummy_recording(false),
 		m_timecode_enabled(false),
 		m_timecode_write(false),
 		m_timecode_text(""),
@@ -159,10 +158,6 @@ video_manager::video_manager(running_machine &machine)
 	filename = machine.options().avi_write();
 	if (filename[0] != 0)
 		begin_recording(filename, MF_AVI);
-
-#ifdef MAME_DEBUG
-	m_dummy_recording = machine.options().dummy_write();
-#endif
 
 	// if no screens, create a periodic timer to drive updates
 	if (machine.first_screen() == nullptr)
@@ -317,7 +312,7 @@ void video_manager::save_snapshot(screen_device *screen, emu_file &file)
 
 	// add two text entries describing the image
 	std::string text1 = std::string(emulator_info::get_appname()).append(" ").append(emulator_info::get_build_version());
-	std::string text2 = std::string(machine().system().manufacturer).append(" ").append(machine().system().description);
+	std::string text2 = std::string(machine().system().manufacturer).append(" ").append(machine().system().type.fullname());
 	png_info pnginfo = { nullptr };
 	png_add_text(&pnginfo, "Software", text1.c_str());
 	png_add_text(&pnginfo, "System", text2.c_str());
@@ -1272,7 +1267,7 @@ osd_file::error video_manager::open_next(emu_file &file, const char *extension)
 void video_manager::record_frame()
 {
 	// ignore if nothing to do
-	if (m_mng_file == nullptr && m_avi_file == nullptr && !m_dummy_recording)
+	if (m_mng_file == nullptr && m_avi_file == nullptr)
 		return;
 
 	// start the profiler and get the current time
@@ -1314,7 +1309,7 @@ void video_manager::record_frame()
 			if (m_mng_frame == 0)
 			{
 				std::string text1 = std::string(emulator_info::get_appname()).append(" ").append(emulator_info::get_build_version());
-				std::string text2 = std::string(machine().system().manufacturer).append(" ").append(machine().system().description);
+				std::string text2 = std::string(machine().system().manufacturer).append(" ").append(machine().system().type.fullname());
 				png_add_text(&pnginfo, "Software", text1.c_str());
 				png_add_text(&pnginfo, "System", text2.c_str());
 			}

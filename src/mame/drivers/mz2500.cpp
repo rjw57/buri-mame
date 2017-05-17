@@ -46,15 +46,17 @@
 
 #include "emu.h"
 #include "cpu/z80/z80.h"
-#include "machine/z80pio.h"
-#include "machine/z80dart.h"
 #include "machine/i8255.h"
-#include "machine/wd_fdc.h"
 #include "machine/pit8253.h"
+#include "machine/rp5c15.h"
+#include "machine/wd_fdc.h"
+#include "machine/z80dart.h"
+#include "machine/z80pio.h"
 #include "sound/2203intf.h"
 #include "sound/beep.h"
-#include "machine/rp5c15.h"
+#include "screen.h"
 #include "softlist.h"
+#include "speaker.h"
 
 //#include "imagedev/cassette.h"
 #include "imagedev/flopdrv.h"
@@ -85,7 +87,7 @@ public:
 	required_device<pit8253_device> m_pit;
 	required_device<beep_device> m_beeper;
 	required_device<gfxdecode_device> m_gfxdecode;
-	required_device<mb8877_t> m_fdc;
+	required_device<mb8877_device> m_fdc;
 	required_device<floppy_connector> m_floppy0;
 	required_device<floppy_connector> m_floppy1;
 	required_device<floppy_connector> m_floppy2;
@@ -1672,7 +1674,8 @@ static INPUT_PORTS_START( mz2500 )
 
 	PORT_START("KEYD")
 	PORT_BIT(0x01,IP_ACTIVE_LOW,IPT_KEYBOARD) PORT_NAME("LOGO KEY")
-	PORT_BIT(0xfe,IP_ACTIVE_LOW,IPT_UNUSED)
+	PORT_BIT(0x02,IP_ACTIVE_LOW,IPT_KEYBOARD) PORT_NAME("HELP")
+	PORT_BIT(0xfc,IP_ACTIVE_LOW,IPT_UNUSED)
 
 	PORT_START("UNUSED")
 	PORT_BIT(0xff,IP_ACTIVE_LOW,IPT_UNUSED )
@@ -2073,7 +2076,7 @@ static SLOT_INTERFACE_START( mz2500_floppies )
 SLOT_INTERFACE_END
 
 
-static MACHINE_CONFIG_START( mz2500, mz2500_state )
+static MACHINE_CONFIG_START( mz2500 )
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", Z80, 6000000)
 	MCFG_CPU_PROGRAM_MAP(mz2500_map)
@@ -2196,5 +2199,5 @@ ROM_END
 
 /* Driver */
 
-COMP( 1985, mz2500,   0,             0,      mz2500,   mz2500, driver_device,        0,      "Sharp",     "MZ-2500", MACHINE_IMPERFECT_GRAPHICS )
-COMP( 1985, mz2520,   mz2500,        0,      mz2500,   mz2500, driver_device,        0,      "Sharp",     "MZ-2520", MACHINE_IMPERFECT_GRAPHICS ) // looks a stripped down version of the regular MZ-2500, with only two floppies drives and no cassette interface
+COMP( 1985, mz2500,   0,             0,      mz2500,   mz2500, mz2500_state,        0,      "Sharp",     "MZ-2500", MACHINE_IMPERFECT_GRAPHICS )
+COMP( 1985, mz2520,   mz2500,        0,      mz2500,   mz2500, mz2500_state,        0,      "Sharp",     "MZ-2520", MACHINE_IMPERFECT_GRAPHICS ) // looks a stripped down version of the regular MZ-2500, with only two floppies drives and no cassette interface

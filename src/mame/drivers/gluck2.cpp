@@ -189,16 +189,18 @@
 
 *******************************************************************************/
 
-
-#define MASTER_CLOCK    XTAL_10MHz
-#define SND_CLOCK       XTAL_3_579545MHz
-
 #include "emu.h"
 #include "cpu/m6502/m6502.h"
+#include "machine/nvram.h"
 #include "sound/ay8910.h"
 #include "sound/ym2413.h"
 #include "video/mc6845.h"
-#include "machine/nvram.h"
+#include "screen.h"
+#include "speaker.h"
+
+
+#define MASTER_CLOCK    XTAL_10MHz
+#define SND_CLOCK       XTAL_3_579545MHz
 
 
 class gluck2_state : public driver_device
@@ -513,7 +515,7 @@ GFXDECODE_END
 *              Machine Drivers               *
 *********************************************/
 
-static MACHINE_CONFIG_START( gluck2, gluck2_state )
+static MACHINE_CONFIG_START( gluck2 )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", M6502, MASTER_CLOCK/16) /* guess */
@@ -584,5 +586,5 @@ ROM_END
 *                Game Drivers                *
 *********************************************/
 
-/*    YEAR  NAME      PARENT  MACHINE   INPUT     STATE          INIT   ROT    COMPANY          FULLNAME       FLAGS... */
-GAME( 1992, gluck2,   0,      gluck2,   gluck2,   driver_device, 0,     ROT0, "Yung Yu / CYE", "Good Luck II", MACHINE_SUPPORTS_SAVE )
+//    YEAR  NAME      PARENT  MACHINE   INPUT     STATE         INIT   ROT    COMPANY          FULLNAME       FLAGS...
+GAME( 1992, gluck2,   0,      gluck2,   gluck2,   gluck2_state, 0,     ROT0, "Yung Yu / CYE", "Good Luck II", MACHINE_SUPPORTS_SAVE )

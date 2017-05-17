@@ -167,6 +167,8 @@ class running_machine
 {
 	DISABLE_COPYING(running_machine);
 
+	class side_effect_disabler;
+
 	friend class sound_manager;
 	friend class memory_manager;
 
@@ -219,6 +221,11 @@ public:
 	bool save_or_load_pending() const { return !m_saveload_pending_file.empty(); }
 	screen_device *first_screen() const { return primary_screen; }
 
+	// RAII-based side effect disable
+	// NOP-ed when passed false, to make it more easily conditional
+	side_effect_disabler disable_side_effect(bool disable_se = true) { return side_effect_disabler(this, disable_se); }
+	bool side_effect_disabled() const { return m_side_effect_disabled != 0; }
+
 	// additional helpers
 	emu_options &options() const { return m_config.options(); }
 	attotime time() const { return m_scheduler.time(); }
@@ -249,8 +256,8 @@ public:
 	void schedule_exit();
 	void schedule_hard_reset();
 	void schedule_soft_reset();
-	void schedule_save(const char *filename);
-	void schedule_load(const char *filename);
+	void schedule_save(std::string &&filename);
+	void schedule_load(std::string &&filename);
 
 	// date & time
 	void base_datetime(system_time &systime);
@@ -265,7 +272,7 @@ public:
 	void strlog(const char *str) const;
 	u32 rand();
 	const char *describe_context();
-	std::string compose_saveload_filename(const char *base_filename, const char **searchpath = nullptr);
+	std::string compose_saveload_filename(std::string &&base_filename, const char **searchpath = nullptr);
 
 	// CPU information
 	cpu_device *            firstcpu;           // first CPU
@@ -274,16 +281,41 @@ private:
 	// video-related information
 	screen_device *         primary_screen;     // the primary screen device, or nullptr if screenless
 
+	// side effect disable counter
+	u32                     m_side_effect_disabled;
+
 public:
 	// debugger-related information
 	u32                     debug_flags;        // the current debug flags
 
 private:
+	class side_effect_disabler {
+		running_machine *m_machine;
+		bool m_disable_se;
+
+	public:
+		side_effect_disabler(running_machine *m, bool disable_se) : m_machine(m), m_disable_se(disable_se) {
+			if(m_disable_se)
+				m_machine->disable_side_effect_count();
+		}
+
+		~side_effect_disabler() {
+			if(m_disable_se)
+				m_machine->enable_side_effect_count();
+		}
+
+		side_effect_disabler(const side_effect_disabler &) = delete;
+		side_effect_disabler(side_effect_disabler &&) = default;
+	};
+
+	void disable_side_effect_count() { m_side_effect_disabled++; }
+	void enable_side_effect_count()  { m_side_effect_disabled--; }
+
 	// internal helpers
 	template <typename T> struct is_null { template <typename U> static bool value(U &&x) { return false; } };
 	template <typename T> struct is_null<T *> { template <typename U> static bool value(U &&x) { return !x; } };
 	void start();
-	void set_saveload_filename(const char *filename);
+	void set_saveload_filename(std::string &&filename);
 	std::string get_statename(const char *statename_opt) const;
 	void handle_saveload();
 	void soft_reset(void *ptr = nullptr, s32 param = 0);
@@ -342,11 +374,11 @@ private:
 	std::unique_ptr<emu_file>  m_logfile;              // pointer to the active log file
 
 	// load/save management
-	enum saveload_schedule
+	enum class saveload_schedule
 	{
-		SLS_NONE,
-		SLS_SAVE,
-		SLS_LOAD
+		NONE,
+		SAVE,
+		LOAD
 	};
 	saveload_schedule       m_saveload_schedule;
 	attotime                m_saveload_schedule_time;

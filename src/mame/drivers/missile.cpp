@@ -354,6 +354,8 @@ Super Missile Attack Board Layout
 #include "machine/watchdog.h"
 #include "sound/pokey.h"
 #include "sound/ay8910.h"
+#include "screen.h"
+#include "speaker.h"
 
 class missile_state : public driver_device
 {
@@ -739,7 +741,7 @@ WRITE8_MEMBER(missile_state::missile_w)
 		output().set_led_value(0, ~data & 0x02);
 		m_ctrld = data & 1;
 	}
-	
+
 	/* color RAM */
 	else if (offset >= 0x4b00 && offset < 0x4c00)
 		m_palette->set_pen_color(offset & 7, pal1bit(~data >> 3), pal1bit(~data >> 2), pal1bit(~data >> 1));
@@ -852,7 +854,7 @@ WRITE8_MEMBER(missile_state::bootleg_w)
 		output().set_led_value(0, ~data & 0x02);
 		m_ctrld = data & 1;
 	}
-	
+
 	/* watchdog */
 	else if (offset >= 0x4900 && offset < 0x4a00)
 		m_watchdog->watchdog_reset();
@@ -917,7 +919,7 @@ READ8_MEMBER(missile_state::bootleg_r)
 	/* IN2 */
 	else if (offset >= 0x4b00 && offset < 0x4c00) // seems ok
 		result = m_r10->read();
-	
+
 
 	/* anything else */
 	else
@@ -1132,7 +1134,7 @@ INPUT_PORTS_END
  *
  *************************************/
 
-static MACHINE_CONFIG_START( missile, missile_state )
+static MACHINE_CONFIG_START( missile )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", M6502, MASTER_CLOCK/8)
@@ -1335,27 +1337,27 @@ ROM_END
 
 /*
 CPUs
-QTY 	Type 	clock 	position 	function
-1x 	6502 		2B 	8-bit Microprocessor - main
-1x 	LM380 		12B 	Audio Amplifier - sound
-1x 	oscillator 	10.000 	6C 	
+QTY     Type    clock   position    function
+1x  6502        2B  8-bit Microprocessor - main
+1x  LM380       12B     Audio Amplifier - sound
+1x  oscillator  10.000  6C
 
 ROMs
-QTY 	Type 	position 	status
-2x 	F2708 	10C, 10E 	dumped
-6x 	MCM2716C 	1-6 	dumped
-1x 	DM74S288N 	6L 	dumped
+QTY     Type    position    status
+2x  F2708   10C, 10E    dumped
+6x  MCM2716C    1-6     dumped
+1x  DM74S288N   6L  dumped
 
 RAMs
-QTY 	Type 	position
-8x 	TMS4116 	4F,4H,4J,4K,4L,4M,4N,4P
-1x 	74S189N 	7L
+QTY     Type    position
+8x  TMS4116     4F,4H,4J,4K,4L,4M,4N,4P
+1x  74S189N     7L
 
 Others
 
 1x 22x2 edge connector
 1x trimmer (volume)(12E)
-2x 8x2 switches DIP(8R,10R) 
+2x 8x2 switches DIP(8R,10R)
 */
 
 ROM_START( missilea )
@@ -1483,17 +1485,17 @@ DRIVER_INIT_MEMBER(missile_state,missilem)
  *
  *************************************/
 
-GAME( 1980, missile,  0,       missile, missile, driver_device,         0, ROT0, "Atari", "Missile Command (rev 3)", MACHINE_SUPPORTS_SAVE )
-GAME( 1980, missile2, missile, missile, missile, driver_device,         0, ROT0, "Atari", "Missile Command (rev 2)", MACHINE_SUPPORTS_SAVE )
-GAME( 1980, missile1, missile, missile, missile, driver_device,         0, ROT0, "Atari", "Missile Command (rev 1)", MACHINE_SUPPORTS_SAVE )
+GAME( 1980, missile,  0,       missile, missile,  missile_state,        0, ROT0, "Atari", "Missile Command (rev 3)", MACHINE_SUPPORTS_SAVE )
+GAME( 1980, missile2, missile, missile, missile,  missile_state,        0, ROT0, "Atari", "Missile Command (rev 2)", MACHINE_SUPPORTS_SAVE )
+GAME( 1980, missile1, missile, missile, missile,  missile_state,        0, ROT0, "Atari", "Missile Command (rev 1)", MACHINE_SUPPORTS_SAVE )
 GAME( 1981, suprmatk, missile, missile, suprmatk, missile_state, suprmatk, ROT0, "Atari / General Computer Corporation", "Super Missile Attack (for rev 1)", MACHINE_SUPPORTS_SAVE )
-GAME( 1981, suprmatkd,missile, missile, suprmatk, driver_device,        0, ROT0, "Atari / General Computer Corporation", "Super Missile Attack (not encrypted)", MACHINE_SUPPORTS_SAVE )
+GAME( 1981, suprmatkd,missile, missile, suprmatk, missile_state,        0, ROT0, "Atari / General Computer Corporation", "Super Missile Attack (not encrypted)", MACHINE_SUPPORTS_SAVE )
 
 /* the following bootleg has extremely similar program ROMs to missile1, but has different unknown sound hardware and 2 more ROMs */
-GAME( 1981, missilea, missile, missilea, missile, driver_device,         0, ROT0, "bootleg (Ugames)", "Missile Attack", MACHINE_NO_SOUND | MACHINE_SUPPORTS_SAVE )
+GAME( 1981, missilea, missile, missilea, missile, missile_state,        0, ROT0, "bootleg (Ugames)", "Missile Attack", MACHINE_NO_SOUND | MACHINE_SUPPORTS_SAVE )
 
 /* the following bootlegs are on different hardware and don't work */
-GAME( 1980, mcombat,  missile, missileb, missileb, driver_device,         0, ROT0, "bootleg (Videotron)", "Missile Combat (Videotron bootleg, set 1)", MACHINE_NOT_WORKING )
-GAME( 1980, mcombata, missile, missileb, missileb, driver_device,         0, ROT0, "bootleg (Videotron)", "Missile Combat (Videotron bootleg, set 2)", MACHINE_NOT_WORKING )
-GAME( 1980, mcombats, missile, missileb, missileb, driver_device,         0, ROT0, "bootleg (Sidam)", "Missile Combat (Sidam bootleg)", MACHINE_NOT_WORKING )
-GAME( 2005, missilem, missile, missilea, missileb, missile_state,  missilem, ROT0, "hack (Braze Technologies)", "Missile Command Multigame", MACHINE_NOT_WORKING )
+GAME( 1980, mcombat,  missile, missileb, missileb, missile_state,        0, ROT0, "bootleg (Videotron)", "Missile Combat (Videotron bootleg, set 1)", MACHINE_NOT_WORKING )
+GAME( 1980, mcombata, missile, missileb, missileb, missile_state,        0, ROT0, "bootleg (Videotron)", "Missile Combat (Videotron bootleg, set 2)", MACHINE_NOT_WORKING )
+GAME( 1980, mcombats, missile, missileb, missileb, missile_state,        0, ROT0, "bootleg (Sidam)", "Missile Combat (Sidam bootleg)", MACHINE_NOT_WORKING )
+GAME( 2005, missilem, missile, missilea, missileb, missile_state, missilem, ROT0, "hack (Braze Technologies)", "Missile Command Multigame", MACHINE_NOT_WORKING )

@@ -7,9 +7,14 @@
 ***************************************************************************/
 
 #include "emu.h"
-#include "cpu/i386/i386.h"
 #include "southbridge.h"
+
+#include "bus/isa/com.h"
+#include "bus/isa/fdc.h"
+#include "bus/isa/lpt.h"
 #include "bus/pc_kbd/keyboards.h"
+#include "cpu/i386/i386.h"
+#include "speaker.h"
 
 
 static SLOT_INTERFACE_START(pc_isa_onboard)
@@ -127,8 +132,8 @@ machine_config_constructor southbridge_device::device_mconfig_additions() const
 	return MACHINE_CONFIG_NAME( southbridge );
 }
 
-southbridge_device::southbridge_device(const machine_config &mconfig, device_type type, const char *name, const char *tag, device_t *owner, uint32_t clock, const char *shortname, const char *source)
-	: device_t(mconfig, type, name, tag, owner, clock, shortname, source),
+southbridge_device::southbridge_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock)
+	: device_t(mconfig, type, tag, owner, clock),
 	m_maincpu(*this, ":maincpu"),
 	m_pic8259_master(*this, "pic8259_master"),
 	m_pic8259_slave(*this, "pic8259_slave"),

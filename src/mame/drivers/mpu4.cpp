@@ -260,11 +260,11 @@ TODO: - Distinguish door switches using manual
       - Per game inputs not currently supported, may need to do something about DIPs, inverted lines etc.
 ***********************************************************************************************************/
 #include "emu.h"
-
 #include "includes/mpu4.h"
 
-
 #include "video/awpvid.h"       //Fruit Machines Only
+
+#include "speaker.h"
 
 #include "mpu4.lh"
 #include "mpu4ext.lh"
@@ -3083,7 +3083,7 @@ MACHINE_CONFIG_FRAGMENT( mpu4_common2 )
 MACHINE_CONFIG_END
 
 /* machine driver for MOD 2 board */
-MACHINE_CONFIG_START( mpu4base, mpu4_state )
+MACHINE_CONFIG_START( mpu4base )
 
 	MCFG_MACHINE_START_OVERRIDE(mpu4_state,mod2    )
 	MCFG_MACHINE_RESET_OVERRIDE(mpu4_state,mpu4)

@@ -12,24 +12,26 @@
 ***************************************************************************/
 
 #include "emu.h"
-#include "cpu/i86/i86.h"
-#include "cpu/i8089/i8089.h"
-#include "machine/ram.h"
-#include "machine/pit8253.h"
-#include "machine/i8255.h"
-#include "machine/pic8259.h"
-#include "machine/z80dart.h"
-#include "machine/74153.h"
-#include "machine/wd_fdc.h"
-#include "video/mc6845.h"
-#include "sound/sn76496.h"
-#include "imagedev/flopdrv.h"
-#include "formats/apridisk.h"
-#include "bus/centronics/ctronics.h"
-#include "bus/rs232/rs232.h"
 #include "bus/apricot/expansion/expansion.h"
 #include "bus/apricot/keyboard/keyboard.h"
+#include "bus/centronics/ctronics.h"
+#include "bus/rs232/rs232.h"
+#include "cpu/i86/i86.h"
+#include "cpu/i8089/i8089.h"
+#include "formats/apridisk.h"
+#include "imagedev/flopdrv.h"
+#include "machine/ram.h"
+#include "machine/74153.h"
+#include "machine/i8255.h"
+#include "machine/pic8259.h"
+#include "machine/pit8253.h"
+#include "machine/wd_fdc.h"
+#include "machine/z80dart.h"
+#include "sound/sn76496.h"
+#include "video/mc6845.h"
+#include "screen.h"
 #include "softlist.h"
+#include "speaker.h"
 
 
 //**************************************************************************
@@ -100,7 +102,7 @@ private:
 	required_device<z80sio0_device> m_sio;
 	required_device<rs232_port_device> m_rs232;
 	required_device<centronics_device> m_centronics;
-	required_device<wd2797_t> m_fdc;
+	required_device<wd2797_device> m_fdc;
 	required_device<floppy_connector> m_floppy0;
 	required_device<floppy_connector> m_floppy1;
 	required_device<palette_device> m_palette;
@@ -325,7 +327,7 @@ ADDRESS_MAP_END
 
 static ADDRESS_MAP_START( apricot_io, AS_IO, 16, apricot_state )
 	AM_RANGE(0x00, 0x03) AM_DEVREADWRITE8("ic31", pic8259_device, read, write, 0x00ff)
-	AM_RANGE(0x40, 0x47) AM_DEVREADWRITE8("ic68", wd2797_t, read, write, 0x00ff)
+	AM_RANGE(0x40, 0x47) AM_DEVREADWRITE8("ic68", wd2797_device, read, write, 0x00ff)
 	AM_RANGE(0x48, 0x4f) AM_DEVREADWRITE8("ic17", i8255_device, read, write, 0x00ff)
 	AM_RANGE(0x50, 0x51) AM_MIRROR(0x06) AM_DEVWRITE8("ic7", sn76489_device, write, 0x00ff)
 	AM_RANGE(0x58, 0x5f) AM_DEVREADWRITE8("ic16", pit8253_device, read, write, 0x00ff)
@@ -345,7 +347,7 @@ ADDRESS_MAP_END
 //  MACHINE DRIVERS
 //**************************************************************************
 
-static MACHINE_CONFIG_START( apricot, apricot_state )
+static MACHINE_CONFIG_START( apricot )
 	// main cpu
 	MCFG_CPU_ADD("ic91", I8086, XTAL_15MHz / 3)
 	MCFG_CPU_PROGRAM_MAP(apricot_mem)
@@ -485,5 +487,5 @@ ROM_END
 //**************************************************************************
 
 //    YEAR  NAME       PARENT   COMPAT  MACHINE    INPUT  CLASS          INIT  COMPANY  FULLNAME      FLAGS
-COMP( 1983, apricot,   0,       0,      apricot,   0,     driver_device, 0,    "ACT",   "Apricot PC", 0 )
-COMP( 1984, apricotxi, apricot, 0,      apricotxi, 0,     driver_device, 0,    "ACT",   "Apricot Xi", 0 )
+COMP( 1983, apricot,   0,       0,      apricot,   0,     apricot_state, 0,    "ACT",   "Apricot PC", 0 )
+COMP( 1984, apricotxi, apricot, 0,      apricotxi, 0,     apricot_state, 0,    "ACT",   "Apricot Xi", 0 )

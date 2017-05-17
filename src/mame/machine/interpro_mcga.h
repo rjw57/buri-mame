@@ -1,10 +1,10 @@
 // license:BSD-3-Clause
 // copyright-holders:Patrick Mackinlay
 
-#pragma once
+#ifndef MAME_MACHINE_INTERPRO_MCGA_H
+#define MAME_MACHINE_INTERPRO_MCGA_H
 
-#ifndef INTERPRO_MCGA_H_
-#define INTERPRO_MCGA_H_
+#pragma once
 
 
 // mcga control register
@@ -18,7 +18,7 @@
 #define MCGA_CTRL_WRPROT     0x00008000
 
 // mcga error register
-#define MCGA_ERROR_VALID	0x00008000
+#define MCGA_ERROR_VALID    0x00008000
 
 class interpro_mcga_device : public device_t
 {
@@ -39,6 +39,6 @@ private:
 };
 
 // device type definition
-extern const device_type INTERPRO_MCGA;
+DECLARE_DEVICE_TYPE(INTERPRO_MCGA, interpro_mcga_device)
 
-#endif
+#endif // MAME_MACHINE_INTERPRO_MCGA_H

@@ -262,12 +262,15 @@ TODO:
 ***************************************************************************/
 
 #include "emu.h"
-#include "cpu/z80/z80.h"
+#include "includes/wecleman.h"
+
 #include "cpu/m68000/m68000.h"
 #include "cpu/m6809/m6809.h"
+#include "cpu/z80/z80.h"
 #include "sound/ym2151.h"
+#include "speaker.h"
+
 #include "wecleman.lh"
-#include "includes/wecleman.h"
 
 
 /***************************************************************************
@@ -1066,7 +1069,7 @@ MACHINE_RESET_MEMBER(wecleman_state,wecleman)
 	m_k007232->set_bank( 0, 1 );
 }
 
-static MACHINE_CONFIG_START( wecleman, wecleman_state )
+static MACHINE_CONFIG_START( wecleman )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", M68000, 10000000)   /* Schems show 10MHz */
@@ -1137,7 +1140,7 @@ MACHINE_RESET_MEMBER(wecleman_state,hotchase)
 }
 
 
-static MACHINE_CONFIG_START( hotchase, wecleman_state )
+static MACHINE_CONFIG_START( hotchase )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", M68000, 10000000)   /* 10 MHz - PCB is drawn in one set's readme */

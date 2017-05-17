@@ -792,6 +792,9 @@ DIP locations verified for:
 #include "cpu/z80/z80.h"
 #include "machine/watchdog.h"
 #include "sound/ay8910.h"
+#include "screen.h"
+#include "speaker.h"
+
 
 /***************************************************************************/
 
@@ -868,7 +871,7 @@ ADDRESS_MAP_END
 READ8_MEMBER(arkanoid_state::hexaa_f000_r)
 {
 //  return m_hexaa_from_sub;
-	return rand();
+	return machine().rand();
 }
 
 WRITE8_MEMBER(arkanoid_state::hexaa_f000_w)
@@ -902,7 +905,7 @@ WRITE8_MEMBER(arkanoid_state::hexaa_sub_80_w)
 READ8_MEMBER(arkanoid_state::hexaa_sub_90_r)
 {
 	return m_hexaa_from_main;
-//  return rand();
+//  return machine().rand();
 }
 
 static ADDRESS_MAP_START( hexaa_sub_iomap, AS_IO, 8, arkanoid_state )
@@ -1332,7 +1335,7 @@ Pixel clock: 3 MHz = 192 HTotal, assuming it's 6 MHz
 #define ARKANOID_VBEND 16
 #define ARKANOID_VBSTART 240
 
-static MACHINE_CONFIG_START( arkanoid, arkanoid_state )
+static MACHINE_CONFIG_START( arkanoid )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", Z80, XTAL_12MHz/2) /* verified on pcb */
@@ -1387,7 +1390,7 @@ static MACHINE_CONFIG_DERIVED( bootleg, arkanoid )
 MACHINE_CONFIG_END
 
 
-static MACHINE_CONFIG_START( hexa, arkanoid_state )
+static MACHINE_CONFIG_START( hexa )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", Z80, XTAL_12MHz/2)  /* Imported from arkanoid - correct? */
@@ -1428,7 +1431,7 @@ static MACHINE_CONFIG_DERIVED( hexaa, hexa )
 MACHINE_CONFIG_END
 
 
-static MACHINE_CONFIG_START( brixian, arkanoid_state )
+static MACHINE_CONFIG_START( brixian )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", Z80, XTAL_12MHz/2)
@@ -1465,13 +1468,20 @@ MACHINE_CONFIG_END
 
 /* ROMs */
 /* rom numbering, with guesses for version numbers and missing roms:
-    A75 01   = Z80 code 1/2 v1.0 Japan (NOT DUMPED, arkatayt and arkangc and maybe arkanoidjbl may actually be bootlegs of this undumped version, so it might be possible to 'restore' this version by 'de-bootlegging' those sets?)
+    A75 01   = Z80 code 1/2 v1.0 Japan (NOT DUMPED, arkatayt and arkangc and
+               maybe arkanoidjbl may actually be bootlegs of this undumped
+               version, so it might be possible to 'restore' this version by
+              'de-bootlegging' those sets?)
     A75 01-1 = Z80 code 1/2 v1.1 Japan and USA/Romstar and World
     A75 02   = Z80 code 2/2 v1.0 Japan (has 'Notice: This game is for use in Japan only' screen)
     A75 03   = GFX 1/3
     A75 04   = GFX 2/3
     A75 05   = GFX 3/3
-    A75 06   = MC68705P5 MCU code, v1.x Japan and v1.x USA/Romstar (DUMPED, verified to have crc&sha1 of 0be83647 and 625fd1e6061123df612f115ef14a06cd6009f5d1; the rom with crc&sha1 of 4e44b50a and c61e7d158dc8e2b003c8158053ec139b904599af is also probably legit as well, only differing due to a different fill in an unused area from the verified one )
+    A75 06   = MC68705P5 MCU code, v1.x Japan and v1.x USA/Romstar (DUMPED,
+               verified to have crc&sha1 of 0be83647 and 625fd1e6061123df612f115ef14a06cd6009f5d1;
+               the rom with crc&sha1 of 4e44b50a and c61e7d158dc8e2b003c8158053ec139b904599af
+               is also probably legit as well, only differing due to a
+               different fill in an unused area from the verified one )
     A75 07   = PROM red
     A75 08   = PROM green
     A75 09   = PROM blue
@@ -1520,9 +1530,21 @@ ROM_START( arkanoid ) // v1.0 World
 
 	// All of these MCUs work in place of A75 06, see comments for each.
 	ROM_REGION( 0x1800, "alt_mcus", 0 ) /* 2k for the microcontroller */
-	ROM_LOAD( "arkanoid_mcu.ic14",       0x0000, 0x0800, CRC(4e44b50a) SHA1(c61e7d158dc8e2b003c8158053ec139b904599af) ) // Decapped: This matches the legitimate Taito rom, with a "Programmed By Yasu 1986" string in it, but has a 0x00 fill after the end of the code instead of 0xFF. This matches the legit rom otherwise and may itself be legit, perhaps an artifact of a 68705 programmer at Taito using a sparse s-record/ihex file and not clearing the ram in the chip programmer to 0xFF (or 0x00?) before programming the MCU.
-	ROM_LOAD( "a75-06__bootleg_68705.ic14",   0x0800, 0x0800, CRC(515d77b6) SHA1(a302937683d11f663abd56a2fd7c174374e4d7fb) ) // NOT decapped: This came from an unprotected bootleg, and used to be used by the main set. It is definitely a bootleg mcu with no timer or int selftest, and completely different code altogether, probably implemented by pirates by blackbox-reverse engineering the real MCU.
-	ROM_LOAD( "arkanoid1_68705p3.ic14",  0x1000, 0x0800, CRC(1b68e2d8) SHA1(f642a7cb624ee14fb0e410de5ae1fc799d2fa1c2) ) // Decapped: This is the same as the bootleg 515d77b6 rom above except the bootrom (0x785-0x7f7) is intact. No other difference.
+	ROM_LOAD( "arkanoid_mcu.ic14", 0x0000, 0x0800, CRC(4e44b50a) SHA1(c61e7d158dc8e2b003c8158053ec139b904599af) ) // Decapped: See below
+	/* This matches the legitimate Taito rom, with a "Programmed By Yasu 1986"
+	   string in it, but has a 0x00 fill after the end of the code instead of
+	   0xFF. This matches the legit rom otherwise and may itself be legit,
+	   perhaps an artifact of a 68705 programmer at Taito using a sparse
+	   s-record/ihex file and not clearing the ram in the chip programmer to
+	   0xFF (or 0x00?) before programming the MCU.*/
+	ROM_LOAD( "a75-06__bootleg_68705.ic14", 0x0800, 0x0800, CRC(515d77b6) SHA1(a302937683d11f663abd56a2fd7c174374e4d7fb) ) // NOT decapped: See below
+	/* This came from an unprotected bootleg, and used to be used by the main
+	   set. It is definitely a bootleg mcu with no timer or int selftest, and
+	   completely different code altogether, probably implemented by pirates
+	   by black-box reverse engineering the real MCU. */
+	ROM_LOAD( "arkanoid1_68705p3.ic14", 0x1000, 0x0800, CRC(1b68e2d8) SHA1(f642a7cb624ee14fb0e410de5ae1fc799d2fa1c2) ) // Decapped: See below
+	/* This is the same as the bootleg 515d77b6 rom above except the bootrom
+	   (0x785-0x7f7) is intact. No other difference. */
 ROM_END
 
 ROM_START( arkanoidu ) // V2.0 US/Romstar
@@ -1564,7 +1586,12 @@ ROM_START( arkanoiduo ) // V1.0 USA/Romstar
 	ROM_LOAD( "a75-09.ic22",    0x0400, 0x0200, CRC(a7c6c277) SHA1(adaa003dcd981576ea1cc5f697d709b2d6b2ea29) )  /* Chip Silkscreen: "A75-09"; blue component */
 
 	ROM_REGION( 0x8000, "altgfx", 0 )
-	ROM_LOAD( "a75__03(alternate).ic64",   0x00000, 0x8000, CRC(983d4485) SHA1(603a8798d1f531a70a527a5c6122f0ffd6adcfb6) ) // this was found on a legit v1.0 Romstar USA pcb with serial number 29342; the only difference seems to be the first 32 tiles are all 0xFF instead of 0x00. Those tiles don't seem to be used by the game at all. This is likely another incidence of "Taito forgot to clear programmer ram before burning a rom from a sparse s-record/ihex file"
+	ROM_LOAD( "a75__03(alternate).ic64",   0x00000, 0x8000, CRC(983d4485) SHA1(603a8798d1f531a70a527a5c6122f0ffd6adcfb6) ) // See below
+	/* This was found on a legit v1.0 Romstar USA pcb with serial number 29342;
+	   the only difference seems to be the first 32 tiles are all 0xFF instead
+	   of 0x00. Those tiles don't seem to be used by the game at all. This is
+	   likely another incident of "Taito forgot to clear programmer ram before
+	   burning a rom from a sparse s-record/ihex file" */
 ROM_END
 
 ROM_START( arkanoidj ) // V2.1 Japan
@@ -1653,7 +1680,12 @@ ROM_START( arkanoidjbl ) // bootleg with MCU copied from real Taito code, but no
 	ROM_LOAD( "e2.6f",        0x8000, 0x8000, CRC(bbc33ceb) SHA1(e9b6fef98d0d20e77c7a1c25eff8e9a8c668a258) ) /* == A75-02.IC16 */
 
 	ROM_REGION( 0x0800, "mcu:mcu", 0 )  /* 2k for the microcontroller */
-	ROM_LOAD( "68705p3.6i",   0x0000, 0x0800, CRC(389a8cfb) SHA1(9530c051b61b5bdec7018c6fdc1ea91288a406bd) ) // This set had an unprotected mcu with a bootlegged copy of the real Taito a75__06.ic14 code, unlike the other bootlegs. It has the bootstrap code missing and the security bit cleared, the area after the rom filled with 0x00, and the verify mode disable jump removed. Otherwise it matches a75__06.ic14
+	ROM_LOAD( "68705p3.6i",   0x0000, 0x0800, CRC(389a8cfb) SHA1(9530c051b61b5bdec7018c6fdc1ea91288a406bd) ) // See below
+	/* This set had an unprotected mcu with a bootlegged copy of the real Taito
+	   a75__06.ic14 code, unlike the other bootlegs. It has the bootstrap code
+	   missing and the security bit cleared, the area after the rom filled with
+	   0x00, and the verify mode disable jump removed. Otherwise it matches
+	   a75__06.ic14 */
 
 	ROM_REGION( 0x18000, "gfx1", 0 )
 	ROM_LOAD( "a75-03.rom",   0x00000, 0x8000, CRC(038b74ba) SHA1(ac053cc4908b4075f918748b89570e07a0ba5116) )
@@ -2160,34 +2192,34 @@ DRIVER_INIT_MEMBER(arkanoid_state,brixian)
 /* Game Drivers */
 
 // original sets of Arkanoid
-//    YEAR, NAME,        PARENT,   MACHINE,  INPUT,     STATE,          INIT,     MONITOR,COMPANY,FULLNAME,FLAGS
-GAME( 1986, arkanoid,    0,        arkanoid, arkanoid,  driver_device,  0,        ROT90, "Taito Corporation Japan",                     "Arkanoid (World, older)",                     MACHINE_SUPPORTS_SAVE )
-GAME( 1986, arkanoidu,   arkanoid, arkanoid, arkanoid,  driver_device,  0,        ROT90, "Taito America Corporation (Romstar license)", "Arkanoid (US, newer)",                        MACHINE_SUPPORTS_SAVE )
-GAME( 1986, arkanoiduo,  arkanoid, arkanoid, arkanoid,  driver_device,  0,        ROT90, "Taito America Corporation (Romstar license)", "Arkanoid (US, older)",                        MACHINE_SUPPORTS_SAVE )
-GAME( 1986, arkanoidj,   arkanoid, arkanoid, arkanoidj, driver_device,  0,        ROT90, "Taito Corporation",                           "Arkanoid (Japan, newer)",                     MACHINE_SUPPORTS_SAVE )
-GAME( 1986, arkanoidja,  arkanoid, arkanoid, arkanoidj, driver_device,  0,        ROT90, "Taito Corporation",                           "Arkanoid (Japan, newer w/level select)",      MACHINE_SUPPORTS_SAVE )
-GAME( 1986, arkanoidjb,  arkanoid, arkanoid, arkanoidj, driver_device,  0,        ROT90, "Taito Corporation",                           "Arkanoid (Japan, older)",                     MACHINE_SUPPORTS_SAVE )
+//    YEAR, NAME,        PARENT,   MACHINE,  INPUT,     STATE,          INIT,     MONITOR,COMPANY,                                       FULLNAME,                                      FLAGS
+GAME( 1986, arkanoid,    0,        arkanoid, arkanoid,  arkanoid_state, 0,        ROT90,  "Taito Corporation Japan",                     "Arkanoid (World, older)",                     MACHINE_SUPPORTS_SAVE )
+GAME( 1986, arkanoidu,   arkanoid, arkanoid, arkanoid,  arkanoid_state, 0,        ROT90,  "Taito America Corporation (Romstar license)", "Arkanoid (US, newer)",                        MACHINE_SUPPORTS_SAVE )
+GAME( 1986, arkanoiduo,  arkanoid, arkanoid, arkanoid,  arkanoid_state, 0,        ROT90,  "Taito America Corporation (Romstar license)", "Arkanoid (US, older)",                        MACHINE_SUPPORTS_SAVE )
+GAME( 1986, arkanoidj,   arkanoid, arkanoid, arkanoidj, arkanoid_state, 0,        ROT90,  "Taito Corporation",                           "Arkanoid (Japan, newer)",                     MACHINE_SUPPORTS_SAVE )
+GAME( 1986, arkanoidja,  arkanoid, arkanoid, arkanoidj, arkanoid_state, 0,        ROT90,  "Taito Corporation",                           "Arkanoid (Japan, newer w/level select)",      MACHINE_SUPPORTS_SAVE )
+GAME( 1986, arkanoidjb,  arkanoid, arkanoid, arkanoidj, arkanoid_state, 0,        ROT90,  "Taito Corporation",                           "Arkanoid (Japan, older)",                     MACHINE_SUPPORTS_SAVE )
 // bootlegs of Arkanoid
-GAME( 1986, arkanoidjbl, arkanoid, p3mcu,    arkanoidj, driver_device,  0,        ROT90, "bootleg",                                     "Arkanoid (bootleg with MCU, set 1)",          MACHINE_SUPPORTS_SAVE )
-GAME( 1986, arkanoidjbl2,arkanoid, p3mcu,    arkanoidj, driver_device,  0,        ROT90, "bootleg (Beta)",                              "Arkanoid (bootleg with MCU, set 2)",          MACHINE_SUPPORTS_SAVE )
-GAME( 1986, ark1ball,    arkanoid, p3mcu,    ark1ball,  driver_device,  0,        ROT90, "bootleg",                                     "Arkanoid (bootleg with MCU, harder)",         MACHINE_SUPPORTS_SAVE )
-GAME( 1986, arkangc,     arkanoid, bootleg,  arkangc,   arkanoid_state, arkangc,  ROT90, "bootleg (Game Corporation)",                  "Arkanoid (Game Corporation bootleg, set 1)",  MACHINE_SUPPORTS_SAVE )
-GAME( 1986, arkangc2,    arkanoid, bootleg,  arkangc2,  arkanoid_state, arkangc2, ROT90, "bootleg (Game Corporation)",                  "Arkanoid (Game Corporation bootleg, set 2)",  MACHINE_SUPPORTS_SAVE )
-GAME( 1986, arkblock,    arkanoid, bootleg,  arkangc,   arkanoid_state, arkblock, ROT90, "bootleg (Game Corporation)",                  "Block (Game Corporation bootleg, set 1)",     MACHINE_SUPPORTS_SAVE )
-GAME( 1986, arkbloc2,    arkanoid, bootleg,  arkangc,   arkanoid_state, arkbloc2, ROT90, "bootleg (Game Corporation)",                  "Block (Game Corporation bootleg, set 2)",     MACHINE_SUPPORTS_SAVE )
-GAME( 1986, arkbloc3,    arkanoid, bootleg,  block2,    arkanoid_state, block2,   ROT90, "bootleg (Game Corporation)",                  "Block (Game Corporation bootleg, set 3)",     MACHINE_SUPPORTS_SAVE ) // Both these sets (arkblock3, block2) have an extra unknown rom
-GAME( 1986, block2,      arkanoid, bootleg,  block2,    arkanoid_state, block2,   ROT90, "bootleg (S.P.A. Co.)",                        "Block 2 (S.P.A. Co. bootleg)",                MACHINE_SUPPORTS_SAVE ) //  and scrambled gfx roms with 'space invader' themed gfx
-GAME( 1986, arkgcbl,     arkanoid, bootleg,  arkgcbl,   arkanoid_state, arkgcbl,  ROT90, "bootleg",                                     "Arkanoid (bootleg on Block hardware, set 1)", MACHINE_SUPPORTS_SAVE )
-GAME( 1986, arkgcbla,    arkanoid, bootleg,  arkgcbl,   arkanoid_state, arkgcbl,  ROT90, "bootleg",                                     "Arkanoid (bootleg on Block hardware, set 2)", MACHINE_SUPPORTS_SAVE )
-GAME( 1988, paddle2,     arkanoid, bootleg,  paddle2,   arkanoid_state, paddle2,  ROT90, "bootleg",                                     "Paddle 2 (bootleg on Block hardware)",        MACHINE_SUPPORTS_SAVE )
-GAME( 1986, arkatayt,    arkanoid, bootleg,  arkatayt,  driver_device,  0,        ROT90, "bootleg (Tayto)",                             "Arkanoid (Tayto bootleg)",                    MACHINE_SUPPORTS_SAVE )
-GAME( 1986, arktayt2,    arkanoid, bootleg,  arktayt2,  driver_device,  0,        ROT90, "bootleg (Tayto)",                             "Arkanoid (Tayto bootleg, harder)",            MACHINE_SUPPORTS_SAVE )
+GAME( 1986, arkanoidjbl, arkanoid, p3mcu,    arkanoidj, arkanoid_state, 0,        ROT90,  "bootleg",                                     "Arkanoid (bootleg with MCU, set 1)",          MACHINE_SUPPORTS_SAVE )
+GAME( 1986, arkanoidjbl2,arkanoid, p3mcu,    arkanoidj, arkanoid_state, 0,        ROT90,  "bootleg (Beta)",                              "Arkanoid (bootleg with MCU, set 2)",          MACHINE_SUPPORTS_SAVE )
+GAME( 1986, ark1ball,    arkanoid, p3mcu,    ark1ball,  arkanoid_state, 0,        ROT90,  "bootleg",                                     "Arkanoid (bootleg with MCU, harder)",         MACHINE_SUPPORTS_SAVE )
+GAME( 1986, arkangc,     arkanoid, bootleg,  arkangc,   arkanoid_state, arkangc,  ROT90,  "bootleg (Game Corporation)",                  "Arkanoid (Game Corporation bootleg, set 1)",  MACHINE_SUPPORTS_SAVE )
+GAME( 1986, arkangc2,    arkanoid, bootleg,  arkangc2,  arkanoid_state, arkangc2, ROT90,  "bootleg (Game Corporation)",                  "Arkanoid (Game Corporation bootleg, set 2)",  MACHINE_SUPPORTS_SAVE )
+GAME( 1986, arkblock,    arkanoid, bootleg,  arkangc,   arkanoid_state, arkblock, ROT90,  "bootleg (Game Corporation)",                  "Block (Game Corporation bootleg, set 1)",     MACHINE_SUPPORTS_SAVE )
+GAME( 1986, arkbloc2,    arkanoid, bootleg,  arkangc,   arkanoid_state, arkbloc2, ROT90,  "bootleg (Game Corporation)",                  "Block (Game Corporation bootleg, set 2)",     MACHINE_SUPPORTS_SAVE )
+GAME( 1986, arkbloc3,    arkanoid, bootleg,  block2,    arkanoid_state, block2,   ROT90,  "bootleg (Game Corporation)",                  "Block (Game Corporation bootleg, set 3)",     MACHINE_SUPPORTS_SAVE ) // Both these sets (arkblock3, block2) have an extra unknown rom
+GAME( 1986, block2,      arkanoid, bootleg,  block2,    arkanoid_state, block2,   ROT90,  "bootleg (S.P.A. Co.)",                        "Block 2 (S.P.A. Co. bootleg)",                MACHINE_SUPPORTS_SAVE ) //  and scrambled gfx roms with 'space invader' themed gfx
+GAME( 1986, arkgcbl,     arkanoid, bootleg,  arkgcbl,   arkanoid_state, arkgcbl,  ROT90,  "bootleg",                                     "Arkanoid (bootleg on Block hardware, set 1)", MACHINE_SUPPORTS_SAVE )
+GAME( 1986, arkgcbla,    arkanoid, bootleg,  arkgcbl,   arkanoid_state, arkgcbl,  ROT90,  "bootleg",                                     "Arkanoid (bootleg on Block hardware, set 2)", MACHINE_SUPPORTS_SAVE )
+GAME( 1988, paddle2,     arkanoid, bootleg,  paddle2,   arkanoid_state, paddle2,  ROT90,  "bootleg",                                     "Paddle 2 (bootleg on Block hardware)",        MACHINE_SUPPORTS_SAVE )
+GAME( 1986, arkatayt,    arkanoid, bootleg,  arkatayt,  arkanoid_state, 0,        ROT90,  "bootleg (Tayto)",                             "Arkanoid (Tayto bootleg)",                    MACHINE_SUPPORTS_SAVE )
+GAME( 1986, arktayt2,    arkanoid, bootleg,  arktayt2,  arkanoid_state, 0,        ROT90,  "bootleg (Tayto)",                             "Arkanoid (Tayto bootleg, harder)",            MACHINE_SUPPORTS_SAVE )
 // Other games
-GAME( 1987, arkatour,    0,        arkanoid, arkanoid,  driver_device,  0,        ROT90, "Taito America Corporation (Romstar license)", "Tournament Arkanoid (US)",                    MACHINE_SUPPORTS_SAVE )
+GAME( 1987, arkatour,    0,        arkanoid, arkanoid,  arkanoid_state, 0,        ROT90,  "Taito America Corporation (Romstar license)", "Tournament Arkanoid (US)",                    MACHINE_SUPPORTS_SAVE )
 
-GAME( 19??, tetrsark,    0,        bootleg,  tetrsark,  arkanoid_state, tetrsark, ROT0,  "D.R. Korea",                                  "Tetris (D.R. Korea)",                         MACHINE_SUPPORTS_SAVE )
+GAME( 19??, tetrsark,    0,        bootleg,  tetrsark,  arkanoid_state, tetrsark, ROT0,   "D.R. Korea",                                  "Tetris (D.R. Korea)",                         MACHINE_SUPPORTS_SAVE )
 
-GAME( 199?, hexa,        0,        hexa,     hexa,      arkanoid_state, hexa,     ROT0,  "D.R. Korea",                                  "Hexa",                                        MACHINE_IMPERFECT_SOUND | MACHINE_SUPPORTS_SAVE )
-GAME( 199?, hexaa,       hexa,     hexaa,    hexa,      arkanoid_state, hexaa,    ROT0,  "D.R. Korea",                                  "Hexa (with 2xZ80, protected)",                MACHINE_NOT_WORKING )
+GAME( 199?, hexa,        0,        hexa,     hexa,      arkanoid_state, hexa,     ROT0,   "D.R. Korea",                                  "Hexa",                                        MACHINE_IMPERFECT_SOUND | MACHINE_SUPPORTS_SAVE )
+GAME( 199?, hexaa,       hexa,     hexaa,    hexa,      arkanoid_state, hexaa,    ROT0,   "D.R. Korea",                                  "Hexa (with 2xZ80, protected)",                MACHINE_NOT_WORKING )
 
-GAME( 1993, brixian,     0,        brixian,  brixian,   arkanoid_state, brixian,  ROT0,  "Cheil Computer System",                       "Brixian",                                     MACHINE_SUPPORTS_SAVE )
+GAME( 1993, brixian,     0,        brixian,  brixian,   arkanoid_state, brixian,  ROT0,   "Cheil Computer System",                       "Brixian",                                     MACHINE_SUPPORTS_SAVE )

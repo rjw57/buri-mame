@@ -1158,10 +1158,13 @@
 
 #include "emu.h"
 #include "includes/namcos22.h"
+
 #include "cpu/m68000/m68000.h"
 #include "cpu/tms32025/tms32025.h"
 #include "machine/namcomcu.h"
 #include "sound/c352.h"
+#include "speaker.h"
+
 
 #define SS22_MASTER_CLOCK   (XTAL_49_152MHz)    /* info from Guru */
 
@@ -3729,7 +3732,7 @@ void namcos22_state::machine_start()
 }
 
 // System 22
-static MACHINE_CONFIG_START( namcos22, namcos22_state )
+static MACHINE_CONFIG_START( namcos22 )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", M68020,SS22_MASTER_CLOCK/2) /* 25 MHz? */
@@ -3788,14 +3791,14 @@ MACHINE_CONFIG_END
 static MACHINE_CONFIG_DERIVED( cybrcomm, namcos22 )
 
 	MCFG_SPEAKER_STANDARD_STEREO("rear_left","rear_right")
-	
+
 	MCFG_SOUND_MODIFY("c352")
 	MCFG_SOUND_ROUTE(2, "rear_left", 1.00)
 	MCFG_SOUND_ROUTE(3, "rear_right", 1.00)
 MACHINE_CONFIG_END
 
 // Super System 22
-static MACHINE_CONFIG_START( namcos22s, namcos22_state )
+static MACHINE_CONFIG_START( namcos22s )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", M68EC020,SS22_MASTER_CLOCK/2)
@@ -3853,7 +3856,7 @@ MACHINE_CONFIG_END
 static MACHINE_CONFIG_DERIVED( airco22b, namcos22s )
 
 	MCFG_SPEAKER_STANDARD_MONO("bodysonic")
-	
+
 	MCFG_SOUND_MODIFY("c352")
 	MCFG_SOUND_ROUTE(2, "bodysonic", 0.50)
 MACHINE_CONFIG_END
@@ -3877,7 +3880,7 @@ MACHINE_CONFIG_END
 static MACHINE_CONFIG_DERIVED( cybrcycc, namcos22s )
 
 	MCFG_SPEAKER_STANDARD_MONO("tank")
-	
+
 	MCFG_SOUND_MODIFY("c352")
 	MCFG_SOUND_ROUTE(2, "tank", 1.00)
 MACHINE_CONFIG_END
@@ -3886,7 +3889,7 @@ static MACHINE_CONFIG_DERIVED( dirtdash, namcos22s )
 
 	MCFG_SPEAKER_STANDARD_MONO("road")
 	MCFG_SPEAKER_STANDARD_MONO("under")
-	
+
 	MCFG_SOUND_MODIFY("c352")
 	MCFG_SOUND_ROUTE(2, "road", 1.00)
 	MCFG_SOUND_ROUTE(3, "under", 0.50) // from sound test
@@ -3903,7 +3906,7 @@ static MACHINE_CONFIG_DERIVED( tokyowar, namcos22s )
 
 	MCFG_SPEAKER_STANDARD_MONO("seat")
 	MCFG_SPEAKER_STANDARD_MONO("vibration")
-	
+
 	MCFG_SOUND_MODIFY("c352")
 	MCFG_SOUND_ROUTE(3, "seat", 1.00)
 	MCFG_SOUND_ROUTE(2, "vibration", 0.50)

@@ -6,19 +6,20 @@
 
 **********************************************************************/
 
+#ifndef MAME_BUS_ECBBUS_GRIP_H
+#define MAME_BUS_ECBBUS_GRIP_H
+
 #pragma once
 
-#ifndef __GRIP__
-#define __GRIP__
-
 #include "ecbbus.h"
+
+#include "bus/centronics/ctronics.h"
 #include "cpu/z80/z80.h"
 #include "cpu/z80/z80daisy.h"
-#include "bus/centronics/ctronics.h"
 #include "machine/i8255.h"
 #include "machine/keyboard.h"
 #include "machine/z80sti.h"
-#include "sound/speaker.h"
+#include "sound/spkrdev.h"
 #include "video/mc6845.h"
 
 
@@ -27,14 +28,13 @@
 //  TYPE DEFINITIONS
 //**************************************************************************
 
-// ======================> grip_device
+// ======================> ecb_grip21_device
 
-class grip_device : public device_t,
-					public device_ecbbus_card_interface
+class ecb_grip21_device : public device_t, public device_ecbbus_card_interface
 {
 public:
 	// construction/destruction
-	grip_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
+	ecb_grip21_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
 
 	// optional information overrides
 	virtual const tiny_rom_entry *device_rom_region() const override;
@@ -57,7 +57,8 @@ public:
 	DECLARE_WRITE8_MEMBER( ppi_pc_w );
 	DECLARE_READ8_MEMBER( sti_gpio_r );
 	DECLARE_WRITE_LINE_MEMBER( speaker_w );
-	DECLARE_WRITE8_MEMBER( kb_w );
+
+	void kb_w(uint8_t data);
 
 	DECLARE_WRITE_LINE_MEMBER( write_centronics_busy );
 	DECLARE_WRITE_LINE_MEMBER( write_centronics_fault );
@@ -110,7 +111,6 @@ private:
 
 	// timers
 	emu_timer *m_kb_timer;
-};
 
 
 	/*
@@ -122,9 +122,10 @@ private:
 	int m_dpage;            // displayed video page
 	*/
 
+};
 
 
 // device type definition
-extern const device_type ECB_GRIP21;
+DECLARE_DEVICE_TYPE(ECB_GRIP21, ecb_grip21_device)
 
-#endif
+#endif // MAME_BUS_ECBBUS_GRIP_H

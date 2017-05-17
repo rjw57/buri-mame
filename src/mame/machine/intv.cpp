@@ -52,21 +52,21 @@ WRITE8_MEMBER( intv_state::intvkbd_dualport8_msb_w )
 struct tape_drive_state_type
 {
 	/* read state */
-	int read_data;			/* 0x4000 */
-	int ready;				/* 0x4001 */
-	int leader_detect;		/* 0x4002 */
-	int tape_missing;		/* 0x4003 */
-	int playing;			/* 0x4004 */
-	int no_data;			/* 0x4005 */
+	int read_data;          /* 0x4000 */
+	int ready;              /* 0x4001 */
+	int leader_detect;      /* 0x4002 */
+	int tape_missing;       /* 0x4003 */
+	int playing;            /* 0x4004 */
+	int no_data;            /* 0x4005 */
 
 	/* write state */
-	int motor_state;		/* 0x4020-0x4022 */
-	int writing;			/* 0x4023 */
-	int audio_b_mute;		/* 0x4024 */
-	int audio_a_mute;		/* 0x4025 */
-	int channel_select;		/* 0x4026 */
-	int erase;				/* 0x4027 */
-	int write_data;			/* 0x4040 */
+	int motor_state;        /* 0x4020-0x4022 */
+	int writing;            /* 0x4023 */
+	int audio_b_mute;       /* 0x4024 */
+	int audio_a_mute;       /* 0x4025 */
+	int channel_select;     /* 0x4026 */
+	int erase;              /* 0x4027 */
+	int write_data;         /* 0x4040 */
 
 	/* bit_counter */
 	int bit_counter;
@@ -74,8 +74,8 @@ struct tape_drive_state_type
 
 //static const char *const tape_motor_mode_desc[8] =
 //{
-//	"IDLE", "IDLE", "IDLE", "IDLE",
-//	"EJECT", "PLAY/RECORD", "REWIND", "FF"
+//  "IDLE", "IDLE", "IDLE", "IDLE",
+//  "EJECT", "PLAY/RECORD", "REWIND", "FF"
 //};
 
 
@@ -213,12 +213,12 @@ WRITE8_MEMBER( intv_state::intvkbd_io_w )
 		case 0x026:
 			// "Tape Drive Control: Mode"
 			// If read mode:
-			//	0=Read Channel B Data, 1 = Read Channel A Data
+			//  0=Read Channel B Data, 1 = Read Channel A Data
 			// If write mode:
 			//  0=Write Channel B data, 1 = Record Channel B Audio
 			tape_drive.channel_select = (data & 1);
-		case 0x027:
 			break;
+		case 0x027:
 			// "Tape Drive Control: Erase"
 			tape_drive.erase = (data & 1);
 			break;
@@ -441,16 +441,16 @@ READ8_MEMBER( intv_state::intvkbd_periph_r )
 			if (m_printer_no_paper)
 				value |= 0x10;
 			//logerror("PeriphRead:  0x%04x->0x%02x\n",offset,value);
-			
-			// After one query of busy, 
+
+			// After one query of busy,
 			// next time the state is not_busy
-			if (!m_printer_not_busy) 
+			if (!m_printer_not_busy)
 				m_printer_not_busy = true;
-				
+
 			return value;
 		break;
 		case 0x07:
-		
+
 		default:
 			//logerror("PeriphRead:  0x%04x->0x%02x\n",offset,0xff);
 			return 0xff;
@@ -557,13 +557,13 @@ void intv_state::machine_reset()
 	m_maincpu->set_input_line_vector(CP1610_INT_INTR,  0x1004);
 
 	/* Set initial PC */
-	m_maincpu->set_state_int(CP1610_R7, 0x1000);
-	
+	m_maincpu->set_state_int(cp1610_cpu_device::CP1610_R7, 0x1000);
+
 	if (m_is_keybd)
 	{
-		m_printer_not_busy = true;			// printer state
-		m_printer_no_paper = false;			// printer state
-		m_printer_not_busy_enable = false;	// printer interface state
+		m_printer_not_busy = true;          // printer state
+		m_printer_no_paper = false;         // printer state
+		m_printer_not_busy_enable = false;  // printer interface state
 	}
 }
 
@@ -581,7 +581,7 @@ void intv_state::machine_start()
 		for (int i = 0; i < 10; i++)
 		{
 			char str[5];
-			sprintf(str, "ROW%i", i);
+			sprintf(str, "ROW%X", uint8_t(i));
 			m_intv_keyboard[i] = ioport(str);
 		}
 
@@ -646,8 +646,8 @@ TIMER_CALLBACK_MEMBER(intv_state::intv_btb_fill)
 	uint8_t row = m_backtab_row;
 	//m_maincpu->adjust_icount(-STIC_ROW_FETCH);
 
-	for (int column = 0; column < STIC_BACKTAB_WIDTH; column++)
-		m_stic->write_to_btb(row, column,  m_ram16[column + row * STIC_BACKTAB_WIDTH]);
+	for (int column = 0; column < stic_device::BACKTAB_WIDTH; column++)
+		m_stic->write_to_btb(row, column,  m_ram16[column + row * stic_device::BACKTAB_WIDTH]);
 
 	m_backtab_row += 1;
 }
@@ -660,16 +660,16 @@ INTERRUPT_GEN_MEMBER(intv_state::intv_interrupt)
 	m_bus_copy_mode = 1;
 	m_backtab_row = 0;
 
-	m_maincpu->adjust_icount(-(12*STIC_ROW_BUSRQ+STIC_FRAME_BUSRQ)); // Account for stic cycle stealing
-	timer_set(m_maincpu->cycles_to_attotime(STIC_VBLANK_END), TIMER_INTV_INTERRUPT_COMPLETE);
-	for (int row = 0; row < STIC_BACKTAB_HEIGHT; row++)
+	m_maincpu->adjust_icount(-(12*stic_device::ROW_BUSRQ+stic_device::FRAME_BUSRQ)); // Account for stic cycle stealing
+	timer_set(m_maincpu->cycles_to_attotime(stic_device::VBLANK_END), TIMER_INTV_INTERRUPT_COMPLETE);
+	for (int row = 0; row < stic_device::BACKTAB_HEIGHT; row++)
 	{
-		timer_set(m_maincpu->cycles_to_attotime(STIC_FIRST_FETCH-STIC_FRAME_BUSRQ+STIC_CYCLES_PER_SCANLINE*STIC_Y_SCALE*delay + (STIC_CYCLES_PER_SCANLINE*STIC_Y_SCALE*STIC_CARD_HEIGHT - STIC_ROW_BUSRQ)*row), TIMER_INTV_BTB_FILL);
+		timer_set(m_maincpu->cycles_to_attotime(stic_device::FIRST_FETCH-stic_device::FRAME_BUSRQ+stic_device::CYCLES_PER_SCANLINE*stic_device::Y_SCALE*delay + (stic_device::CYCLES_PER_SCANLINE*stic_device::Y_SCALE*stic_device::CARD_HEIGHT - stic_device::ROW_BUSRQ)*row), TIMER_INTV_BTB_FILL);
 	}
 
 	if (delay == 0)
 	{
-		m_maincpu->adjust_icount(-STIC_ROW_BUSRQ); // extra row fetch occurs if vertical delay == 0
+		m_maincpu->adjust_icount(-stic_device::ROW_BUSRQ); // extra row fetch occurs if vertical delay == 0
 	}
 
 	m_stic->screenrefresh();

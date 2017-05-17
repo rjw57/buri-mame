@@ -14,11 +14,12 @@
 #include "emu.h"
 #include "includes/alesis.h"
 #include "sound/volt_reg.h"
+#include "speaker.h"
 
 #define LOG 1
 
 // device type definition
-const device_type ALESIS_DM3AG = &device_creator<alesis_dm3ag_device>;
+DEFINE_DEVICE_TYPE(ALESIS_DM3AG, alesis_dm3ag_device, "alesis_dm3ag", "Alesis DM3AG")
 
 /***************************************************************************
     IMPLEMENTATION
@@ -37,9 +38,9 @@ MACHINE_CONFIG_END
 //-------------------------------------------------
 
 alesis_dm3ag_device::alesis_dm3ag_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
-	: device_t(mconfig, ALESIS_DM3AG, "Alesis DM3AG", tag, owner, clock, "alesis_dm3ag", __FILE__),
-		m_dac(*this, "dac"),
-		m_samples(*this, DEVICE_SELF)
+	: device_t(mconfig, ALESIS_DM3AG, tag, owner, clock)
+	, m_dac(*this, "dac")
+	, m_samples(*this, DEVICE_SELF)
 {
 }
 
@@ -74,6 +75,7 @@ void alesis_dm3ag_device::device_reset()
 	m_cur_sample = 0;
 	m_shift = 0;
 	memset(m_cmd, 0, sizeof(m_cmd));
+	m_dac->write(0x8000);
 }
 
 //-------------------------------------------------
@@ -116,7 +118,7 @@ void alesis_dm3ag_device::device_timer(emu_timer &timer, device_timer_id id, int
 			sample = m_samples[m_cur_sample++];
 		}
 
-		m_dac->write(sample << m_shift);
+		m_dac->write(0x8000 - (sample << m_shift));
 	}
 }
 

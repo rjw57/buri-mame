@@ -151,10 +151,11 @@ PCB 'Z545-1 A240570-1'
 
 #include "emu.h"
 #include "cpu/sh2/sh2.h"
-//#include "cpu/v60/v60.h"
 #include "bus/generic/slot.h"
 #include "bus/generic/carts.h"
+#include "screen.h"
 #include "softlist.h"
+#include "speaker.h"
 
 class casloopy_state : public driver_device
 {
@@ -501,7 +502,7 @@ DEVICE_IMAGE_LOAD_MEMBER( casloopy_state, loopy_cart )
 	return image_init_result::PASS;
 }
 
-static MACHINE_CONFIG_START( casloopy, casloopy_state )
+static MACHINE_CONFIG_START( casloopy )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu",SH2A,8000000)

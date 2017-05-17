@@ -156,16 +156,20 @@ From JP manual
 ***************************************************************************/
 
 #include "emu.h"
+#include "includes/topspeed.h"
+#include "includes/taitoipt.h"
+#include "audio/taitosnd.h"
+
 #include "cpu/m68000/m68000.h"
 #include "cpu/z80/z80.h"
-#include "machine/z80ctc.h"
 #include "machine/taitoio.h"
-#include "audio/taitosnd.h"
-#include "sound/ym2151.h"
-#include "sound/msm5205.h"
+#include "machine/z80ctc.h"
 #include "sound/flt_vol.h"
-#include "includes/taitoipt.h"
-#include "includes/topspeed.h"
+#include "sound/msm5205.h"
+#include "sound/ym2151.h"
+#include "screen.h"
+#include "speaker.h"
+
 #include "topspeed.lh"
 
 
@@ -558,7 +562,7 @@ void topspeed_state::machine_reset()
 }
 
 
-static MACHINE_CONFIG_START( topspeed, topspeed_state )
+static MACHINE_CONFIG_START( topspeed )
 
 	// basic machine hardware
 	MCFG_CPU_ADD("maincpu", M68000, XTAL_16MHz / 2)
@@ -621,11 +625,11 @@ static MACHINE_CONFIG_START( topspeed, topspeed_state )
 
 	MCFG_SOUND_ADD("msm1", MSM5205, XTAL_384kHz)
 	MCFG_MSM5205_VCLK_CB(WRITELINE(topspeed_state, msm5205_1_vck)) // VCK function
-	MCFG_MSM5205_PRESCALER_SELECTOR(MSM5205_S48_4B)      // 8 kHz, 4-bit
+	MCFG_MSM5205_PRESCALER_SELECTOR(S48_4B)      // 8 kHz, 4-bit
 	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "filter2", 1.0)
 
 	MCFG_SOUND_ADD("msm2", MSM5205, XTAL_384kHz)
-	MCFG_MSM5205_PRESCALER_SELECTOR(MSM5205_SEX_4B)      // Slave mode, 4-bit
+	MCFG_MSM5205_PRESCALER_SELECTOR(SEX_4B)      // Slave mode, 4-bit
 	MCFG_SOUND_ROUTE(ALL_OUTPUTS, "filter3", 1.0)
 
 	MCFG_FILTER_VOLUME_ADD("filter1l", 0)
@@ -774,6 +778,6 @@ ROM_START( fullthrl )
 ROM_END
 
 
-GAMEL( 1987, topspeed, 0,        topspeed, topspeed, driver_device, 0, ROT0, "Taito Corporation Japan",                     "Top Speed (World)",     MACHINE_SUPPORTS_SAVE, layout_topspeed )
-GAMEL( 1987, topspeedu,topspeed, topspeed, fullthrl, driver_device, 0, ROT0, "Taito America Corporation (Romstar license)", "Top Speed (US)",        MACHINE_SUPPORTS_SAVE, layout_topspeed )
-GAMEL( 1987, fullthrl, topspeed, topspeed, fullthrl, driver_device, 0, ROT0, "Taito Corporation",                           "Full Throttle (Japan)", MACHINE_SUPPORTS_SAVE, layout_topspeed )
+GAMEL( 1987, topspeed, 0,        topspeed, topspeed, topspeed_state, 0, ROT0, "Taito Corporation Japan",                     "Top Speed (World)",     MACHINE_SUPPORTS_SAVE, layout_topspeed )
+GAMEL( 1987, topspeedu,topspeed, topspeed, fullthrl, topspeed_state, 0, ROT0, "Taito America Corporation (Romstar license)", "Top Speed (US)",        MACHINE_SUPPORTS_SAVE, layout_topspeed )
+GAMEL( 1987, fullthrl, topspeed, topspeed, fullthrl, topspeed_state, 0, ROT0, "Taito Corporation",                           "Full Throttle (Japan)", MACHINE_SUPPORTS_SAVE, layout_topspeed )

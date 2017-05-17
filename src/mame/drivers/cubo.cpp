@@ -314,6 +314,7 @@ routines :
 #include "includes/amiga.h"
 #include "imagedev/chd_cd.h"
 #include "machine/microtch.h"
+#include "speaker.h"
 
 
 /* set to 0 to use control panel with only buttons (as in quiz games) - joy is default in dispenser setup */
@@ -1023,7 +1024,7 @@ static INPUT_PORTS_START( mgprem11 )
 INPUT_PORTS_END
 
 
-static MACHINE_CONFIG_START( cubo, cubo_state )
+static MACHINE_CONFIG_START( cubo )
 
 	/* basic machine hardware */
 	MCFG_CPU_ADD("maincpu", M68EC020, amiga_state::CLK_28M_PAL / 2)

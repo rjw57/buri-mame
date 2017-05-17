@@ -18,10 +18,10 @@
 //  GLOBAL VARIABLES
 //**************************************************************************
 
-extern const device_type GOTTLIEB_SOUND_REV0;
-extern const device_type GOTTLIEB_SOUND_REV1;
-extern const device_type GOTTLIEB_SOUND_REV1_WITH_VOTRAX;
-extern const device_type GOTTLIEB_SOUND_REV2;
+DECLARE_DEVICE_TYPE(GOTTLIEB_SOUND_REV0,        gottlieb_sound_r0_device)
+DECLARE_DEVICE_TYPE(GOTTLIEB_SOUND_REV1,        gottlieb_sound_r1_device)
+DECLARE_DEVICE_TYPE(GOTTLIEB_SOUND_REV1_VOTRAX, gottlieb_sound_r1_with_votrax_device)
+DECLARE_DEVICE_TYPE(GOTTLIEB_SOUND_REV2,        gottlieb_sound_r2_device)
 
 
 
@@ -75,7 +75,6 @@ class gottlieb_sound_r1_device : public device_t, public device_mixer_interface
 public:
 	// construction/destruction
 	gottlieb_sound_r1_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
-	gottlieb_sound_r1_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock, bool populate_votrax);
 
 	// read/write
 	DECLARE_WRITE8_MEMBER( write );
@@ -88,6 +87,13 @@ public:
 	DECLARE_WRITE_LINE_MEMBER( votrax_request );
 
 protected:
+	gottlieb_sound_r1_device(
+			const machine_config &mconfig,
+			device_type type,
+			const char *tag,
+			device_t *owner,
+			uint32_t clock);
+
 	// device-level overrides
 	virtual machine_config_constructor device_mconfig_additions() const override;
 	virtual ioport_constructor device_input_ports() const override;
