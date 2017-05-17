@@ -7,7 +7,7 @@
 #include "emu.h"
 
 #include "bus/rs232/rs232.h"
-#include "cpu/g65816/g65816.h"
+#include "cpu/m6502/m65c02.h"
 #include "machine/6522via.h"
 #include "machine/mos6551.h"
 
@@ -34,7 +34,6 @@ public:
 
 	DECLARE_WRITE_LINE_MEMBER(mos6551_irq_w);
 	DECLARE_WRITE_LINE_MEMBER(via6522_irq_w);
-	DECLARE_WRITE8_MEMBER(via_pa_w);
 
 	required_device<cpu_device> m_maincpu;
 	required_device<mos6551_device> m_mos6551;
@@ -51,7 +50,7 @@ public:
 private:
 	void irqs_updated_() {
 		m_maincpu->set_input_line(
-			G65816_LINE_IRQ,
+			M65C02_IRQ_LINE,
 			m_irqs.val ? ASSERT_LINE : CLEAR_LINE);
 	}
 };
@@ -81,8 +80,8 @@ static DEVICE_INPUT_DEFAULTS_START( serial_port )
 	DEVICE_INPUT_DEFAULTS( "RS232_STOPBITS", 0xff, RS232_STOPBITS_1 )
 DEVICE_INPUT_DEFAULTS_END
 
-static MACHINE_CONFIG_START(borr, borr_state)
-	MCFG_CPU_ADD("maincpu", G65816, XTAL_2MHz)
+static MACHINE_CONFIG_START(borr)
+	MCFG_CPU_ADD("maincpu", M65C02, XTAL_2MHz)
 	MCFG_CPU_PROGRAM_MAP(borr_mem)
 
 	MCFG_DEVICE_ADD(MOS6551_TAG, MOS6551, 0)
@@ -104,7 +103,6 @@ static MACHINE_CONFIG_START(borr, borr_state)
 	MCFG_DEVICE_CARD_DEVICE_INPUT_DEFAULTS("pty", serial_port)
 
 	MCFG_DEVICE_ADD(VIA6522_TAG, VIA6522, XTAL_2MHz)
-	MCFG_VIA6522_WRITEPA_HANDLER(WRITE8(borr_state, via_pa_w))
 	MCFG_VIA6522_IRQ_HANDLER(WRITELINE(borr_state, via6522_irq_w))
 MACHINE_CONFIG_END
 
@@ -125,9 +123,5 @@ WRITE_LINE_MEMBER(borr_state::via6522_irq_w)
 	irqs_updated_();
 }
 
-WRITE8_MEMBER(borr_state::via_pa_w)
-{
-}
-
-/*    YEAR  NAME    PARENT  COMPAT   MACHINE    INPUT    CLASS         INIT    COMPANY                FULLNAME               FLAGS */
-COMP(2017,  borr,   0,      0,       borr,      borr,    driver_device,0,      "Rich Wareham", "Borr homebrew computer", MACHINE_TYPE_COMPUTER)
+/*    YEAR  NAME    PARENT  COMPAT   MACHINE    INPUT    STATE         INIT    COMPANY                FULLNAME               FLAGS */
+COMP(2017,  borr,   0,      0,       borr,      borr,    borr_state,   0,      "Rich Wareham", "Borr homebrew computer", MACHINE_TYPE_COMPUTER | MACHINE_NO_SOUND)
