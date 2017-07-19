@@ -1,7 +1,7 @@
 // license:BSD-3-Clause
 // copyright-holders:Rich Wareham
 /*
- * Borr driver.
+ * Odin driver.
  */
 
 #include "emu.h"
@@ -19,10 +19,10 @@ const char* UART1_TAG = "uart1";
 const int VIA6522_START = 0xDEF0;
 const int MOS6551_START = 0xDFFC;
 
-class borr_state : public driver_device
+class odin_state : public driver_device
 {
 public:
-	borr_state(const machine_config &mconfig,
+	odin_state(const machine_config &mconfig,
 	           device_type type, const char *tag) :
 	           driver_device(mconfig, type, tag),
 	           m_maincpu(*this, "maincpu"),
@@ -55,7 +55,7 @@ private:
 	}
 };
 
-static ADDRESS_MAP_START(borr_mem, AS_PROGRAM, 8, borr_state)
+static ADDRESS_MAP_START(odin_mem, AS_PROGRAM, 8, odin_state)
 	AM_RANGE(0x0000, 0xC000) AM_RAM
 	AM_RANGE(0xE000, 0xFFFF) AM_ROM AM_REGION("maincpu", 0)
 
@@ -68,7 +68,7 @@ static ADDRESS_MAP_START(borr_mem, AS_PROGRAM, 8, borr_state)
 		AM_DEVREADWRITE(VIA6522_TAG, via6522_device, read, write)
 ADDRESS_MAP_END
 
-static INPUT_PORTS_START(borr)
+static INPUT_PORTS_START(odin)
 INPUT_PORTS_END
 
 static DEVICE_INPUT_DEFAULTS_START( serial_port )
@@ -80,14 +80,14 @@ static DEVICE_INPUT_DEFAULTS_START( serial_port )
 	DEVICE_INPUT_DEFAULTS( "RS232_STOPBITS", 0xff, RS232_STOPBITS_1 )
 DEVICE_INPUT_DEFAULTS_END
 
-static MACHINE_CONFIG_START(borr)
+static MACHINE_CONFIG_START(odin)
 	MCFG_CPU_ADD("maincpu", M65C02, XTAL_2MHz)
-	MCFG_CPU_PROGRAM_MAP(borr_mem)
+	MCFG_CPU_PROGRAM_MAP(odin_mem)
 
 	MCFG_DEVICE_ADD(MOS6551_TAG, MOS6551, 0)
 	MCFG_MOS6551_XTAL(XTAL_1_8432MHz)
 	MCFG_MOS6551_TXD_HANDLER(DEVWRITELINE(UART1_TAG, rs232_port_device, write_txd))
-	MCFG_MOS6551_IRQ_HANDLER(WRITELINE(borr_state, mos6551_irq_w))
+	MCFG_MOS6551_IRQ_HANDLER(WRITELINE(odin_state, mos6551_irq_w))
 	MCFG_MOS6551_DTR_HANDLER(DEVWRITELINE(UART1_TAG, rs232_port_device, write_dtr))
 
 	MCFG_RS232_PORT_ADD(UART1_TAG, default_rs232_devices, nullptr)
@@ -103,25 +103,25 @@ static MACHINE_CONFIG_START(borr)
 	MCFG_DEVICE_CARD_DEVICE_INPUT_DEFAULTS("pty", serial_port)
 
 	MCFG_DEVICE_ADD(VIA6522_TAG, VIA6522, XTAL_2MHz)
-	MCFG_VIA6522_IRQ_HANDLER(WRITELINE(borr_state, via6522_irq_w))
+	MCFG_VIA6522_IRQ_HANDLER(WRITELINE(odin_state, via6522_irq_w))
 MACHINE_CONFIG_END
 
-ROM_START(borr)
+ROM_START(odin)
 	ROM_REGION(0x2000, "maincpu", 0)
-	ROM_LOAD("borros.bin", 0x0000, 0x2000, "")
+	ROM_LOAD("odinos.bin", 0x0000, 0x2000, "")
 ROM_END
 
-WRITE_LINE_MEMBER(borr_state::mos6551_irq_w)
+WRITE_LINE_MEMBER(odin_state::mos6551_irq_w)
 {
 	m_irqs.flags.mos6551 = (state != 0);
 	irqs_updated_();
 }
 
-WRITE_LINE_MEMBER(borr_state::via6522_irq_w)
+WRITE_LINE_MEMBER(odin_state::via6522_irq_w)
 {
 	m_irqs.flags.via6522 = (state != 0);
 	irqs_updated_();
 }
 
 /*    YEAR  NAME    PARENT  COMPAT   MACHINE    INPUT    STATE         INIT    COMPANY                FULLNAME               FLAGS */
-COMP(2017,  borr,   0,      0,       borr,      borr,    borr_state,   0,      "Rich Wareham", "Borr homebrew computer", MACHINE_TYPE_COMPUTER | MACHINE_NO_SOUND)
+COMP(2017,  odin,   0,      0,       odin,      odin,    odin_state,   0,      "Rich Wareham", "Odin homebrew computer", MACHINE_TYPE_COMPUTER | MACHINE_NO_SOUND)

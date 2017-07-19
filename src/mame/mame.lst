@@ -8883,9 +8883,6 @@ buggychlt                       // A22 (c) 1984 Taito Corporation + Tefri licens
 wmbullet                        //
 wmbulletf                       //
 
-@source:borr.cpp
-borr                            // Borr version 3
-
 @source:busicom.cpp
 busicom                         //
 
@@ -29733,6 +29730,9 @@ ob68k1a                         //
 
 @source:octopus.cpp
 octopus                         //
+
+@source:odin.cpp
+odin                            // Odin homebrew
 
 @source:odyssey2.cpp
 g7400                           // 1983 Videopac Plus G7400

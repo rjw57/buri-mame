@@ -86,7 +86,6 @@ bk.cpp
 bmjr.cpp
 bml3.cpp
 bob85.cpp
-borr.cpp
 bpmmicro.cpp
 br8641.cpp
 bullet.cpp
@@ -419,6 +418,7 @@ novag68k.cpp
 novagmcs48.cpp
 ob68k1a.cpp
 octopus.cpp
+odin.cpp
 odyssey2.cpp
 okean240.cpp
 ondra.cpp
