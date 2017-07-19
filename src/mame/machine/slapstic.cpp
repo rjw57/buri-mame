@@ -184,6 +184,9 @@
 #include "emu.h"
 #include "includes/slapstic.h"
 
+#include "cpu/m6800/m6800.h"
+#include "cpu/m68000/m68000.h"
+
 
 /*************************************
  *
@@ -1102,7 +1105,7 @@ void atari_slapstic_device::slapstic_log(running_machine &machine, offs_t offset
 			fprintf(slapsticlog, "------------------------------------\n");
 		last_time = time;
 
-		fprintf(slapsticlog, "%s: %04X B=%d ", machine.describe_context(), offset, current_bank);
+		fprintf(slapsticlog, "%s: %04X B=%d ", machine.describe_context().c_str(), offset, current_bank);
 		switch (state)
 		{
 			case DISABLED:

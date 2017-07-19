@@ -4,6 +4,11 @@
 
   Sharp SM590 MCU core implementation
 
+  TODO:
+  - finish SM590/SM595 emulation (NES/SNES CIC)
+
+  http://bitsavers.informatik.uni-stuttgart.de/pdf/sharp/_dataBooks/1990_Sharp_Microcomputers_Data_Book.pdf
+  pdf page 35/doc page 26 thru pdf page 44/doc page 35
 */
 
 #include "emu.h"
@@ -12,21 +17,21 @@
 
 
 // MCU types
-DEFINE_DEVICE_TYPE(SM590, sm590_device, "sm590", "SM590")
-//DEFINE_DEVICE_TYPE(SM591, sm591_device, "sm591", "SM591")
-//DEFINE_DEVICE_TYPE(SM595, sm595_device, "sm595", "SM595")
+DEFINE_DEVICE_TYPE(SM590, sm590_device, "sm590", "SM590") // 512x8 ROM, 32x4 RAM
+//DEFINE_DEVICE_TYPE(SM591, sm591_device, "sm591", "SM591") // 1kx8 ROM, 56x4 RAM
+//DEFINE_DEVICE_TYPE(SM595, sm595_device, "sm595", "SM595") // 768x8 ROM, 32x4 RAM
 
 // internal memory maps
 static ADDRESS_MAP_START(program_1x128x4, AS_PROGRAM, 8, sm510_base_device)
-	AM_RANGE(0x000, 0x1ff) AM_ROM 
+	AM_RANGE(0x000, 0x1ff) AM_ROM
 ADDRESS_MAP_END
 
 /*static ADDRESS_MAP_START(program_2x128x4, AS_PROGRAM, 8, sm510_base_device)
-	AM_RANGE(0x000, 0x3ff) AM_ROM 
+    AM_RANGE(0x000, 0x3ff) AM_ROM
 ADDRESS_MAP_END
 
 static ADDRESS_MAP_START(program_1x128x4_1x128x2, AS_PROGRAM, 8, sm510_base_device)
-	AM_RANGE(0x000, 0x2ff) AM_ROM 
+    AM_RANGE(0x000, 0x2ff) AM_ROM
 ADDRESS_MAP_END*/
 
 static ADDRESS_MAP_START(data_16x2x4, AS_DATA, 8, sm510_base_device)
@@ -36,10 +41,10 @@ ADDRESS_MAP_END
 
 /*
 static ADDRESS_MAP_START(data_16x3.5x4, AS_DATA, 8, sm510_base_device)
-	AM_RANGE(0x00, 0x0f) AM_RAM
-	AM_RANGE(0x10, 0x1f) AM_RAM
-	AM_RANGE(0x20, 0x2f) AM_RAM
-	AM_RANGE(0x30, 0x37) AM_RAM
+    AM_RANGE(0x00, 0x0f) AM_RAM
+    AM_RANGE(0x10, 0x1f) AM_RAM
+    AM_RANGE(0x20, 0x2f) AM_RAM
+    AM_RANGE(0x30, 0x37) AM_RAM
 ADDRESS_MAP_END
 */
 
@@ -50,12 +55,12 @@ sm590_device::sm590_device(const machine_config &mconfig, const char *tag, devic
 }
 
 //sm591_device::sm591_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock)
-//	: sm510_base_device(mconfig, SM591, tag, owner, clock, 4 /* stack levels */, 10 /* prg width */, ADDRESS_MAP_NAME(program_2x128x4), 6 /* data width */, ADDRESS_MAP_NAME(data_16x3.5x4))
+//  : sm510_base_device(mconfig, SM591, tag, owner, clock, 4 /* stack levels */, 10 /* prg width */, ADDRESS_MAP_NAME(program_2x128x4), 6 /* data width */, ADDRESS_MAP_NAME(data_16x3.5x4))
 //{
 //}
 
 //sm595_device::sm595_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock)
-//	: sm510_base_device(mconfig, SM595, tag, owner, clock, 4 /* stack levels */, 10 /* prg width */, ADDRESS_MAP_NAME(program_1x128x4_1x128x2), 5 /* data width */, ADDRESS_MAP_NAME(data_16x2x4))
+//  : sm510_base_device(mconfig, SM595, tag, owner, clock, 4 /* stack levels */, 10 /* prg width */, ADDRESS_MAP_NAME(program_1x128x4_1x128x2), 5 /* data width */, ADDRESS_MAP_NAME(data_16x2x4))
 //{
 //}
 
@@ -83,19 +88,31 @@ void sm590_device::device_reset()
 	m_halt = false;
 	m_sbm = false; // needed?
 	m_op = m_prev_op = 0;
-	do_branch(0, 0, 0);
+	reset_vector();
 	m_prev_pc = m_pc;
+	m_clk_div = 4; // 4 clock oscillations per cycle on SM59x, see datasheet page 30/pdf page 39
 
 	m_rports[0] = m_rports[1] = m_rports[2] = m_rports[3] = 0;
 	//m_write_r(0, 0, 0xff); // TODO: are the four ports zeroed on reset?
 }
 
 //-------------------------------------------------
-//  init overrides
+//  wake from suspend mode
 //-------------------------------------------------
-void sm590_device::init_divider() {} // doesn't have it
-void sm590_device::init_lcd_driver() {} // doesn't have it
-void sm590_device::init_melody() {} // doesn't have it
+bool sm590_device::wake_me_up()
+{
+	// in halt mode, wake up after R2.2 goes high
+	if (m_rports[2]&0x4)
+	{
+		m_halt = false;
+		do_branch(0, 1, 0); // field 0, page 1, step 0
+
+		standard_irq_callback(0);
+		return true;
+	}
+	else
+		return false;
+}
 
 //-------------------------------------------------
 //  execute

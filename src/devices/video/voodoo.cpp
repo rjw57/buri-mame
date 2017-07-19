@@ -937,23 +937,21 @@ TIMER_CALLBACK_MEMBER( voodoo_device::vblank_off_callback )
 	/* set internal state and call the client */
 	fbi.vblank = false;
 
-	// TODO: Vblank IRQ enable is VOODOO3 only?
-	if (vd_type >= TYPE_VOODOO_3)
+	// PCI Vblank IRQ enable is VOODOO2 and up
+	if (vd_type >= TYPE_VOODOO_2)
 	{
 		if (reg[intrCtrl].u & 0x8)       // call IRQ handler if VSYNC interrupt (falling) is enabled
 		{
 			reg[intrCtrl].u |= 0x200;        // VSYNC int (falling) active
-
-			if (!m_vblank.isnull())
-				m_vblank(false);
+			reg[intrCtrl].u &= ~0x80000000;
+			if (!m_pciint.isnull())
+				m_pciint(true);
 
 		}
 	}
-	else
-	{
-		if (!m_vblank.isnull())
-			m_vblank(false);
-	}
+	// External vblank handler
+	if (!m_vblank.isnull())
+		m_vblank(false);
 
 	/* go to the end of the next frame */
 	adjust_vblank_timer(this);
@@ -976,7 +974,7 @@ TIMER_CALLBACK_MEMBER( voodoo_device::vblank_callback )
 	fbi.vblank_count++;
 	if (fbi.vblank_count > 250)
 		fbi.vblank_count = 250;
-	if (LOG_VBLANK_SWAP) logerror("---- vblank count = %d", fbi.vblank_count);
+	if (LOG_VBLANK_SWAP) logerror("---- vblank count = %u swap = %u pending = %u", fbi.vblank_count, fbi.vblank_swap, fbi.vblank_swap_pending);
 	if (fbi.vblank_swap_pending)
 		if (LOG_VBLANK_SWAP) logerror(" (target=%d)", fbi.vblank_swap);
 	if (LOG_VBLANK_SWAP) logerror("\n");
@@ -993,22 +991,20 @@ TIMER_CALLBACK_MEMBER( voodoo_device::vblank_callback )
 	/* set internal state and call the client */
 	fbi.vblank = true;
 
-	// TODO: Vblank IRQ enable is VOODOO3 only?
-	if (vd_type >= TYPE_VOODOO_3)
+	// PCI Vblank IRQ enable is VOODOO2 and up
+	if (vd_type >= TYPE_VOODOO_2)
 	{
 		if (reg[intrCtrl].u & 0x4)       // call IRQ handler if VSYNC interrupt (rising) is enabled
 		{
 			reg[intrCtrl].u |= 0x100;        // VSYNC int (rising) active
-
-			if (!m_vblank.isnull())
-				m_vblank(true);
+			reg[intrCtrl].u &= ~0x80000000;
+			if (!m_pciint.isnull())
+				m_pciint(true);
 		}
 	}
-	else
-	{
-		if (!m_vblank.isnull())
-			m_vblank(true);
-	}
+	// External vblank handler
+	if (!m_vblank.isnull())
+		m_vblank(true);
 }
 
 
@@ -1921,6 +1917,7 @@ uint32_t voodoo_device::cmdfifo_execute(voodoo_device *vd, cmdfifo_info *f)
 				case 1:     // Planar YUV
 				{
 					// TODO
+					if (LOG_CMDFIFO) vd->logerror("  PACKET TYPE 5: Planar YUV count=%d dest=%08X bd2=%X bdN=%X\n", count, target, (command >> 26) & 15, (command >> 22) & 15);
 
 					/* just update the pointers for now */
 					for (i = 0; i < count; i++)
@@ -2188,6 +2185,15 @@ int32_t voodoo_device::register_w(voodoo_device *vd, offs_t offset, uint32_t dat
 	/* switch off the register */
 	switch (regnum)
 	{
+		case intrCtrl:
+			vd->reg[regnum].u = data;
+			// Setting bit 31 clears the PCI interrupts
+			if (data & 0x80000000) {
+				// Clear pci interrupt
+				if (!vd->m_pciint.isnull())
+					vd->m_pciint(false);
+			}
+			break;
 		/* Vertex data is 12.4 formatted fixed point */
 		case fvertexAx:
 			data = float_to_int32(data, 4);
@@ -2490,14 +2496,16 @@ int32_t voodoo_device::register_w(voodoo_device *vd, offs_t offset, uint32_t dat
 
 		case userIntrCMD:
 			poly_wait(vd->poly, vd->regnames[regnum]);
-			//fatalerror("userIntrCMD\n");
+			// Bit 5 of intrCtrl enables user interrupts
+			if (vd->reg[intrCtrl].u & 0x20) {
+				// Bits 19:12 are set to cmd 9:2, bit 11 is user interrupt flag
+				vd->reg[intrCtrl].u |= ((data << 10) & 0x000ff000) | 0x800;
+				vd->reg[intrCtrl].u &= ~0x80000000;
 
-			vd->reg[intrCtrl].u |= 0x1800;
-			vd->reg[intrCtrl].u &= ~0x80000000;
-
-			// TODO: rename vblank_client for less confusion?
-			if (!vd->m_vblank.isnull())
-				vd->m_vblank(true);
+				// Signal pci interrupt handler
+				if (!vd->m_pciint.isnull())
+					vd->m_pciint(true);
+			}
 			break;
 
 		/* gamma table access -- Voodoo/Voodoo2 only */
@@ -3247,7 +3255,7 @@ int32_t voodoo_device::lfb_w(voodoo_device* vd, offs_t offset, uint32_t data, ui
 			depth += scry * vd->fbi.rowpixels;
 
 		/* compute dithering */
-		COMPUTE_DITHER_POINTERS(vd->reg[fbzMode].u, y);
+		COMPUTE_DITHER_POINTERS(vd->reg[fbzMode].u, y, vd->reg[fogMode].u);
 
 		/* loop over up to two pixels */
 		for (pix = 0; mask; pix++)
@@ -3901,18 +3909,37 @@ uint32_t voodoo_device::register_r(voodoo_device *vd, offs_t offset)
 				result = vd->dac.read_result;
 			break;
 
-		/* return the current scanline for now */
+		/* return the current visible scanline */
 		case vRetrace:
 
 			/* eat some cycles since people like polling here */
 			if (EAT_CYCLES) vd->cpu->execute().eat_cycles(10);
-			result = vd->screen->vpos();
+			// Return 0 if vblank is active
+			if (vd->fbi.vblank) {
+				result = 0;
+			}
+			else {
+				// Want screen position from vblank off
+				result = vd->screen->vpos();
+			}
 			break;
 
-		/* reserved area in the TMU read by the Vegas startup sequence */
+		/* return visible horizontal and vertical positions. Read by the Vegas startup sequence */
 		case hvRetrace:
-			result = 0x200 << 16;   /* should be between 0x7b and 0x267 */
-			result |= 0x80;         /* should be between 0x17 and 0x103 */
+			/* eat some cycles since people like polling here */
+			if (EAT_CYCLES) vd->cpu->execute().eat_cycles(10);
+			//result = 0x200 << 16;   /* should be between 0x7b and 0x267 */
+			//result |= 0x80;         /* should be between 0x17 and 0x103 */
+			// Return 0 if vblank is active
+			if (vd->fbi.vblank) {
+				result = 0;
+			}
+			else {
+				// Want screen position from vblank off
+				result = vd->screen->vpos();
+			}
+			// Hpos
+			result |= vd->screen->hpos() << 16;
 			break;
 
 		/* cmdFifo -- Voodoo2 only */
@@ -4373,7 +4400,7 @@ static void blit_2d(voodoo_device *vd, uint32_t data)
 		{
 			// TODO
 #if LOG_BANSHEE_2D
-			logerror("   blit_2d:screen_to_screen: src X %d, src Y %d\n", data & 0xfff, (data >> 16) & 0xfff);
+			vd->logerror("   blit_2d:screen_to_screen: src X %d, src Y %d\n", data & 0xfff, (data >> 16) & 0xfff);
 #endif
 			break;
 		}
@@ -4390,7 +4417,7 @@ static void blit_2d(voodoo_device *vd, uint32_t data)
 			addr += (vd->banshee.blt_dst_y * vd->banshee.blt_dst_stride) + (vd->banshee.blt_dst_x * vd->banshee.blt_dst_bpp);
 
 #if LOG_BANSHEE_2D
-			logerror("   blit_2d:host_to_screen: %08x -> %08x, %d, %d\n", data, addr, vd->banshee.blt_dst_x, vd->banshee.blt_dst_y);
+			vd->logerror("   blit_2d:host_to_screen: %08x -> %08x, %d, %d\n", data, addr, vd->banshee.blt_dst_x, vd->banshee.blt_dst_y);
 #endif
 
 			switch (vd->banshee.blt_dst_bpp)
@@ -4462,7 +4489,7 @@ int32_t voodoo_device::banshee_2d_w(voodoo_device *vd, offs_t offset, uint32_t d
 	{
 		case banshee2D_command:
 #if LOG_BANSHEE_2D
-			logerror("   2D:command: cmd %d, ROP0 %02X\n", data & 0xf, data >> 24);
+			vd->logerror("   2D:command: cmd %d, ROP0 %02X\n", data & 0xf, data >> 24);
 #endif
 
 			vd->banshee.blt_src_x        = vd->banshee.blt_regs[banshee2D_srcXY] & 0xfff;
@@ -4504,105 +4531,105 @@ int32_t voodoo_device::banshee_2d_w(voodoo_device *vd, offs_t offset, uint32_t d
 
 		case banshee2D_colorBack:
 #if LOG_BANSHEE_2D
-			logerror("   2D:colorBack: %08X\n", data);
+			vd->logerror("   2D:colorBack: %08X\n", data);
 #endif
 			vd->banshee.blt_regs[banshee2D_colorBack] = data;
 			break;
 
 		case banshee2D_colorFore:
 #if LOG_BANSHEE_2D
-			logerror("   2D:colorFore: %08X\n", data);
+			vd->logerror("   2D:colorFore: %08X\n", data);
 #endif
 			vd->banshee.blt_regs[banshee2D_colorFore] = data;
 			break;
 
 		case banshee2D_srcBaseAddr:
 #if LOG_BANSHEE_2D
-			logerror("   2D:srcBaseAddr: %08X, %s\n", data & 0xffffff, data & 0x80000000 ? "tiled" : "non-tiled");
+			vd->logerror("   2D:srcBaseAddr: %08X, %s\n", data & 0xffffff, data & 0x80000000 ? "tiled" : "non-tiled");
 #endif
 			vd->banshee.blt_regs[banshee2D_srcBaseAddr] = data;
 			break;
 
 		case banshee2D_dstBaseAddr:
 #if LOG_BANSHEE_2D
-			logerror("   2D:dstBaseAddr: %08X, %s\n", data & 0xffffff, data & 0x80000000 ? "tiled" : "non-tiled");
+			vd->logerror("   2D:dstBaseAddr: %08X, %s\n", data & 0xffffff, data & 0x80000000 ? "tiled" : "non-tiled");
 #endif
 			vd->banshee.blt_regs[banshee2D_dstBaseAddr] = data;
 			break;
 
 		case banshee2D_srcSize:
 #if LOG_BANSHEE_2D
-			logerror("   2D:srcSize: %d, %d\n", data & 0xfff, (data >> 16) & 0xfff);
+			vd->logerror("   2D:srcSize: %d, %d\n", data & 0xfff, (data >> 16) & 0xfff);
 #endif
 			vd->banshee.blt_regs[banshee2D_srcSize] = data;
 			break;
 
 		case banshee2D_dstSize:
 #if LOG_BANSHEE_2D
-			logerror("   2D:dstSize: %d, %d\n", data & 0xfff, (data >> 16) & 0xfff);
+			vd->logerror("   2D:dstSize: %d, %d\n", data & 0xfff, (data >> 16) & 0xfff);
 #endif
 			vd->banshee.blt_regs[banshee2D_dstSize] = data;
 			break;
 
 		case banshee2D_srcXY:
 #if LOG_BANSHEE_2D
-			logerror("   2D:srcXY: %d, %d\n", data & 0xfff, (data >> 16) & 0xfff);
+			vd->logerror("   2D:srcXY: %d, %d\n", data & 0xfff, (data >> 16) & 0xfff);
 #endif
 			vd->banshee.blt_regs[banshee2D_srcXY] = data;
 			break;
 
 		case banshee2D_dstXY:
 #if LOG_BANSHEE_2D
-			logerror("   2D:dstXY: %d, %d\n", data & 0xfff, (data >> 16) & 0xfff);
+			vd->logerror("   2D:dstXY: %d, %d\n", data & 0xfff, (data >> 16) & 0xfff);
 #endif
 			vd->banshee.blt_regs[banshee2D_dstXY] = data;
 			break;
 
 		case banshee2D_srcFormat:
 #if LOG_BANSHEE_2D
-			logerror("   2D:srcFormat: str %d, fmt %d, packing %d\n", data & 0x3fff, (data >> 16) & 0xf, (data >> 22) & 0x3);
+			vd->logerror("   2D:srcFormat: str %d, fmt %d, packing %d\n", data & 0x3fff, (data >> 16) & 0xf, (data >> 22) & 0x3);
 #endif
 			vd->banshee.blt_regs[banshee2D_srcFormat] = data;
 			break;
 
 		case banshee2D_dstFormat:
 #if LOG_BANSHEE_2D
-			logerror("   2D:dstFormat: str %d, fmt %d\n", data & 0x3fff, (data >> 16) & 0xf);
+			vd->logerror("   2D:dstFormat: str %d, fmt %d\n", data & 0x3fff, (data >> 16) & 0xf);
 #endif
 			vd->banshee.blt_regs[banshee2D_dstFormat] = data;
 			break;
 
 		case banshee2D_clip0Min:
 #if LOG_BANSHEE_2D
-			logerror("   2D:clip0Min: %d, %d\n", data & 0xfff, (data >> 16) & 0xfff);
+			vd->logerror("   2D:clip0Min: %d, %d\n", data & 0xfff, (data >> 16) & 0xfff);
 #endif
 			vd->banshee.blt_regs[banshee2D_clip0Min] = data;
 			break;
 
 		case banshee2D_clip0Max:
 #if LOG_BANSHEE_2D
-			logerror("   2D:clip0Max: %d, %d\n", data & 0xfff, (data >> 16) & 0xfff);
+			vd->logerror("   2D:clip0Max: %d, %d\n", data & 0xfff, (data >> 16) & 0xfff);
 #endif
 			vd->banshee.blt_regs[banshee2D_clip0Max] = data;
 			break;
 
 		case banshee2D_clip1Min:
 #if LOG_BANSHEE_2D
-			logerror("   2D:clip1Min: %d, %d\n", data & 0xfff, (data >> 16) & 0xfff);
+			vd->logerror("   2D:clip1Min: %d, %d\n", data & 0xfff, (data >> 16) & 0xfff);
 #endif
 			vd->banshee.blt_regs[banshee2D_clip1Min] = data;
 			break;
 
 		case banshee2D_clip1Max:
 #if LOG_BANSHEE_2D
-			logerror("   2D:clip1Max: %d, %d\n", data & 0xfff, (data >> 16) & 0xfff);
+			vd->logerror("   2D:clip1Max: %d, %d\n", data & 0xfff, (data >> 16) & 0xfff);
 #endif
 			vd->banshee.blt_regs[banshee2D_clip1Max] = data;
 			break;
 
 		case banshee2D_rop:
 #if LOG_BANSHEE_2D
-			logerror("   2D:rop: %d, %d, %d\n",  data & 0xff, (data >> 8) & 0xff, (data >> 16) & 0xff);
+			vd->logerror("   2D:rop: %d, %d, %d\n",  data & 0xff, (data >> 8) & 0xff, (data >> 16) & 0xff);
 #endif
 			vd->banshee.blt_regs[banshee2D_rop] = data;
 			break;
@@ -4956,6 +4983,7 @@ void voodoo_device::device_start()
 	freq = clock();
 	m_vblank.resolve();
 	m_stall.resolve();
+	m_pciint.resolve();
 
 	/* create a multiprocessor work queue */
 	poly = poly_alloc(machine(), 64, sizeof(poly_extra_data), 0);
@@ -5767,6 +5795,7 @@ voodoo_device::voodoo_device(const machine_config &mconfig, device_type type, co
 	, m_cputag(nullptr)
 	, m_vblank(*this)
 	, m_stall(*this)
+	, m_pciint(*this)
 	, vd_type(vdt)
 {
 }

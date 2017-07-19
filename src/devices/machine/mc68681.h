@@ -55,7 +55,6 @@ public:
 	// device-level overrides
 	virtual void device_start() override;
 	virtual void device_reset() override;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
 
 	// device_serial overrides
 	virtual void rcv_complete() override;    // Rx completed receiving byte
@@ -147,7 +146,7 @@ protected:
 	// device-level overrides
 	virtual void device_start() override;
 	virtual void device_reset() override;
-	virtual machine_config_constructor device_mconfig_additions() const override;
+	virtual void device_add_mconfig(machine_config &config) override;
 
 	devcb_write_line write_irq, write_a_tx, write_b_tx, write_c_tx, write_d_tx;
 	devcb_read8 read_inport;
@@ -226,7 +225,7 @@ public:
 	virtual DECLARE_WRITE8_MEMBER(write) override;
 
 protected:
-	virtual machine_config_constructor device_mconfig_additions() const override;
+	virtual void device_add_mconfig(machine_config &config) override;
 
 private:
 };

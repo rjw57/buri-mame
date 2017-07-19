@@ -21,15 +21,17 @@
     Aero Blaster (32)
     After Burner II (46)
     Alice in Wonderland (61)
-  * Ankoku Densetu (Legendary Axe II)
+    Ankoku Densetsu (Legendary Axe II) (33)
     Armed-F (?)
     Ballistix (186)
     Barunba (39)
-  * Batman
+    Batman (30)
     Be Ball (93)
   * Blodia
     Bomberman (71)
     Bull Fight (185)
+    Burning Angels (49)
+    Cadash (203)
     Chozetsurinjin Beraboh Man (Super Foolish Man) (27)
     Chuka Taisen (37)
     Columns (90)
@@ -42,9 +44,9 @@
   * Die Hard
     Dodge Ball (194)
     Doraemon Meikyuu Daisakusen (20)
-  * Doraemon II
+    Doreamon - Nobita's Dorabian Night (Doraemon II, 43)
     Down Load (43)
-    Dragon Egg! (137)
+    Dragon Egg! (98)
     Dragon Saber (65)
     Dragon Spirit (?)
     Drop Rock Hora Hora (12)
@@ -56,6 +58,7 @@
     Final Match Tennis (62)
     Formation Soccer (1)
     Gomola Speed (27)
+    Gradius (187)
     Gunhed (148)
     Hana Taka Daka (Super Long Nose Goblin) (6)
   * Hatris
@@ -65,7 +68,8 @@
     Kato & Ken (42)
     Kiki Kaikai (120)
     Legend Of Hero Tomna (56)
-    Makyo Densetsu - The Legenary Axe (40)
+    Makyo Densetsu - The Legendary Axe (40)
+    Mashin Eiyuden Wataru (27)
     Mesopotamia (197)
     Mizubaku Daibouken Liquid Kids (10) (marketed as "Parasol Stars II")
     Mr. Heli (23)
@@ -92,7 +96,7 @@
     R-Type II (61)
   * Rabio Lepus Special
     Raiden (111)
-    Rastan Saga II (?)
+    Rastan Saga II (33, possibly incorrect riser)
     Saigo no Nindou (44)
     Salamander (184)
     Shinobi (5)
@@ -111,6 +115,7 @@
     Thunder Blade (34)
   * Tiger Road
   * Titan
+    Toilet Kids (196)
     Toy Shop Boys (51)
     Tricky (42)
   * TV Sports
@@ -120,6 +125,7 @@
     Volfied (68)
     W-Ring (21)
     Winning Shot (28)
+    World Jockey (202)
     Xevious (?)
 
     Rumored games:
